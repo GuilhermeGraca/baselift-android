@@ -14,3 +14,7 @@
 .cxx
 local.properties
 /notas.md
+
+# Ficheiros e imagens de demonstração (não versionados no Git)
+MockDataInjector.kt
+/app/src/main/assets/demo_images/
