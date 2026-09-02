@@ -18,3 +18,4 @@ local.properties
 # Ficheiros e imagens de demonstração (não versionados no Git)
 MockDataInjector.kt
 /app/src/main/assets/demo_images/
+implementation_plan.md
