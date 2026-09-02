@@ -120,7 +120,7 @@ fun AppNavigation(
         val startDestination = remember(isLoaded, hasUser, isRecalibrating) {
             when {
                 isRecalibrating -> Routes.ONBOARDING  // utilizador clicou explicitamente em "Recalibrate"
-                hasUser -> Routes.DASHBOARD            // utilizador já existe, ir direto para o dashboard
+                hasUser -> Routes.INSIGHTS             // utilizador já existe, ir direto para insights
                 else -> Routes.ONBOARDING              // primeiro uso, sem dados
             }
         }
