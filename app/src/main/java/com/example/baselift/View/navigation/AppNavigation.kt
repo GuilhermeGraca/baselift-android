@@ -101,6 +101,7 @@ fun AppNavigation(
 
     val isLoaded by onboardingViewModel.isLoaded.collectAsStateWithLifecycle()
     val isRecalibrating by onboardingViewModel.isRecalibrating.collectAsStateWithLifecycle()
+    val hasUser by onboardingViewModel.hasUser.collectAsStateWithLifecycle()
     val userState by progressViewModel.user.collectAsStateWithLifecycle()
     var resetType by remember { mutableStateOf<ResetType?>(null) }
 
@@ -116,8 +117,12 @@ fun AppNavigation(
     if (!isLoaded) {
         PremiumSplashScreen()
     } else {
-        val startDestination = remember {
-            if (isRecalibrating) Routes.INSIGHTS else Routes.ONBOARDING
+        val startDestination = remember(isLoaded, hasUser, isRecalibrating) {
+            when {
+                isRecalibrating -> Routes.ONBOARDING  // utilizador clicou explicitamente em "Recalibrate"
+                hasUser -> Routes.DASHBOARD            // utilizador já existe, ir direto para o dashboard
+                else -> Routes.ONBOARDING              // primeiro uso, sem dados
+            }
         }
         Scaffold(
             topBar = {

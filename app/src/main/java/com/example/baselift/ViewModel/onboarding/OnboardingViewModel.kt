@@ -24,6 +24,9 @@ class OnboardingViewModel(
     private val _isRecalibrating = MutableStateFlow(false)
     val isRecalibrating: StateFlow<Boolean> = _isRecalibrating.asStateFlow()
 
+    private val _hasUser = MutableStateFlow(false)
+    val hasUser: StateFlow<Boolean> = _hasUser.asStateFlow()
+
     private val _isLoaded = MutableStateFlow(false)
     val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
 
@@ -34,12 +37,13 @@ class OnboardingViewModel(
             userRepository.getUser().collect { user ->
                 if (user != null) {
                     _uiState.value = user
-                    _isRecalibrating.value = true
+                    _hasUser.value = true
                     if (oldWeight == null) {
                         oldWeight = user.weight
                     }
                 } else {
                     _uiState.value = UserEntity()
+                    _hasUser.value = false
                     _isRecalibrating.value = false
                     oldWeight = null
                 }
@@ -115,6 +119,7 @@ class OnboardingViewModel(
                 )
             }
             oldWeight = newUser.weight
+            _isRecalibrating.value = false
         }
     }
 }
