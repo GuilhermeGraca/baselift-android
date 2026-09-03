@@ -112,6 +112,8 @@ BaseLift is an all-in-one mobile application designed to centralize workout trac
 
 * **Modern Android Architecture**: Built using the MVVM pattern with a clean Repository abstraction to isolate local database operations from the UI layer.
 * **Reactive State Management**: Implemented declarative UI flows in Jetpack Compose driven by Kotlin Coroutines, Flow, and StateFlow.
+* **Comprehensive Testing Suite**: Built over 70 unit and integration tests covering pure domain logic, Room DAOs, ViewModels (via Fake Repositories for ultra-fast JVM execution), and MockK for isolated complex rules (e.g., PR calculation).
+* **AI-Assisted Test Automation**: The testing suite was extensively authored with AI assistance. This served as a profound lesson in modern development: delegating repetitive test creation to AI is one of its most powerful use cases, guaranteeing massive edge-case coverage, enforcing strict logical patterns, and dramatically increasing development speed.
 * **Relational SQLite Schema**: Designed custom Room database entities, foreign key relationships, and migration paths for workouts, exercises, sets, and nutrition logs.
 * **Custom Graphics Rendering**: Developed interactive charts and progress visualizations from scratch using Jetpack Compose Canvas.
 * **User Experience Planning**: Designed an intuitive onboarding flow, clear navigation, and responsive layouts tailored for daily gym use.
