@@ -19,3 +19,6 @@ local.properties
 MockDataInjector.kt
 /app/src/main/assets/demo_images/
 implementation_plan.md
+# Ignorar ficheiros de configuração local do Android Studio
+/.idea/deploymentTargetDropDown.xml
+/.idea/deploymentTargetSelector.xml
