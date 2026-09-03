@@ -41,7 +41,7 @@ data class WorkoutUiState(
     val isLoading: Boolean = true
 )
 
-class WorkoutViewModel(private val repository: WorkoutRepository) : ViewModel() {
+class WorkoutViewModel(private val repository: com.example.baselift.Model.repository.IWorkoutRepository) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkoutUiState())
     val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
@@ -259,7 +259,9 @@ class WorkoutViewModel(private val repository: WorkoutRepository) : ViewModel() 
     }
 }
 
-class WorkoutViewModelFactory(private val repository: WorkoutRepository) : ViewModelProvider.Factory {
+class WorkoutViewModelFactory(
+    private val repository: com.example.baselift.Model.repository.IWorkoutRepository
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(WorkoutViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")

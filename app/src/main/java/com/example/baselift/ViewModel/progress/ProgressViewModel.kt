@@ -18,8 +18,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ProgressViewModel(
-    private val progressRepository: ProgressRepository,
-    private val userRepository: UserRepository
+    private val progressRepository: com.example.baselift.Model.repository.IProgressRepository,
+    private val userRepository: com.example.baselift.Model.repository.IUserRepository
 ) : ViewModel() {
 
     val user: StateFlow<UserEntity?> = userRepository.getUser()
@@ -155,8 +155,8 @@ class ProgressViewModel(
 }
 
 class ProgressViewModelFactory(
-    private val progressRepository: ProgressRepository,
-    private val userRepository: UserRepository
+    private val progressRepository: com.example.baselift.Model.repository.IProgressRepository,
+    private val userRepository: com.example.baselift.Model.repository.IUserRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ProgressViewModel::class.java)) {

@@ -20,10 +20,10 @@ interface AppContainer {
     // Expõe a base de dados e os repositórios
     // para que possam ser injetados nas classes
     val database: AppDatabase
-    val userRepository: UserRepository
-    val progressRepository: ProgressRepository
-    val workoutRepository: com.example.baselift.Model.repository.WorkoutRepository
-    val nutritionRepository: NutritionRepository
+    val userRepository: com.example.baselift.Model.repository.IUserRepository
+    val progressRepository: com.example.baselift.Model.repository.IProgressRepository
+    val workoutRepository: com.example.baselift.Model.repository.IWorkoutRepository
+    val nutritionRepository: com.example.baselift.Model.repository.INutritionRepository
 }
 
 /**
@@ -39,19 +39,19 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     // Repositórios
-    override val userRepository: UserRepository by lazy {
+    override val userRepository: com.example.baselift.Model.repository.IUserRepository by lazy {
         UserRepository(database.userDao())
     }
 
-    override val progressRepository: ProgressRepository by lazy {
+    override val progressRepository: com.example.baselift.Model.repository.IProgressRepository by lazy {
         ProgressRepository(database.weightLogDao(), database.photoLogDao())
     }
 
-    override val workoutRepository: com.example.baselift.Model.repository.WorkoutRepository by lazy {
+    override val workoutRepository: com.example.baselift.Model.repository.IWorkoutRepository by lazy {
         com.example.baselift.Model.repository.WorkoutRepository(database.workoutDao())
     }
 
-    override val nutritionRepository: NutritionRepository by lazy {
+    override val nutritionRepository: com.example.baselift.Model.repository.INutritionRepository by lazy {
         NutritionRepository(database.nutritionDao())
     }
 }

@@ -39,8 +39,8 @@ data class NutritionUiState(
 
 // modelo de vista responsável pela aba de nutrição
 class NutritionViewModel(
-    private val nutritionRepository: NutritionRepository,
-    private val userRepository: UserRepository
+    private val nutritionRepository: com.example.baselift.Model.repository.INutritionRepository,
+    private val userRepository: com.example.baselift.Model.repository.IUserRepository
 ) : ViewModel() {
 
     private val refreshTrigger = MutableStateFlow(System.currentTimeMillis())
@@ -151,8 +151,8 @@ class NutritionViewModel(
 
 // fábrica para instanciar o modelo de vista
 class NutritionViewModelFactory(
-    private val nutritionRepository: NutritionRepository,
-    private val userRepository: UserRepository
+    private val nutritionRepository: com.example.baselift.Model.repository.INutritionRepository,
+    private val userRepository: com.example.baselift.Model.repository.IUserRepository
 ) : androidx.lifecycle.ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(NutritionViewModel::class.java)) {

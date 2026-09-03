@@ -6,30 +6,44 @@ import com.example.baselift.Model.local.entity.NutritionLogEntity
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 
-// abstração para o repositório de nutrição
-class NutritionRepository(private val nutritionDao: NutritionDao) {
+/**
+ * Interface do repositório de nutrição.
+ * Permite criar implementações fake para testes.
+ */
+interface INutritionRepository {
+    suspend fun insertNutritionLog(log: NutritionLogEntity)
+    suspend fun deleteNutritionLog(log: NutritionLogEntity)
+    suspend fun resetTodayLogs()
+    fun getTodayLogs(): Flow<List<NutritionLogEntity>>
+    suspend fun insertMealTemplate(template: MealTemplateEntity)
+    suspend fun deleteMealTemplate(template: MealTemplateEntity)
+    fun getAllMealTemplates(): Flow<List<MealTemplateEntity>>
+    fun getAllNutritionLogs(): Flow<List<NutritionLogEntity>>
+    suspend fun clearAllNutritionData()
+}
+
+/**
+ * Implementação real que delega para o NutritionDao (Room).
+ */
+class NutritionRepository(private val nutritionDao: NutritionDao) : INutritionRepository {
 
     // --- LOGS DIÁRIOS ---
 
-    // inserir um novo registo
-    suspend fun insertNutritionLog(log: NutritionLogEntity) {
+    override suspend fun insertNutritionLog(log: NutritionLogEntity) {
         nutritionDao.insertNutritionLog(log)
     }
 
-    // apagar um registo específico
-    suspend fun deleteNutritionLog(log: NutritionLogEntity) {
+    override suspend fun deleteNutritionLog(log: NutritionLogEntity) {
         nutritionDao.deleteNutritionLog(log)
     }
 
-    // apagar todos os registos do dia atual
-    suspend fun resetTodayLogs() {
+    override suspend fun resetTodayLogs() {
         val startOfDay = getStartOfDayTimestamp()
         val endOfDay = getEndOfDayTimestamp()
         nutritionDao.deleteLogsInTimeRange(startOfDay, endOfDay)
     }
 
-    // obter um fluxo contínuo dos registos do dia atual
-    fun getTodayLogs(): Flow<List<NutritionLogEntity>> {
+    override fun getTodayLogs(): Flow<List<NutritionLogEntity>> {
         val startOfDay = getStartOfDayTimestamp()
         val endOfDay = getEndOfDayTimestamp()
         return nutritionDao.getLogsForTimeRange(startOfDay, endOfDay)
@@ -37,22 +51,21 @@ class NutritionRepository(private val nutritionDao: NutritionDao) {
 
     // --- TEMPLATES DE REFEIÇÕES ---
 
-    suspend fun insertMealTemplate(template: MealTemplateEntity) {
+    override suspend fun insertMealTemplate(template: MealTemplateEntity) {
         nutritionDao.insertMealTemplate(template)
     }
 
-    suspend fun deleteMealTemplate(template: MealTemplateEntity) {
+    override suspend fun deleteMealTemplate(template: MealTemplateEntity) {
         nutritionDao.deleteMealTemplate(template)
     }
 
-    fun getAllMealTemplates(): Flow<List<MealTemplateEntity>> {
+    override fun getAllMealTemplates(): Flow<List<MealTemplateEntity>> {
         return nutritionDao.getAllMealTemplates()
     }
 
     // --- DASHBOARD ---
 
-    // todos os logs de nutrição (para streak e calendário)
-    fun getAllNutritionLogs() = nutritionDao.getAllNutritionLogs()
+    override fun getAllNutritionLogs() = nutritionDao.getAllNutritionLogs()
 
     // funções auxiliares para calcular limites do dia atual
     private fun getStartOfDayTimestamp(): Long {
@@ -73,8 +86,9 @@ class NutritionRepository(private val nutritionDao: NutritionDao) {
         return calendar.timeInMillis
     }
 
-    suspend fun clearAllNutritionData() {
+    override suspend fun clearAllNutritionData() {
         nutritionDao.clearNutritionLogsTable()
         nutritionDao.clearMealTemplatesTable()
     }
 }
+

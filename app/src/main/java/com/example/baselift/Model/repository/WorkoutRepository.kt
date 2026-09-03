@@ -7,28 +7,60 @@ import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import kotlinx.coroutines.flow.Flow
 
-class WorkoutRepository(private val workoutDao: WorkoutDao) {
+/**
+ * Interface do repositório de treino.
+ * Permite criar implementações fake para testes.
+ */
+interface IWorkoutRepository {
+    val allWorkouts: Flow<List<WorkoutEntity>>
+    val allExercises: Flow<List<ExerciseEntity>>
+    suspend fun createWorkout(name: String, orderIndex: Int = 0): Int
+    suspend fun deleteWorkout(workout: WorkoutEntity)
+    fun getExercisesForWorkout(workoutId: Int): Flow<List<ExerciseEntity>>
+    suspend fun createExercise(workoutId: Int, name: String, equipment: String, muscleGroups: String, orderIndex: Int = 0)
+    suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String)
+    suspend fun deleteExercise(exercise: ExerciseEntity)
+    suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int)
+    suspend fun addSet(exercise: ExerciseEntity)
+    fun getActiveSessionFlow(workoutId: Int): Flow<WorkoutSessionEntity?>
+    suspend fun startOrGetSession(workoutId: Int): WorkoutSessionEntity
+    suspend fun finalizeSession(session: WorkoutSessionEntity)
+    fun getSetsForSession(sessionId: Int): Flow<List<SetLogEntity>>
+    suspend fun getPreviousSet(exerciseId: Int, setNumber: Int): SetLogEntity?
+    suspend fun checkPR(exerciseId: Int, weight: Float, reps: Int): String
+    suspend fun logSet(sessionId: Int, exerciseId: Int, setNumber: Int, weight: Float, reps: Int, isCompleted: Boolean, existingSetId: Int = 0)
+    fun getAllCompletedSessions(): Flow<List<WorkoutSessionEntity>>
+    fun getAllCompletedSetLogs(): Flow<List<SetLogEntity>>
+    fun getCompletedSetLogsForExercise(exerciseId: Int): Flow<List<SetLogEntity>>
+    fun getCompletedSessionsForWorkout(workoutId: Int): Flow<List<WorkoutSessionEntity>>
+    suspend fun clearAllWorkoutData()
+}
+
+/**
+ * Implementação real que delega para o WorkoutDao (Room).
+ */
+class WorkoutRepository(private val workoutDao: WorkoutDao) : IWorkoutRepository {
 
     // --- WORKOUT TEMPLATES ---
-    val allWorkouts: Flow<List<WorkoutEntity>> = workoutDao.getAllWorkouts()
+    override val allWorkouts: Flow<List<WorkoutEntity>> = workoutDao.getAllWorkouts()
 
-    suspend fun createWorkout(name: String, orderIndex: Int = 0): Int {
+    override suspend fun createWorkout(name: String, orderIndex: Int): Int {
         val workout = WorkoutEntity(name = name, orderIndex = orderIndex)
         return workoutDao.insertWorkout(workout).toInt()
     }
 
-    suspend fun deleteWorkout(workout: WorkoutEntity) {
+    override suspend fun deleteWorkout(workout: WorkoutEntity) {
         workoutDao.deleteWorkout(workout)
     }
 
     // --- EXERCISES ---
-    val allExercises: Flow<List<ExerciseEntity>> = workoutDao.getAllExercises()
+    override val allExercises: Flow<List<ExerciseEntity>> = workoutDao.getAllExercises()
 
-    fun getExercisesForWorkout(workoutId: Int): Flow<List<ExerciseEntity>> {
+    override fun getExercisesForWorkout(workoutId: Int): Flow<List<ExerciseEntity>> {
         return workoutDao.getExercisesForWorkout(workoutId)
     }
 
-    suspend fun createExercise(workoutId: Int, name: String, equipment: String, muscleGroups: String, orderIndex: Int = 0) {
+    override suspend fun createExercise(workoutId: Int, name: String, equipment: String, muscleGroups: String, orderIndex: Int) {
         val exercise = ExerciseEntity(
             workoutId = workoutId,
             name = name,
@@ -40,16 +72,16 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
         workoutDao.insertExercise(exercise)
     }
 
-    suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String) {
+    override suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String) {
         workoutDao.updateExercise(exercise.copy(name = name, equipment = equipment, muscleGroups = muscleGroups))
     }
 
-    suspend fun deleteExercise(exercise: ExerciseEntity) {
+    override suspend fun deleteExercise(exercise: ExerciseEntity) {
         workoutDao.deleteExercise(exercise)
     }
 
     /** decrementa o número de séries e apaga o registo na sessão atual */
-    suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int) {
+    override suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int) {
         val newCount = maxOf(1, exercise.setCount - 1)
         val setNumberToRemove = exercise.setCount
         workoutDao.deleteSetByNumber(exercise.id, sessionId, setNumberToRemove)
@@ -57,16 +89,16 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
     }
 
     /** incrementa o número de séries */
-    suspend fun addSet(exercise: ExerciseEntity) {
+    override suspend fun addSet(exercise: ExerciseEntity) {
         workoutDao.updateExercise(exercise.copy(setCount = exercise.setCount + 1))
     }
 
     // --- SESSIONS ---
-    fun getActiveSessionFlow(workoutId: Int): Flow<WorkoutSessionEntity?> {
+    override fun getActiveSessionFlow(workoutId: Int): Flow<WorkoutSessionEntity?> {
         return workoutDao.getActiveSessionFlow(workoutId)
     }
 
-    suspend fun startOrGetSession(workoutId: Int): WorkoutSessionEntity {
+    override suspend fun startOrGetSession(workoutId: Int): WorkoutSessionEntity {
         var session = workoutDao.getActiveSession(workoutId)
         if (session == null) {
             val newSession = WorkoutSessionEntity(
@@ -79,15 +111,7 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
         return session
     }
 
-    suspend fun finalizeSession(sessionId: Int) {
-        // obter a sessão ou assumir que a temos para atualizar por id
-        // para simplificar podemos obter marcar como completa e guardar
-        // primeiro precisamos de pesquisar para obter os campos existentes
-        // vou adicionar uma query auxiliar ou passar a sessão
-        // vamos assumir que passamos a sessão ao repositório
-    }
-
-    suspend fun finalizeSession(session: WorkoutSessionEntity) {
+    override suspend fun finalizeSession(session: WorkoutSessionEntity) {
         val completedSession = session.copy(
             isCompleted = true,
             endTime = System.currentTimeMillis()
@@ -96,11 +120,11 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
     }
 
     // --- SETS & PR LOGIC ---
-    fun getSetsForSession(sessionId: Int): Flow<List<SetLogEntity>> {
+    override fun getSetsForSession(sessionId: Int): Flow<List<SetLogEntity>> {
         return workoutDao.getSetsForSession(sessionId)
     }
 
-    suspend fun getPreviousSet(exerciseId: Int, setNumber: Int): SetLogEntity? {
+    override suspend fun getPreviousSet(exerciseId: Int, setNumber: Int): SetLogEntity? {
         return workoutDao.getPreviousSet(exerciseId, setNumber)
     }
 
@@ -109,7 +133,7 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
      * usa um pequeno valor para evitar falsos positivos
      * o troféu só é dado quando o novo valor é maior que o anterior
      */
-    suspend fun checkPR(exerciseId: Int, weight: Float, reps: Int): String {
+    override suspend fun checkPR(exerciseId: Int, weight: Float, reps: Int): String {
         val maxWeight = workoutDao.getMaxWeightForExercise(exerciseId) ?: 0f
         val max1RM = workoutDao.getMax1RMForExercise(exerciseId) ?: 0f
 
@@ -123,7 +147,7 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
         }
     }
 
-    suspend fun logSet(sessionId: Int, exerciseId: Int, setNumber: Int, weight: Float, reps: Int, isCompleted: Boolean, existingSetId: Int = 0) {
+    override suspend fun logSet(sessionId: Int, exerciseId: Int, setNumber: Int, weight: Float, reps: Int, isCompleted: Boolean, existingSetId: Int) {
         val setLog = SetLogEntity(
             id = existingSetId,
             sessionId = sessionId,
@@ -160,18 +184,18 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) {
     // --- DASHBOARD ---
 
     // todas as sessões completas
-    fun getAllCompletedSessions() = workoutDao.getAllCompletedSessions()
+    override fun getAllCompletedSessions() = workoutDao.getAllCompletedSessions()
 
     // todos os set logs completos
-    fun getAllCompletedSetLogs() = workoutDao.getAllCompletedSetLogs()
+    override fun getAllCompletedSetLogs() = workoutDao.getAllCompletedSetLogs()
 
     // set logs completos de um exercício
-    fun getCompletedSetLogsForExercise(exerciseId: Int) = workoutDao.getCompletedSetLogsForExercise(exerciseId)
+    override fun getCompletedSetLogsForExercise(exerciseId: Int) = workoutDao.getCompletedSetLogsForExercise(exerciseId)
 
     // sessões completas de um workout
-    fun getCompletedSessionsForWorkout(workoutId: Int) = workoutDao.getCompletedSessionsForWorkout(workoutId)
+    override fun getCompletedSessionsForWorkout(workoutId: Int) = workoutDao.getCompletedSessionsForWorkout(workoutId)
 
-    suspend fun clearAllWorkoutData() {
+    override suspend fun clearAllWorkoutData() {
         workoutDao.clearSetLogsTable()
         workoutDao.clearWorkoutSessionsTable()
         workoutDao.clearExercisesTable()

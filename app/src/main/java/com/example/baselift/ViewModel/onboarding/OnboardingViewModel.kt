@@ -14,8 +14,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 class OnboardingViewModel(
-    private val userRepository: UserRepository,
-    private val progressRepository: ProgressRepository
+    private val userRepository: com.example.baselift.Model.repository.IUserRepository,
+    private val progressRepository: com.example.baselift.Model.repository.IProgressRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UserEntity())
@@ -128,8 +128,8 @@ class OnboardingViewModel(
  * Factory necessária para injetar o UserRepository e o ProgressRepository no ViewModel quando fazemos DI Manual
  */
 class OnboardingViewModelFactory(
-    private val userRepository: UserRepository,
-    private val progressRepository: ProgressRepository
+    private val userRepository: com.example.baselift.Model.repository.IUserRepository,
+    private val progressRepository: com.example.baselift.Model.repository.IProgressRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {

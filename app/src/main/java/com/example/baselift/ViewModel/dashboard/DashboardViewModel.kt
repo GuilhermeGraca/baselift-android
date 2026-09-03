@@ -55,8 +55,8 @@ data class DashboardUiState(
 
 // modelo de vista do dashboard
 class DashboardViewModel(
-    private val workoutRepository: WorkoutRepository,
-    private val nutritionRepository: NutritionRepository
+    private val workoutRepository: com.example.baselift.Model.repository.IWorkoutRepository,
+    private val nutritionRepository: com.example.baselift.Model.repository.INutritionRepository
 ) : ViewModel() {
 
     private val restDaysFlow = MutableStateFlow(4) // por defeito 4 dias de descanso
@@ -447,8 +447,8 @@ class DashboardViewModel(
 
 // fábrica para instanciar o modelo de vista
 class DashboardViewModelFactory(
-    private val workoutRepository: WorkoutRepository,
-    private val nutritionRepository: NutritionRepository
+    private val workoutRepository: com.example.baselift.Model.repository.IWorkoutRepository,
+    private val nutritionRepository: com.example.baselift.Model.repository.INutritionRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {

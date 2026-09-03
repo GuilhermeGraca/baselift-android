@@ -6,31 +6,49 @@ import com.example.baselift.Model.local.entity.PhotoLogEntity
 import com.example.baselift.Model.local.entity.WeightLogEntity
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Interface do repositório de progresso.
+ * Permite criar implementações fake para testes.
+ */
+interface IProgressRepository {
+    val allWeightLogs: Flow<List<WeightLogEntity>>
+    val allPhotoLogs: Flow<List<PhotoLogEntity>>
+    suspend fun insertWeightLog(weight: Float, timestamp: Long)
+    suspend fun insertPhotoLog(photoUri: String, timestamp: Long)
+    suspend fun deleteWeightLog(weightLog: WeightLogEntity)
+    suspend fun deletePhotoLog(photoLog: PhotoLogEntity)
+    suspend fun clearProgressData()
+}
+
+/**
+ * Implementação real que delega para os DAOs de peso e foto.
+ */
 class ProgressRepository(
     private val weightLogDao: WeightLogDao,
     private val photoLogDao: PhotoLogDao
-) {
-    val allWeightLogs: Flow<List<WeightLogEntity>> = weightLogDao.getAllWeightLogs()
-    val allPhotoLogs: Flow<List<PhotoLogEntity>> = photoLogDao.getAllPhotoLogsDescending()
+) : IProgressRepository {
+    override val allWeightLogs: Flow<List<WeightLogEntity>> = weightLogDao.getAllWeightLogs()
+    override val allPhotoLogs: Flow<List<PhotoLogEntity>> = photoLogDao.getAllPhotoLogsDescending()
     
-    suspend fun insertWeightLog(weight: Float, timestamp: Long) {
+    override suspend fun insertWeightLog(weight: Float, timestamp: Long) {
         weightLogDao.insertWeightLog(WeightLogEntity(weightValue = weight, timestamp = timestamp))
     }
     
-    suspend fun insertPhotoLog(photoUri: String, timestamp: Long) {
+    override suspend fun insertPhotoLog(photoUri: String, timestamp: Long) {
         photoLogDao.insertPhotoLog(PhotoLogEntity(photoUri = photoUri, timestamp = timestamp))
     }
 
-    suspend fun deleteWeightLog(weightLog: WeightLogEntity) {
+    override suspend fun deleteWeightLog(weightLog: WeightLogEntity) {
         weightLogDao.deleteWeightLog(weightLog)
     }
 
-    suspend fun deletePhotoLog(photoLog: PhotoLogEntity) {
+    override suspend fun deletePhotoLog(photoLog: PhotoLogEntity) {
         photoLogDao.deletePhotoLog(photoLog)
     }
 
-    suspend fun clearProgressData() {
+    override suspend fun clearProgressData() {
         weightLogDao.clearWeightLogsTable()
         photoLogDao.clearPhotoLogsTable()
     }
 }
+
