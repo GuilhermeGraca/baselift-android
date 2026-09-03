@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.baselift.Model.local.entity.MealTemplateEntity
 import com.example.baselift.Model.local.entity.NutritionLogEntity
-import com.example.baselift.Model.repository.NutritionRepository
-import com.example.baselift.Model.repository.UserRepository
+import com.example.baselift.Model.repository.INutritionRepository
+import com.example.baselift.Model.repository.IUserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,8 +39,8 @@ data class NutritionUiState(
 
 // modelo de vista responsável pela aba de nutrição
 class NutritionViewModel(
-    private val nutritionRepository: NutritionRepository,
-    private val userRepository: UserRepository
+    private val nutritionRepository: INutritionRepository,
+    private val userRepository: IUserRepository
 ) : ViewModel() {
 
     private val refreshTrigger = MutableStateFlow(System.currentTimeMillis())
@@ -70,7 +70,7 @@ class NutritionViewModel(
             mealTemplates = templates,
             isLoading = false
         )
-    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Lazily,
         initialValue = NutritionUiState()
@@ -151,8 +151,8 @@ class NutritionViewModel(
 
 // fábrica para instanciar o modelo de vista
 class NutritionViewModelFactory(
-    private val nutritionRepository: NutritionRepository,
-    private val userRepository: UserRepository
+    private val nutritionRepository: INutritionRepository,
+    private val userRepository: IUserRepository
 ) : androidx.lifecycle.ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(NutritionViewModel::class.java)) {

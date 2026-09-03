@@ -5,24 +5,30 @@ import com.example.baselift.Model.local.entity.UserEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Abstração entre o UserDao e os ViewModels
- * faz a ligação entre a base de dados e as views
+ * Interface do repositório de utilizador.
+ * Permite criar implementações fake para testes.
  */
-class UserRepository(private val userDao: UserDao) {
+interface IUserRepository {
+    fun getUser(): Flow<UserEntity?>
+    suspend fun saveUser(user: UserEntity)
+    suspend fun clearUserData()
+}
 
-    // retorna um Flow contínuo com os dados do utilizador
-    // sempre que o UserEntity for alterado os ViewModels
-    // recebem a atualização automaticamente
-    fun getUser(): Flow<UserEntity?> {
+/**
+ * Implementação real que delega para o UserDao (Room).
+ */
+class UserRepository(private val userDao: UserDao) : IUserRepository {
+
+    override fun getUser(): Flow<UserEntity?> {
         return userDao.getUser()
     }
 
-    // função para inserir ou atualizar o utilizador
-    suspend fun saveUser(user: UserEntity) {
+    override suspend fun saveUser(user: UserEntity) {
         userDao.insertOrUpdateUser(user)
     }
 
-    suspend fun clearUserData() {
+    override suspend fun clearUserData() {
         userDao.clearUserTable()
     }
 }
+

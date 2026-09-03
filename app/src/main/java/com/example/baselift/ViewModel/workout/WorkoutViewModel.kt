@@ -8,6 +8,7 @@ import com.example.baselift.Model.local.entity.ExerciseEntity
 import com.example.baselift.Model.local.entity.SetLogEntity
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
+import com.example.baselift.Model.repository.IWorkoutRepository
 import com.example.baselift.Model.repository.WorkoutRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -41,7 +42,7 @@ data class WorkoutUiState(
     val isLoading: Boolean = true
 )
 
-class WorkoutViewModel(private val repository: WorkoutRepository) : ViewModel() {
+class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkoutUiState())
     val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
@@ -157,7 +158,7 @@ class WorkoutViewModel(private val repository: WorkoutRepository) : ViewModel() 
                     }
                     ExerciseUiModel(exercise, uiSets)
                 }
-            }.flowOn(Dispatchers.IO).collect { exerciseModels ->
+            }.collect { exerciseModels ->
                 _uiState.update { it.copy(exercises = exerciseModels) }
             }
         }
@@ -259,7 +260,9 @@ class WorkoutViewModel(private val repository: WorkoutRepository) : ViewModel() 
     }
 }
 
-class WorkoutViewModelFactory(private val repository: WorkoutRepository) : ViewModelProvider.Factory {
+class WorkoutViewModelFactory(
+    private val repository: IWorkoutRepository
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(WorkoutViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")

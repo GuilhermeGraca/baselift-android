@@ -9,8 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.baselift.Model.local.entity.PhotoLogEntity
 import com.example.baselift.Model.local.entity.UserEntity
 import com.example.baselift.Model.local.entity.WeightLogEntity
-import com.example.baselift.Model.repository.ProgressRepository
-import com.example.baselift.Model.repository.UserRepository
+import com.example.baselift.Model.repository.IProgressRepository
+import com.example.baselift.Model.repository.IUserRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -18,8 +18,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ProgressViewModel(
-    private val progressRepository: ProgressRepository,
-    private val userRepository: UserRepository
+    private val progressRepository: IProgressRepository,
+    private val userRepository: IUserRepository
 ) : ViewModel() {
 
     val user: StateFlow<UserEntity?> = userRepository.getUser()
@@ -155,8 +155,8 @@ class ProgressViewModel(
 }
 
 class ProgressViewModelFactory(
-    private val progressRepository: ProgressRepository,
-    private val userRepository: UserRepository
+    private val progressRepository: IProgressRepository,
+    private val userRepository: IUserRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ProgressViewModel::class.java)) {
