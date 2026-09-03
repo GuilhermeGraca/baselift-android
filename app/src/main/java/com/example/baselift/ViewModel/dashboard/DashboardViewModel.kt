@@ -226,7 +226,7 @@ class DashboardViewModel(
             nutritionRestDays = nutritionRestDays,
             isLoading = false
         )
-    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Lazily,
         initialValue = DashboardUiState()

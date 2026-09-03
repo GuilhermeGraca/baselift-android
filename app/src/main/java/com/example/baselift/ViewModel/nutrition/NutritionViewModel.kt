@@ -70,7 +70,7 @@ class NutritionViewModel(
             mealTemplates = templates,
             isLoading = false
         )
-    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Lazily,
         initialValue = NutritionUiState()

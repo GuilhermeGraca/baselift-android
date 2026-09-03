@@ -158,7 +158,7 @@ class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel()
                     }
                     ExerciseUiModel(exercise, uiSets)
                 }
-            }.flowOn(Dispatchers.IO).collect { exerciseModels ->
+            }.collect { exerciseModels ->
                 _uiState.update { it.copy(exercises = exerciseModels) }
             }
         }
