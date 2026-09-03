@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.baselift.Model.local.entity.UserEntity
-import com.example.baselift.Model.repository.UserRepository
-import com.example.baselift.Model.repository.ProgressRepository
+import com.example.baselift.Model.repository.IProgressRepository
+import com.example.baselift.Model.repository.IUserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,8 +14,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 class OnboardingViewModel(
-    private val userRepository: com.example.baselift.Model.repository.IUserRepository,
-    private val progressRepository: com.example.baselift.Model.repository.IProgressRepository
+    private val userRepository: IUserRepository,
+    private val progressRepository: IProgressRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UserEntity())
@@ -128,8 +128,8 @@ class OnboardingViewModel(
  * Factory necessária para injetar o UserRepository e o ProgressRepository no ViewModel quando fazemos DI Manual
  */
 class OnboardingViewModelFactory(
-    private val userRepository: com.example.baselift.Model.repository.IUserRepository,
-    private val progressRepository: com.example.baselift.Model.repository.IProgressRepository
+    private val userRepository: IUserRepository,
+    private val progressRepository: IProgressRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {

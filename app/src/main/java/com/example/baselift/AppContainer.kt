@@ -6,6 +6,11 @@ import com.example.baselift.Model.local.AppDatabase
 import com.example.baselift.Model.repository.UserRepository
 import com.example.baselift.Model.repository.ProgressRepository
 import com.example.baselift.Model.repository.NutritionRepository
+import com.example.baselift.Model.repository.WorkoutRepository
+import com.example.baselift.Model.repository.IUserRepository
+import com.example.baselift.Model.repository.IProgressRepository
+import com.example.baselift.Model.repository.INutritionRepository
+import com.example.baselift.Model.repository.IWorkoutRepository
 
 /**
  * Gere a injeção de dependências
@@ -20,10 +25,10 @@ interface AppContainer {
     // Expõe a base de dados e os repositórios
     // para que possam ser injetados nas classes
     val database: AppDatabase
-    val userRepository: com.example.baselift.Model.repository.IUserRepository
-    val progressRepository: com.example.baselift.Model.repository.IProgressRepository
-    val workoutRepository: com.example.baselift.Model.repository.IWorkoutRepository
-    val nutritionRepository: com.example.baselift.Model.repository.INutritionRepository
+    val userRepository: IUserRepository
+    val progressRepository: IProgressRepository
+    val workoutRepository: IWorkoutRepository
+    val nutritionRepository: INutritionRepository
 }
 
 /**
@@ -39,19 +44,19 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     // Repositórios
-    override val userRepository: com.example.baselift.Model.repository.IUserRepository by lazy {
+    override val userRepository: IUserRepository by lazy {
         UserRepository(database.userDao())
     }
 
-    override val progressRepository: com.example.baselift.Model.repository.IProgressRepository by lazy {
+    override val progressRepository: IProgressRepository by lazy {
         ProgressRepository(database.weightLogDao(), database.photoLogDao())
     }
 
-    override val workoutRepository: com.example.baselift.Model.repository.IWorkoutRepository by lazy {
-        com.example.baselift.Model.repository.WorkoutRepository(database.workoutDao())
+    override val workoutRepository: IWorkoutRepository by lazy {
+        WorkoutRepository(database.workoutDao())
     }
 
-    override val nutritionRepository: com.example.baselift.Model.repository.INutritionRepository by lazy {
+    override val nutritionRepository: INutritionRepository by lazy {
         NutritionRepository(database.nutritionDao())
     }
 }
