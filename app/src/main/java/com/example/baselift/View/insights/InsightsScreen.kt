@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Male
+import androidx.compose.material.icons.filled.Female
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -220,7 +222,12 @@ fun InsightsScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                MetricCard(label = stringResource(com.example.baselift.R.string.insights_gender), value = uiState.gender, unit = "", icon = Icons.Default.Person, modifier = Modifier.weight(1f))
+                val genderIcon = when (uiState.gender.lowercase(Locale.ROOT)) {
+                    "male", "masculino" -> Icons.Default.Male
+                    "female", "feminino" -> Icons.Default.Female
+                    else -> Icons.Default.Person
+                }
+                MetricCard(label = stringResource(com.example.baselift.R.string.insights_gender), value = uiState.gender, unit = "", icon = genderIcon, modifier = Modifier.weight(1f))
                 MetricCard(label = stringResource(com.example.baselift.R.string.insights_age), value = uiState.age.toString(), unit = stringResource(com.example.baselift.R.string.insights_yrs), icon = Icons.Default.DateRange, modifier = Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -389,6 +396,7 @@ fun InsightsScreen(
             // diário visual
             VisualDiarySection(
                 photoLogs = photoLogs,
+                weightLogs = weightLogs,
                 onPhotoClick = { clickedPhoto = it }
             ) {
                 photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))

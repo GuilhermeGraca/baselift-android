@@ -15,6 +15,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -46,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -386,6 +390,7 @@ fun TechnicalHistoryLedger(weightLogs: List<WeightLogEntity>, user: UserEntity?,
 @Composable
 fun VisualDiarySection(
     photoLogs: List<PhotoLogEntity>,
+    weightLogs: List<WeightLogEntity>,
     onPhotoClick: (PhotoLogEntity) -> Unit,
     onAddPhoto: () -> Unit
 ) {
@@ -459,6 +464,22 @@ fun VisualDiarySection(
                                     Text(stringResource(com.example.baselift.R.string.insights_latest), color = PureBlack, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
+                            
+                            val associatedWeight = weightLogs.find { isSameCalendarDay(it.timestamp, photoLog.timestamp) }
+                            if (associatedWeight != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${associatedWeight.weightValue} KG",
+                                        color = CrystalWhite,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
 
                             Text(
                                 text = dateFormat.format(Date(photoLog.timestamp)).uppercase(Locale.US),
@@ -524,29 +545,29 @@ fun PhotoDetailDialog(
     
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
-        scale = (scale * zoomChange).coerceIn(1f, 5f)
-        offset = if (scale > 1f) offset + panChange else Offset.Zero
-    }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(PureBlack)
-                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-        ) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.02f))
-                        )
-                    )
-                    .padding(16.dp)
+                    .background(PureBlack, RoundedCornerShape(12.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.02f))
+                            ),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(16.dp)
+                ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -578,21 +599,34 @@ fun PhotoDetailDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(380.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(DarkSurface)
+                            .height(420.dp)
+                            .zIndex(1f)
+                            .background(DarkSurface, RoundedCornerShape(8.dp))
                             .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onDoubleTap = {
-                                        if (scale > 1f) {
-                                            scale = 1f
-                                            offset = Offset.Zero
-                                        } else {
-                                            scale = 2.5f
-                                        }
-                                    }
-                                )
-                            },
+                                detectTransformGestures { centroid, pan, zoom, _ ->
+                                    val oldScale = scale
+                                    scale = (scale * zoom).coerceIn(1f, 5f)
+                                    
+                                    val fractionalX = centroid.x - size.width / 2
+                                    val fractionalY = centroid.y - size.height / 2
+                                    
+                                    offset = Offset(
+                                        offset.x * (scale / oldScale) + pan.x - fractionalX * (scale - oldScale),
+                                        offset.y * (scale / oldScale) + pan.y - fractionalY * (scale - oldScale)
+                                    )
+                                }
+                            }
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    awaitFirstDown()
+                                    do {
+                                        val event = awaitPointerEvent()
+                                    } while (event.changes.any { it.pressed })
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                }
+                            }
+                        ,
                         contentAlignment = Alignment.Center
                     ) {
                         AsyncImage(
@@ -607,7 +641,6 @@ fun PhotoDetailDialog(
                                     translationX = offset.x,
                                     translationY = offset.y
                                 )
-                                .transformable(state = transformState)
                         )
                     }
                     
@@ -622,55 +655,59 @@ fun PhotoDetailDialog(
                         textAlign = TextAlign.Center
                     )
                     
-                    // peso cruzado
-                    if (associatedWeight != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(NeonGreen.copy(alpha = 0.1f))
-                                .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.FitnessCenter,
-                                contentDescription = null,
-                                tint = NeonGreen,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = stringResource(com.example.baselift.R.string.insights_weight_recorded, associatedWeight.weightValue),
-                                color = NeonGreen,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    
-                    // fluxo de confirmação para eliminar
                     var showConfirmDelete by remember { mutableStateOf(false) }
                     
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     
                     if (!showConfirmDelete) {
-                        OutlinedButton(
-                            onClick = { showConfirmDelete = true },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = SoftCoral),
-                            border = BorderStroke(1.dp, SoftCoral.copy(alpha = 0.3f)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = SoftCoral,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(com.example.baselift.R.string.insights_remove_photo), fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
+                            if (associatedWeight != null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(NeonGreen.copy(alpha = 0.1f))
+                                        .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = NeonGreen,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "${associatedWeight.weightValue} KG",
+                                        color = NeonGreen,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.width(16.dp))
+                            }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(SoftCoral.copy(alpha = 0.1f))
+                                    .border(1.dp, SoftCoral.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                    .clickable { showConfirmDelete = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete Photo",
+                                    tint = SoftCoral,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     } else {
                         Row(
@@ -703,6 +740,7 @@ fun PhotoDetailDialog(
             }
         }
     }
+}
 }
 
 // componentes visuais e de ajuda mantidos intactos
