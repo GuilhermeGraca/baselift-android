@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import com.example.baselift.View.theme.ElectricBlue
 import com.example.baselift.View.theme.MediumGrey
 import com.example.baselift.View.theme.NeonGreen
@@ -68,7 +69,7 @@ fun QuickLogSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Quick\nLog",
+                    text = stringResource(com.example.baselift.R.string.nutrition_quick_log),
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -82,12 +83,12 @@ fun QuickLogSection(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     TabItem(
-                        title = "CALORIES\nONLY",
+                        title = stringResource(com.example.baselift.R.string.nutrition_cal_only),
                         isSelected = isCaloriesOnly,
                         onClick = { isCaloriesOnly = true }
                     )
                     TabItem(
-                        title = "DETAILED\nMACROS",
+                        title = stringResource(com.example.baselift.R.string.nutrition_detailed_macros),
                         isSelected = !isCaloriesOnly,
                         onClick = { isCaloriesOnly = false }
                     )
@@ -99,7 +100,7 @@ fun QuickLogSection(
             // inputs
             if (isCaloriesOnly) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = "TOTAL CALORIES (kcal)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(text = stringResource(com.example.baselift.R.string.nutrition_total_cal), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier
@@ -163,13 +164,13 @@ fun QuickLogSection(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     MacroInputField(
-                        label = "KCAL",
+                        label = stringResource(com.example.baselift.R.string.nutrition_kcal_label),
                         value = kcalInput,
                         onValueChange = { kcalInput = it.filter { char -> char.isDigit() } },
                         modifier = Modifier.weight(1f)
                     )
                     MacroInputField(
-                        label = "PROTEIN (g)",
+                        label = stringResource(com.example.baselift.R.string.nutrition_protein_g),
                         value = proteinInput,
                         onValueChange = { proteinInput = it.filter { char -> char.isDigit() } },
                         modifier = Modifier.weight(1f)
@@ -183,13 +184,13 @@ fun QuickLogSection(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     MacroInputField(
-                        label = "CARBS (g)",
+                        label = stringResource(com.example.baselift.R.string.nutrition_carbs_g),
                         value = carbsInput,
                         onValueChange = { carbsInput = it.filter { char -> char.isDigit() } },
                         modifier = Modifier.weight(1f)
                     )
                     MacroInputField(
-                        label = "FATS (g)",
+                        label = stringResource(com.example.baselift.R.string.nutrition_fats_g),
                         value = fatsInput,
                         onValueChange = { fatsInput = it.filter { char -> char.isDigit() } },
                         modifier = Modifier.weight(1f)
@@ -219,7 +220,7 @@ fun QuickLogSection(
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
-                Text(text = "+ ADD ENTRY", color = PureBlack, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(text = stringResource(com.example.baselift.R.string.nutrition_add_entry), color = PureBlack, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
     }

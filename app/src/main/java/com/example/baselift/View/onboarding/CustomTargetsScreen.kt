@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
 import com.example.baselift.View.theme.*
 import com.example.baselift.ViewModel.onboarding.OnboardingViewModel
 import kotlin.math.roundToInt
@@ -93,13 +94,14 @@ fun CustomTargetsScreen(
             .systemBarsPadding()
             .verticalScroll(rememberScrollState())
     ) {
-        Text("Custom Targets", style = Typography.headlineLarge.copy(color = CrystalWhite), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        Text(stringResource(com.example.baselift.R.string.onboarding_custom_targets_title), style = Typography.headlineLarge.copy(color = CrystalWhite), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Manual macro override. Precision matters.", style = Typography.bodyLarge.copy(color = MediumGrey), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        Text(stringResource(com.example.baselift.R.string.onboarding_custom_targets_desc), style = Typography.bodyLarge.copy(color = MediumGrey), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         Spacer(modifier = Modifier.height(16.dp))
 
         // calorias
-        MacroAdjustBox("TOTAL CALORIES", "kcal", calories, { calories = it.filter { char -> char.isDigit() } }, { updateValue(calories, it, { calories = it }) }, NeonGreen)
+        val totalCaloriesLabel = stringResource(com.example.baselift.R.string.onboarding_total_calories)
+        MacroAdjustBox(totalCaloriesLabel, stringResource(com.example.baselift.R.string.onboarding_kcal), calories, { calories = it.filter { char -> char.isDigit() } }, { updateValue(calories, it, { calories = it }) }, NeonGreen, showBorder = true)
         Spacer(modifier = Modifier.height(16.dp))
 
         // calculadora avançada
@@ -117,7 +119,7 @@ fun CustomTargetsScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Calculate, contentDescription = "Calculator", tint = ElectricBlue, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(12.dp))
-                Text("Hypertrophy Calculator", color = ElectricBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.onboarding_hypertrophy_calc), color = ElectricBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
             Icon(
                 imageVector = if (showAdvancedCalc) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -129,10 +131,10 @@ fun CustomTargetsScreen(
 
         if (showAdvancedCalc) {
             Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(DarkSurface).padding(16.dp)) {
-                Text("PROTEIN TARGET: ${String.format("%.1f", proteinMultiplier)} g/kg", color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.onboarding_protein_target, String.format("%.1f", proteinMultiplier)), color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(4.dp))
                 val fatFactor = if (uiState.gender == "FEMALE") "1.0g" else "0.8g"
-                Text("Recommended range for muscle hypertrophy (1.6g - 2.2g).\nFats fixed to hormonal minimums ($fatFactor/kg). Carbs take the remaining energy.", color = MediumGrey, fontSize = 11.sp, lineHeight = 16.sp)
+                Text(stringResource(com.example.baselift.R.string.onboarding_hypertrophy_calc_desc, fatFactor), color = MediumGrey, fontSize = 11.sp, lineHeight = 16.sp)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Text("1.6", color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -159,11 +161,11 @@ fun CustomTargetsScreen(
         }
 
         // macronutrientes
-        MacroAdjustBox("PROTEIN", "g", protein, { protein = it.filter { char -> char.isDigit() } }, { updateValue(protein, it, { protein = it }) }, SunYellow)
+        MacroAdjustBox(stringResource(com.example.baselift.R.string.onboarding_protein_label), stringResource(com.example.baselift.R.string.onboarding_grams), protein, { protein = it.filter { char -> char.isDigit() } }, { updateValue(protein, it, { protein = it }) }, SunYellow)
         Spacer(modifier = Modifier.height(8.dp))
-        MacroAdjustBox("CARBS", "g", carbs, { carbs = it.filter { char -> char.isDigit() } }, { updateValue(carbs, it, { carbs = it }) }, ElectricBlue)
+        MacroAdjustBox(stringResource(com.example.baselift.R.string.onboarding_carbs_label), stringResource(com.example.baselift.R.string.onboarding_grams), carbs, { carbs = it.filter { char -> char.isDigit() } }, { updateValue(carbs, it, { carbs = it }) }, ElectricBlue)
         Spacer(modifier = Modifier.height(8.dp))
-        MacroAdjustBox("FATS", "g", fat, { fat = it.filter { char -> char.isDigit() } }, { updateValue(fat, it, { fat = it }) }, VibrantPurple)
+        MacroAdjustBox(stringResource(com.example.baselift.R.string.onboarding_fats_label), stringResource(com.example.baselift.R.string.onboarding_grams), fat, { fat = it.filter { char -> char.isDigit() } }, { updateValue(fat, it, { fat = it }) }, VibrantPurple)
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -179,7 +181,7 @@ fun CustomTargetsScreen(
             Icon(Icons.Default.Info, contentDescription = "Info", tint = ElectricBlue)
             Spacer(modifier = Modifier.width(16.dp))
             Text(
-                "Manual overrides will disable automatic weekly adjustments based on weigh-ins.",
+                stringResource(com.example.baselift.R.string.onboarding_manual_override_info),
                 color = CrystalWhite,
                 fontSize = 14.sp,
                 lineHeight = 20.sp
@@ -205,7 +207,7 @@ fun CustomTargetsScreen(
             shape = RoundedCornerShape(12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("SAVE & SYNC", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.onboarding_save_and_sync), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.width(8.dp))
                 Icon(Icons.Default.Refresh, contentDescription = "Sync")
             }
@@ -214,7 +216,7 @@ fun CustomTargetsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Revert to Auto-Calculated",
+            text = stringResource(com.example.baselift.R.string.onboarding_revert_auto),
             color = CrystalWhite,
             fontSize = 14.sp,
             modifier = Modifier.fillMaxWidth().clickable { onRevert() },
@@ -241,8 +243,8 @@ fun MacroAdjustBox(
             .background(DarkSurface)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.align(if (label == "TOTAL CALORIES") Alignment.CenterHorizontally else Alignment.Start)) {
-            if (label != "TOTAL CALORIES") {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.align(if (showBorder) Alignment.CenterHorizontally else Alignment.Start)) {
+            if (!showBorder) {
                 Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(accentColor))
                 Spacer(modifier = Modifier.width(8.dp))
             }
@@ -256,7 +258,7 @@ fun MacroAdjustBox(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AdjustButton(text = "-", onClick = { onAdjust(if (label == "TOTAL CALORIES") -50 else -5) })
+            AdjustButton(text = "-", onClick = { onAdjust(if (showBorder) -50 else -5) })
             
             Row(verticalAlignment = Alignment.Bottom) {
                 BasicTextField(
@@ -271,7 +273,7 @@ fun MacroAdjustBox(
                 Text(unit, color = MediumGrey, fontSize = 14.sp, modifier = Modifier.padding(bottom = 2.dp))
             }
 
-            AdjustButton(text = "+", onClick = { onAdjust(if (label == "TOTAL CALORIES") 50 else 5) })
+            AdjustButton(text = "+", onClick = { onAdjust(if (showBorder) 50 else 5) })
         }
     }
 }

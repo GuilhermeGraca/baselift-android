@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,7 +58,7 @@ fun TodaysLogsSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "TODAY'S LOGS",
+                text = stringResource(com.example.baselift.R.string.nutrition_todays_logs),
                 color = SunYellow,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -71,7 +72,7 @@ fun TodaysLogsSection(
                     .clickable { showResetDialog = true }
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text("RESET ALL LOGS", color = SoftCoral, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.nutrition_reset_all), color = SoftCoral, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -124,7 +125,7 @@ fun TodaysLogsSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = log.name ?: "Quick Add",
+                                text = log.name ?: stringResource(com.example.baselift.R.string.nutrition_quick_add),
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
@@ -137,7 +138,7 @@ fun TodaysLogsSection(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = " KCAL",
+                                    text = stringResource(com.example.baselift.R.string.nutrition_kcal),
                                     color = MediumGrey,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
@@ -178,7 +179,7 @@ fun TodaysLogsSection(
                     HorizontalDivider(color = Color(0xFF2A2A2A))
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = if (showAllLogs) "SHOW LESS" else "SHOW MORE",
+                        text = if (showAllLogs) stringResource(com.example.baselift.R.string.nutrition_show_less) else stringResource(com.example.baselift.R.string.nutrition_show_more),
                         color = MediumGrey,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -203,13 +204,13 @@ fun TodaysLogsSection(
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                     .padding(24.dp)
             ) {
-                Text("Delete Entry", color = SoftCoral, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.nutrition_delete_entry), color = SoftCoral, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Are you sure you want to remove '${logToDelete?.name ?: "this entry"}'? This action cannot be undone.", color = CrystalWhite, fontSize = 14.sp)
+                Text(stringResource(com.example.baselift.R.string.nutrition_delete_entry_msg, logToDelete?.name ?: stringResource(com.example.baselift.R.string.nutrition_this_entry)), color = CrystalWhite, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = { logToDelete = null }) {
-                        Text("CANCEL", color = MediumGrey)
+                        Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -220,7 +221,7 @@ fun TodaysLogsSection(
                         colors = ButtonDefaults.buttonColors(containerColor = SoftCoral),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("DELETE", color = PureBlack, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.example.baselift.R.string.workout_delete), color = PureBlack, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -237,13 +238,13 @@ fun TodaysLogsSection(
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                     .padding(24.dp)
             ) {
-                Text("Reset All Logs", color = SoftCoral, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.nutrition_reset_all_title), color = SoftCoral, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Are you sure you want to clear all nutrition logs for today?", color = CrystalWhite, fontSize = 14.sp)
+                Text(stringResource(com.example.baselift.R.string.nutrition_reset_all_msg), color = CrystalWhite, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = { showResetDialog = false }) {
-                        Text("CANCEL", color = MediumGrey)
+                        Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -254,7 +255,7 @@ fun TodaysLogsSection(
                         colors = ButtonDefaults.buttonColors(containerColor = SoftCoral),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("RESET", color = PureBlack, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.example.baselift.R.string.nutrition_reset), color = PureBlack, fontWeight = FontWeight.Bold)
                     }
                 }
             }

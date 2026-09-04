@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import com.example.baselift.ViewModel.workout.ExerciseUiModel
 import com.example.baselift.View.theme.*
 
@@ -59,8 +60,8 @@ fun ExerciseCard(
 
     if (showDeleteDialog) {
         ConfirmDeleteDialog(
-            title = "Eliminar exercício",
-            message = "Tens a certeza que queres eliminar \"${exercise.name}\"? Esta ação é irreversível e eliminará todo o histórico deste exercício.",
+            title = stringResource(com.example.baselift.R.string.workout_delete_exercise),
+            message = stringResource(com.example.baselift.R.string.workout_delete_exercise_msg, exercise.name),
             onConfirm = {
                 onDeleteExercise()
                 showDeleteDialog = false
@@ -105,12 +106,12 @@ fun ExerciseCard(
                         modifier = Modifier.background(Color(0xFF1E1E1E))
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Editar exercício", color = CrystalWhite, fontSize = 14.sp) },
+                            text = { Text(stringResource(com.example.baselift.R.string.workout_edit_exercise), color = CrystalWhite, fontSize = 14.sp) },
                             leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = MediumGrey, modifier = Modifier.size(18.dp)) },
                             onClick = { showMenu = false; showEditDialog = true }
                         )
                         DropdownMenuItem(
-                            text = { Text("Eliminar exercício", color = Color(0xFFFF4444), fontSize = 14.sp) },
+                            text = { Text(stringResource(com.example.baselift.R.string.workout_delete_exercise), color = Color(0xFFFF4444), fontSize = 14.sp) },
                             leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF4444), modifier = Modifier.size(18.dp)) },
                             onClick = { showMenu = false; showDeleteDialog = true }
                         )
@@ -139,11 +140,11 @@ fun ExerciseCard(
 
             // cabeçalho da tabela de séries
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("SET", color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.5f).padding(start = 8.dp))
-                Text("PREV", color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("KG", color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
+                Text(stringResource(com.example.baselift.R.string.workout_set_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.5f).padding(start = 8.dp))
+                Text(stringResource(com.example.baselift.R.string.workout_prev_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(stringResource(com.example.baselift.R.string.workout_kg_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("REPS", color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
+                Text(stringResource(com.example.baselift.R.string.workout_reps_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.width(64.dp))
             }
 
@@ -179,7 +180,7 @@ fun ExerciseCard(
                 .padding(vertical = 12.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "+ ADD SET", color = Color(0xFFC4C9AC), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(text = stringResource(com.example.baselift.R.string.workout_add_set), color = Color(0xFFC4C9AC), fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

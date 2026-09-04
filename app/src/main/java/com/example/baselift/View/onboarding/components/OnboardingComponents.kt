@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
 import com.example.baselift.Model.local.entity.UserEntity
 import com.example.baselift.View.theme.*
 import com.example.baselift.ViewModel.onboarding.OnboardingViewModel
@@ -93,7 +94,7 @@ fun OnboardingHeader(
         }
 
         Text(
-            text = "STEP ${currentStep + 1} OF $totalSteps",
+            text = stringResource(com.example.baselift.R.string.onboarding_step_of, currentStep + 1, totalSteps),
             color = NeonGreen,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
@@ -118,28 +119,28 @@ fun StepProfile(
             .fillMaxSize()
     ) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            Text("Build Your Profile", style = Typography.headlineLarge.copy(color = CrystalWhite))
+            Text(stringResource(com.example.baselift.R.string.onboarding_build_profile), style = Typography.headlineLarge.copy(color = CrystalWhite))
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Let's establish your baseline. This data helps tailor your initial programs.",
+            stringResource(com.example.baselift.R.string.onboarding_build_profile_desc),
             style = Typography.bodyLarge.copy(color = MediumGrey)
         )
         
         Spacer(modifier = Modifier.height(16.dp))
 
         // seleção do género
-        Text("GENDER", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(com.example.baselift.R.string.onboarding_gender), color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
             GenderButton(
-                text = "MALE",
+                text = stringResource(com.example.baselift.R.string.onboarding_male),
                 isSelected = uiState.gender == "MALE",
                 onClick = { viewModel.updateGender("MALE") },
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.Male
             )
             GenderButton(
-                text = "FEMALE",
+                text = stringResource(com.example.baselift.R.string.onboarding_female),
                 isSelected = uiState.gender == "FEMALE",
                 onClick = { viewModel.updateGender("FEMALE") },
                 modifier = Modifier.weight(1f),
@@ -150,7 +151,7 @@ fun StepProfile(
         Spacer(modifier = Modifier.height(16.dp))
 
         // idade
-        Text("AGE", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(com.example.baselift.R.string.onboarding_age), color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
         GlassTextField(
             value = ageStr,
@@ -166,7 +167,7 @@ fun StepProfile(
 
         // peso
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("CURRENT WEIGHT", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.example.baselift.R.string.onboarding_current_weight), color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             UnitToggle(
                 option1 = "KG",
                 option2 = "LBS",
@@ -189,7 +190,7 @@ fun StepProfile(
 
         // altura
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("HEIGHT", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.example.baselift.R.string.onboarding_height), color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             UnitToggle(
                 option1 = "CM",
                 option2 = "FT",
@@ -210,7 +211,7 @@ fun StepProfile(
 
         }
         Spacer(modifier = Modifier.height(16.dp))
-        NeonButton(text = "Continue \u2192", onClick = onNext, enabled = uiState.age > 0 && uiState.weight > 0f && uiState.height > 0f)
+        NeonButton(text = stringResource(com.example.baselift.R.string.onboarding_continue), onClick = onNext, enabled = uiState.age > 0 && uiState.weight > 0f && uiState.height > 0f)
     }
 }
 
@@ -222,18 +223,18 @@ fun StepActivityLevel(
     onNext: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("Activity Level", style = Typography.headlineLarge.copy(color = CrystalWhite))
+        Text(stringResource(com.example.baselift.R.string.onboarding_activity_level), style = Typography.headlineLarge.copy(color = CrystalWhite))
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Select your baseline metabolic frequency.", style = Typography.bodyLarge.copy(color = MediumGrey))
+        Text(stringResource(com.example.baselift.R.string.onboarding_activity_level_desc), style = Typography.bodyLarge.copy(color = MediumGrey))
         Spacer(modifier = Modifier.height(16.dp))
 
         val levels = listOf(
-            "Sedentary" to "Little or no exercise. Desk job, minimal walking.",
-            "Light" to "Exercise 1-3 times/week. Light jogging, yoga.",
-            "Moderate" to "Exercise 4-5 times/week. Consistent training routine.",
-            "Active" to "Daily exercise or intense exercise 3-4 times/week.",
-            "Very Active" to "Intense exercise 6-7 times/week. Competitive training.",
-            "Extra Active" to "Very intense exercise daily, or physical labor job."
+            "Sedentary" to stringResource(com.example.baselift.R.string.onboarding_sedentary_desc),
+            "Light" to stringResource(com.example.baselift.R.string.onboarding_light_desc),
+            "Moderate" to stringResource(com.example.baselift.R.string.onboarding_moderate_desc),
+            "Active" to stringResource(com.example.baselift.R.string.onboarding_active_desc),
+            "Very Active" to stringResource(com.example.baselift.R.string.onboarding_very_active_desc),
+            "Extra Active" to stringResource(com.example.baselift.R.string.onboarding_extra_active_desc)
         )
 
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -249,7 +250,7 @@ fun StepActivityLevel(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        NeonButton(text = "Continue \u2192", onClick = onNext, enabled = uiState.activityLevel.isNotEmpty())
+        NeonButton(text = stringResource(com.example.baselift.R.string.onboarding_continue), onClick = onNext, enabled = uiState.activityLevel.isNotEmpty())
     }
 }
 
@@ -261,20 +262,20 @@ fun StepWeightGoal(
     onCalculate: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("Weight Goal", style = Typography.headlineLarge.copy(color = CrystalWhite))
+        Text(stringResource(com.example.baselift.R.string.onboarding_weight_goal), style = Typography.headlineLarge.copy(color = CrystalWhite))
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Define your target weekly rate.", style = Typography.bodyLarge.copy(color = MediumGrey))
+        Text(stringResource(com.example.baselift.R.string.onboarding_weight_goal_desc), style = Typography.bodyLarge.copy(color = MediumGrey))
         Spacer(modifier = Modifier.height(16.dp))
 
         data class GoalItem(val title: String, val desc: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val color: Color)
         val goals = listOf(
-            GoalItem("Extreme Loss", "1kg / week", Icons.Default.TrendingDown, ElectricBlue),
-            GoalItem("Weight Loss", "0.5kg / week", Icons.Default.TrendingDown, ElectricBlue),
-            GoalItem("Mild Weight Loss", "0.25kg (0.5lb) / week", Icons.Default.TrendingDown, ElectricBlue),
-            GoalItem("Maintenance", "Stay the same", Icons.Default.TrendingFlat, CrystalWhite),
-            GoalItem("Mild Weight Gain", "0.25kg / week", Icons.Default.TrendingUp, NeonGreen),
-            GoalItem("Weight Gain", "0.5kg / week", Icons.Default.TrendingUp, NeonGreen),
-            GoalItem("Extreme Gain", "1kg (2lb) / week", Icons.Default.TrendingUp, NeonGreen)
+            GoalItem("Extreme Loss", stringResource(com.example.baselift.R.string.onboarding_extreme_loss_desc), Icons.Default.TrendingDown, ElectricBlue),
+            GoalItem("Weight Loss", stringResource(com.example.baselift.R.string.onboarding_weight_loss_desc), Icons.Default.TrendingDown, ElectricBlue),
+            GoalItem("Mild Weight Loss", stringResource(com.example.baselift.R.string.onboarding_mild_weight_loss_desc), Icons.Default.TrendingDown, ElectricBlue),
+            GoalItem("Maintenance", stringResource(com.example.baselift.R.string.onboarding_maintenance_desc), Icons.Default.TrendingFlat, CrystalWhite),
+            GoalItem("Mild Weight Gain", stringResource(com.example.baselift.R.string.onboarding_mild_weight_gain_desc), Icons.Default.TrendingUp, NeonGreen),
+            GoalItem("Weight Gain", stringResource(com.example.baselift.R.string.onboarding_weight_gain_desc), Icons.Default.TrendingUp, NeonGreen),
+            GoalItem("Extreme Gain", stringResource(com.example.baselift.R.string.onboarding_extreme_gain_desc), Icons.Default.TrendingUp, NeonGreen)
         )
 
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -292,7 +293,7 @@ fun StepWeightGoal(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        NeonButton(text = "Calculate Targets", onClick = onCalculate, enabled = uiState.goal.isNotEmpty())
+        NeonButton(text = stringResource(com.example.baselift.R.string.onboarding_calculate_targets), onClick = onCalculate, enabled = uiState.goal.isNotEmpty())
     }
 }
 
@@ -309,7 +310,7 @@ fun StepCalculatedTargets(
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (uiState.isCustomTargets) "Your Custom Targets" else "Your Calculated Targets",
+                    if (uiState.isCustomTargets) stringResource(com.example.baselift.R.string.onboarding_your_custom_targets) else stringResource(com.example.baselift.R.string.onboarding_your_calculated_targets),
                     style = Typography.headlineLarge.copy(color = CrystalWhite)
                 )
                 if (uiState.isCustomTargets) {
@@ -324,7 +325,7 @@ fun StepCalculatedTargets(
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Based on your selected profile.", style = Typography.bodyLarge.copy(color = MediumGrey))
+            Text(stringResource(com.example.baselift.R.string.onboarding_based_on_profile), style = Typography.bodyLarge.copy(color = MediumGrey))
             Spacer(modifier = Modifier.height(16.dp))
 
         // mostrar calorias
@@ -337,7 +338,7 @@ fun StepCalculatedTargets(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("DAILY MAINTENANCE", color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.onboarding_daily_maintenance), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         "${uiState.dailyCaloriesGoal}",
@@ -358,11 +359,11 @@ fun StepCalculatedTargets(
                 .background(DarkSurface)
                 .padding(16.dp)
         ) {
-            MacroRow("PROTEIN", uiState.proteinGoal, "30% P", ElectricBlue, 0.3f)
+            MacroRow(stringResource(com.example.baselift.R.string.onboarding_protein), uiState.proteinGoal, stringResource(com.example.baselift.R.string.onboarding_protein_desc), ElectricBlue, 0.3f)
             HorizontalDivider(color = MediumGrey.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 8.dp))
-            MacroRow("CARBS", uiState.carbsGoal, "45% C", NeonGreen, 0.45f)
+            MacroRow(stringResource(com.example.baselift.R.string.onboarding_carbs), uiState.carbsGoal, stringResource(com.example.baselift.R.string.onboarding_carbs_desc), NeonGreen, 0.45f)
             HorizontalDivider(color = MediumGrey.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 8.dp))
-            MacroRow("FATS", uiState.fatGoal, "25% F", SoftCoral, 0.25f)
+            MacroRow(stringResource(com.example.baselift.R.string.onboarding_fats), uiState.fatGoal, stringResource(com.example.baselift.R.string.onboarding_fats_desc), SoftCoral, 0.25f)
         }
 
         }
@@ -370,14 +371,14 @@ fun StepCalculatedTargets(
         Spacer(modifier = Modifier.height(16.dp))
 
         NeonButton(
-            text = if (isRecalibrating) "UPDATE BASELINE" else "GET STARTED",
+            text = if (isRecalibrating) stringResource(com.example.baselift.R.string.onboarding_update_baseline) else stringResource(com.example.baselift.R.string.onboarding_get_started),
             onClick = onGetStarted
         )
         
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "Have a custom plan? Set macros manually >",
+            text = stringResource(com.example.baselift.R.string.onboarding_custom_plan_msg),
             color = ElectricBlue,
             fontSize = 14.sp,
             modifier = Modifier.fillMaxWidth().clickable { onCustomTargets() },

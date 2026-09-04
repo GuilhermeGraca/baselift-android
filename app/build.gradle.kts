@@ -71,6 +71,12 @@ dependencies {
     // Coil for Images
     implementation("io.coil-kt:coil-compose:2.5.0")
     
+    // Konfetti for Animations
+    implementation("nl.dionsegijn:konfetti-compose:2.0.4")
+    
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    
     testImplementation(libs.junit)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("app.cash.turbine:turbine:1.1.0")

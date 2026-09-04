@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import com.example.baselift.View.components.BarChartWithControls
 import com.example.baselift.View.components.ChartDataPoint
 import com.example.baselift.View.theme.NeonGreen
@@ -39,7 +40,7 @@ fun TotalTrainingVolumeSection(weeklyVolumes: List<WeeklyVolume>) {
             val percentChange = (delta / previousWeek.totalVolume) * 100
             
             val sign = if (percentChange >= 0) "+" else ""
-            subtitle = "$sign${String.format(Locale.US, "%.1f", percentChange)}% vs last period"
+            subtitle = stringResource(com.example.baselift.R.string.dash_vs_last_period, "$sign${String.format(Locale.US, "%.1f", percentChange)}%")
             subtitleColor = if (percentChange >= 0) NeonGreen else SoftCoral
         }
     }
@@ -49,7 +50,7 @@ fun TotalTrainingVolumeSection(weeklyVolumes: List<WeeklyVolume>) {
     val summaryValueStr = NumberFormat.getNumberInstance(Locale.US).format(totalVolume)
 
     BarChartWithControls(
-        title = "Total Training Volume",
+        title = stringResource(com.example.baselift.R.string.dash_total_volume),
         dataPoints = dataPoints,
         barColor = NeonGreen,
         yUnit = "kg",

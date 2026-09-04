@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.stringResource
 import com.example.baselift.ViewModel.workout.SetUiModel
 import com.example.baselift.View.theme.*
 
@@ -48,8 +49,8 @@ fun SetRow(
 
     if (showRemoveDialog) {
         ConfirmDeleteDialog(
-            title = "Remover set",
-            message = "Tens a certeza que queres remover o set ${setModel.setNumber}? Na próxima sessão este set já não aparecerá.",
+            title = stringResource(com.example.baselift.R.string.workout_remove_set),
+            message = stringResource(com.example.baselift.R.string.workout_remove_set_msg, setModel.setNumber),
             onConfirm = { onRemove(); showRemoveDialog = false },
             onDismiss = { showRemoveDialog = false }
         )

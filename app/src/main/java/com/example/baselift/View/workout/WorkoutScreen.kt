@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.View.theme.*
@@ -34,6 +35,12 @@ import com.example.baselift.View.workout.components.ExerciseCard
 import com.example.baselift.View.workout.components.GenericInputDialog
 import com.example.baselift.View.workout.components.RestTimerWidget
 import com.example.baselift.View.workout.components.ConfirmDeleteDialog
+import nl.dionsegijn.konfetti.compose.KonfettiView
+import nl.dionsegijn.konfetti.core.Party
+import nl.dionsegijn.konfetti.core.Position
+import nl.dionsegijn.konfetti.core.emitter.Emitter
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.launch
 
 @Composable
 fun WorkoutScreen(
@@ -46,6 +53,9 @@ fun WorkoutScreen(
     var showAddExerciseDialog by remember { mutableStateOf(false) }
     var workoutToDelete by remember { mutableStateOf<WorkoutEntity?>(null) }
     
+    var showConfetti by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    
     // Defer rendering of heavy lists by a few frames to make tab transition perfectly smooth
     var isContentReady by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -55,8 +65,8 @@ fun WorkoutScreen(
 
     if (workoutToDelete != null) {
         ConfirmDeleteDialog(
-            title = "Eliminar treino",
-            message = "Tens a certeza que queres eliminar o treino \"${workoutToDelete!!.name}\"? Esta ação é irreversível.",
+            title = stringResource(com.example.baselift.R.string.workout_delete_workout),
+            message = stringResource(com.example.baselift.R.string.workout_delete_workout_msg, workoutToDelete!!.name),
             onConfirm = {
                 viewModel.deleteWorkout(workoutToDelete!!)
                 workoutToDelete = null
@@ -131,7 +141,7 @@ fun WorkoutScreen(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No routines found. Click '+' to create one.", color = MediumGrey)
+                    Text(stringResource(com.example.baselift.R.string.workout_no_routines), color = MediumGrey)
                 }
             }
 
@@ -188,7 +198,7 @@ fun WorkoutScreen(
                                     Icon(Icons.Default.Add, contentDescription = "Add Exercise", tint = CrystalWhite)
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("+ ADD EXERCISE TO SESSION", color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Text(stringResource(com.example.baselift.R.string.workout_add_exercise_session), color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                             }
                         }
                         
@@ -201,13 +211,28 @@ fun WorkoutScreen(
 
                         // botão para finalizar treino
                         if (uiState.exercises.isNotEmpty()) {
+                            val hasCompletedSets = uiState.exercises.any { ex -> ex.sets.any { set -> set.isCompleted } }
+                            
                             Button(
-                                onClick = { viewModel.finalizeWorkout() },
+                                onClick = { 
+                                    showConfetti = true
+                                    scope.launch {
+                                        kotlinx.coroutines.delay(2000)
+                                        showConfetti = false
+                                        viewModel.finalizeWorkout()
+                                    }
+                                },
+                                enabled = hasCompletedSets,
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = NeonGreen,
+                                    disabledContainerColor = Color(0xFF222222),
+                                    contentColor = PureBlack,
+                                    disabledContentColor = Color(0xFF555555)
+                                ),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("FINALIZE WORKOUT", color = PureBlack, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                                Text(stringResource(com.example.baselift.R.string.workout_finalize), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
                             }
                         }
                     }
@@ -232,6 +257,34 @@ fun WorkoutScreen(
                 Icon(Icons.Default.Add, contentDescription = "Add Workout", modifier = Modifier.size(32.dp))
             }
         }
+
+        if (showConfetti) {
+            KonfettiView(
+                modifier = Modifier.fillMaxSize(),
+                parties = listOf(
+                    Party(
+                        speed = 30f,
+                        maxSpeed = 60f,
+                        damping = 0.9f,
+                        angle = 290,
+                        spread = 45,
+                        colors = listOf(0xCCFF00.toInt(), 0x00E5FF.toInt(), 0xFFFF6B6B.toInt()),
+                        emitter = Emitter(duration = 100, TimeUnit.MILLISECONDS).max(100),
+                        position = Position.Relative(0.0, 1.0)
+                    ),
+                    Party(
+                        speed = 30f,
+                        maxSpeed = 60f,
+                        damping = 0.9f,
+                        angle = 250,
+                        spread = 45,
+                        colors = listOf(0xCCFF00.toInt(), 0x00E5FF.toInt(), 0xFFFF6B6B.toInt()),
+                        emitter = Emitter(duration = 100, TimeUnit.MILLISECONDS).max(100),
+                        position = Position.Relative(1.0, 1.0)
+                    )
+                )
+            )
+        }
     }
 
     // diálogos
@@ -239,7 +292,7 @@ fun WorkoutScreen(
         var newWorkoutName by remember { mutableStateOf("") }
         Dialog(onDismissRequest = { showAddWorkoutDialog = false }) {
             GenericInputDialog(
-                title = "NEW ROUTINE",
+                title = stringResource(com.example.baselift.R.string.workout_new_routine),
                 content = {
                     BasicTextField(
                         value = newWorkoutName,
@@ -266,24 +319,24 @@ fun WorkoutScreen(
 
         Dialog(onDismissRequest = { showAddExerciseDialog = false }) {
             GenericInputDialog(
-                title = "ADD EXERCISE",
+                title = stringResource(com.example.baselift.R.string.workout_add_exercise),
                 content = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Exercise Name", color = MediumGrey, fontSize = 12.sp)
+                        Text(stringResource(com.example.baselift.R.string.workout_ex_name), color = MediumGrey, fontSize = 12.sp)
                         BasicTextField(
                             value = exName,
                             onValueChange = { exName = it },
                             modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(12.dp),
                             textStyle = Typography.bodyLarge.copy(color = CrystalWhite)
                         )
-                        Text("Equipment/Variant", color = MediumGrey, fontSize = 12.sp)
+                        Text(stringResource(com.example.baselift.R.string.workout_ex_equipment), color = MediumGrey, fontSize = 12.sp)
                         BasicTextField(
                             value = exEquipment,
                             onValueChange = { exEquipment = it },
                             modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(12.dp),
                             textStyle = Typography.bodyLarge.copy(color = CrystalWhite)
                         )
-                        Text("Muscle Tags (comma separated)", color = MediumGrey, fontSize = 12.sp)
+                        Text(stringResource(com.example.baselift.R.string.workout_ex_muscles), color = MediumGrey, fontSize = 12.sp)
                         BasicTextField(
                             value = exMuscles,
                             onValueChange = { exMuscles = it.uppercase() },

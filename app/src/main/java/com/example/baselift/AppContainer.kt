@@ -53,7 +53,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     override val workoutRepository: IWorkoutRepository by lazy {
-        WorkoutRepository(database.workoutDao())
+        WorkoutRepository(database.workoutDao(), context)
     }
 
     override val nutritionRepository: INutritionRepository by lazy {

@@ -4,7 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,14 +85,14 @@ fun DailyProgressSection(
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
+                androidx.compose.material3.Text(
                     text = remainingCalories.toString(),
                     color = Color.White,
                     fontSize = 48.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
-                Text(
-                    text = "REMAINING\n/ $targetCalories KCAL",
+                androidx.compose.material3.Text(
+                    text = stringResource(com.example.baselift.R.string.nutrition_remaining_kcal, targetCalories),
                     color = MediumGrey,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -112,17 +112,17 @@ fun DailyProgressSection(
                 verticalAlignment = Alignment.Bottom
             ) {
                 Column {
-                    Text("CONSUMED", color = NeonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    androidx.compose.material3.Text(stringResource(com.example.baselift.R.string.nutrition_consumed), color = NeonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text(consumedCalories.toString(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text(" KCAL", color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        androidx.compose.material3.Text(consumedCalories.toString(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        androidx.compose.material3.Text(stringResource(com.example.baselift.R.string.nutrition_kcal), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     }
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("GOAL", color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    androidx.compose.material3.Text(stringResource(com.example.baselift.R.string.nutrition_goal), color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text(targetCalories.toString(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text(" KCAL", color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        androidx.compose.material3.Text(targetCalories.toString(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        androidx.compose.material3.Text(stringResource(com.example.baselift.R.string.nutrition_kcal), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     }
                 }
             }
@@ -164,8 +164,8 @@ fun DailyProgressSection(
             
             if (consumedCalories > targetCalories) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${consumedCalories - targetCalories} KCAL OVER THE LIMIT",
+                androidx.compose.material3.Text(
+                    text = stringResource(com.example.baselift.R.string.nutrition_over_limit, consumedCalories - targetCalories),
                     color = SoftCoral,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
@@ -185,21 +185,21 @@ fun DailyProgressSection(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 MacroBar(
-                    label = "PROTEIN",
+                    label = stringResource(com.example.baselift.R.string.nutrition_protein),
                     consumed = consumedProtein,
                     target = targetProtein,
                     color = SunYellow,
                     overColor = DarkSunYellow
                 )
                 MacroBar(
-                    label = "CARBS",
+                    label = stringResource(com.example.baselift.R.string.nutrition_carbs),
                     consumed = consumedCarbs,
                     target = targetCarbs,
                     color = ElectricBlue,
                     overColor = DarkElectricBlue
                 )
                 MacroBar(
-                    label = "FATS",
+                    label = stringResource(com.example.baselift.R.string.nutrition_fats),
                     consumed = consumedFats,
                     target = targetFats,
                     color = VibrantPurple,
@@ -224,10 +224,10 @@ fun MacroBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom
         ) {
-            Text(text = label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            androidx.compose.material3.Text(text = label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(text = consumed.toString(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text(text = " / ${target}g", color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                androidx.compose.material3.Text(text = consumed.toString(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                androidx.compose.material3.Text(text = stringResource(com.example.baselift.R.string.nutrition_grams, target), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
         Spacer(modifier = Modifier.height(6.dp))

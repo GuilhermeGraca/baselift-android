@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +37,7 @@ fun LazyListScope.RoutinesSection(
 ) {
     item {
         Text(
-            "Routines",
+            stringResource(com.example.baselift.R.string.dash_routines),
             color = CrystalWhite,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold
@@ -54,7 +55,7 @@ fun LazyListScope.RoutinesSection(
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No routines available.", color = MediumGrey)
+                Text(stringResource(com.example.baselift.R.string.dash_no_routines), color = MediumGrey)
             }
         }
     } else {
@@ -144,7 +145,7 @@ fun WorkoutCollapsibleCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "VOLUME TREND",
+                        stringResource(com.example.baselift.R.string.dash_volume_trend),
                         color = CrystalWhite.copy(alpha = 0.6f),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -203,7 +204,7 @@ fun WorkoutCollapsibleCard(
                             .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No data", color = MediumGrey, fontSize = 12.sp)
+                        Text(stringResource(com.example.baselift.R.string.dash_no_data), color = MediumGrey, fontSize = 12.sp)
                     }
                 }
                 
@@ -343,7 +344,7 @@ fun ExerciseCollapsibleCard(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("MAX WEIGHT", color = CrystalWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(stringResource(com.example.baselift.R.string.dash_max_weight), color = CrystalWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text("${String.format(java.util.Locale.US, "%.1f", maxW)} kg", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -368,7 +369,7 @@ fun ExerciseCollapsibleCard(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = ElectricBlue, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("MAX VOLUME", color = CrystalWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(stringResource(com.example.baselift.R.string.dash_max_volume), color = CrystalWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text("${String.format(java.util.Locale.US, "%.0f", maxV)} kg", color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -376,11 +377,11 @@ fun ExerciseCollapsibleCard(
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Estimated 1RM: ${String.format(java.util.Locale.US, "%.1f", overallEst1RM)} kg", color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.dash_est_1rm, String.format(java.util.Locale.US, "%.1f", overallEst1RM)), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    "VOLUME",
+                    stringResource(com.example.baselift.R.string.dash_volume),
                     color = CrystalWhite.copy(alpha = 0.6f),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
@@ -407,7 +408,7 @@ fun ExerciseCollapsibleCard(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    "ABSOLUTE WEIGHT",
+                    stringResource(com.example.baselift.R.string.dash_absolute_weight),
                     color = CrystalWhite.copy(alpha = 0.6f),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold

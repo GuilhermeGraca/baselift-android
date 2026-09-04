@@ -36,6 +36,7 @@ import com.example.baselift.View.theme.SoftCoral
 import com.example.baselift.View.theme.SunYellow
 import com.example.baselift.View.theme.VibrantPurple
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -47,7 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
@@ -73,7 +74,7 @@ fun QuickAddMealsSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Quick Add Meals",
+                text = stringResource(com.example.baselift.R.string.nutrition_quick_add_meals),
                 color = Color.White,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
@@ -85,7 +86,7 @@ fun QuickAddMealsSection(
             ) {
                 Icon(Icons.Default.Settings, contentDescription = "Configure", tint = NeonGreen, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("CONFIGURE", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.nutrition_configure), color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -100,7 +101,7 @@ fun QuickAddMealsSection(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No saved meals yet.\nClick CONFIGURE to add your first template.",
+                    text = stringResource(com.example.baselift.R.string.nutrition_no_meals),
                     color = MediumGrey,
                     fontSize = 12.sp,
                     textAlign = TextAlign.Center
@@ -254,7 +255,7 @@ fun QuickAddMealsSection(
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = "TAP TO LOG AUTOMATICALLY",
+                                            text = stringResource(com.example.baselift.R.string.nutrition_tap_to_log),
                                             color = MediumGrey,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Medium,
@@ -271,7 +272,7 @@ fun QuickAddMealsSection(
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = "kcal",
+                                            text = stringResource(com.example.baselift.R.string.nutrition_kcal_lower),
                                             color = MediumGrey,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
@@ -294,7 +295,7 @@ fun QuickAddMealsSection(
                     HorizontalDivider(color = Color(0xFF2A2A2A))
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = if (showAllLogs) "SHOW LESS" else "SHOW MORE",
+                        text = if (showAllLogs) stringResource(com.example.baselift.R.string.nutrition_show_less) else stringResource(com.example.baselift.R.string.nutrition_show_more),
                         color = MediumGrey,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -333,13 +334,13 @@ fun QuickAddMealsSection(
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                     .padding(24.dp)
             ) {
-                Text("Delete Template", color = SoftCoral, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.nutrition_delete_template), color = SoftCoral, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Are you sure you want to remove '${template.name}' from your templates? This action cannot be undone.", color = CrystalWhite, fontSize = 14.sp)
+                Text(stringResource(com.example.baselift.R.string.nutrition_delete_template_msg, template.name), color = CrystalWhite, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = { itemToDelete = null }) {
-                        Text("CANCEL", color = MediumGrey)
+                        Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -350,7 +351,7 @@ fun QuickAddMealsSection(
                         colors = ButtonDefaults.buttonColors(containerColor = SoftCoral),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("DELETE", color = PureBlack, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.example.baselift.R.string.workout_delete), color = PureBlack, fontWeight = FontWeight.Bold)
                     }
                 }
             }

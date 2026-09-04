@@ -63,6 +63,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -92,7 +93,7 @@ fun WeightTrendSection(weightLogs: List<WeightLogEntity>, targetWeight: Float?, 
     }
 
     InteractiveChartWithControls(
-        title = "Weight Trend",
+        title = stringResource(com.example.baselift.R.string.insights_weight_trend),
         dataPoints = dataPoints,
         targetValue = targetWeight,
         onSetTargetValue = onSetTargetWeight,
@@ -136,20 +137,20 @@ fun LogWeightSection(onConfirmEntry: (Float, Long) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Add, contentDescription = "Add", tint = NeonGreen)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("LOG WEIGHT", color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.example.baselift.R.string.insights_log_weight), color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Expand", tint = MediumGrey)
             }
         } else {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("NEW MANUAL ENTRY", color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.example.baselift.R.string.insights_new_manual_entry), color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Icon(Icons.Default.Add, contentDescription = "Collapse", tint = MediumGrey, modifier = Modifier.clickable { isExpanded = false })
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Text("WEIGHT (KG)", color = MediumGrey, fontSize = 10.sp)
+                Text(stringResource(com.example.baselift.R.string.insights_weight_kg), color = MediumGrey, fontSize = 10.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = weightInput,
@@ -170,7 +171,7 @@ fun LogWeightSection(onConfirmEntry: (Float, Long) -> Unit) {
 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Text("ENTRY DATE", color = MediumGrey, fontSize = 10.sp)
+                Text(stringResource(com.example.baselift.R.string.insights_entry_date), color = MediumGrey, fontSize = 10.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = dateFormat.format(Date(selectedTimestamp)),
@@ -206,7 +207,7 @@ fun LogWeightSection(onConfirmEntry: (Float, Long) -> Unit) {
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
                 ) {
-                    Text("CONFIRM ENTRY", color = PureBlack, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.example.baselift.R.string.insights_confirm_entry), color = PureBlack, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -251,16 +252,16 @@ fun TechnicalHistoryLedger(weightLogs: List<WeightLogEntity>, user: UserEntity?,
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("TECHNICAL HISTORY LEDGER", color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.example.baselift.R.string.insights_technical_history), color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(NeonGreen.copy(alpha = 0.2f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                Text("RAW_DATA_SYNCED", color = NeonGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.insights_raw_data_synced), color = NeonGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
             }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
 
         if (sortedLogs.isEmpty()) {
-            Text("No entries yet.", color = MediumGrey, fontSize = 12.sp)
+            Text(stringResource(com.example.baselift.R.string.insights_no_entries), color = MediumGrey, fontSize = 12.sp)
         } else {
             val displayLogs = if (showAllLogs) sortedLogs else sortedLogs.take(4)
             
@@ -331,7 +332,7 @@ fun TechnicalHistoryLedger(weightLogs: List<WeightLogEntity>, user: UserEntity?,
                 HorizontalDivider(color = MediumGrey.copy(alpha = 0.2f))
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = if (showAllLogs) "LOAD LESS DATA" else "LOAD MORE DATA",
+                    text = if (showAllLogs) stringResource(com.example.baselift.R.string.insights_load_less_data) else stringResource(com.example.baselift.R.string.insights_load_more_data),
                     color = MediumGrey,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -357,13 +358,13 @@ fun TechnicalHistoryLedger(weightLogs: List<WeightLogEntity>, user: UserEntity?,
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                     .padding(24.dp)
             ) {
-                Text("Delete Entry", color = SoftCoral, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.insights_delete_entry), color = SoftCoral, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Are you sure you want to remove this weight record? This action cannot be undone.", color = CrystalWhite, fontSize = 14.sp)
+                Text(stringResource(com.example.baselift.R.string.insights_delete_weight_record_msg), color = CrystalWhite, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = { logToDelete = null }) {
-                        Text("CANCEL", color = MediumGrey)
+                        Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -374,7 +375,7 @@ fun TechnicalHistoryLedger(weightLogs: List<WeightLogEntity>, user: UserEntity?,
                         colors = ButtonDefaults.buttonColors(containerColor = SoftCoral),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("DELETE", color = PureBlack, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.example.baselift.R.string.workout_delete), color = PureBlack, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -401,7 +402,7 @@ fun VisualDiarySection(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Visual Diary", color = CrystalWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.example.baselift.R.string.insights_visual_diary), color = CrystalWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Icon(Icons.Default.CameraAlt, contentDescription = "Add Photo", tint = NeonGreen, modifier = Modifier.clickable { onAddPhoto() })
         }
         
@@ -412,7 +413,7 @@ fun VisualDiarySection(
                 modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(12.dp)).background(DarkSurface),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No photos added yet.", color = MediumGrey)
+                Text(stringResource(com.example.baselift.R.string.insights_no_photos), color = MediumGrey)
             }
         } else {
             val leftFadeAlpha by animateFloatAsState(
@@ -455,7 +456,7 @@ fun VisualDiarySection(
                             
                             if (isLatest) {
                                 Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(4.dp)).background(NeonGreen).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                                    Text("LATEST", color = PureBlack, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(com.example.baselift.R.string.insights_latest), color = PureBlack, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -556,14 +557,14 @@ fun PhotoDetailDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "PROGRESS PHOTO",
+                            text = stringResource(com.example.baselift.R.string.insights_progress_photo),
                             color = NeonGreen,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         )
                         Text(
-                            text = "CLOSE",
+                            text = stringResource(com.example.baselift.R.string.insights_close),
                             color = MediumGrey,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
@@ -641,7 +642,7 @@ fun PhotoDetailDialog(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "WEIGHT RECORDED: ${associatedWeight.weightValue} KG",
+                                text = stringResource(com.example.baselift.R.string.insights_weight_recorded, associatedWeight.weightValue),
                                 color = NeonGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -669,7 +670,7 @@ fun PhotoDetailDialog(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("REMOVE PHOTO", fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
+                            Text(stringResource(com.example.baselift.R.string.insights_remove_photo), fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                         }
                     } else {
                         Row(
@@ -683,7 +684,7 @@ fun PhotoDetailDialog(
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("CANCEL", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(stringResource(com.example.baselift.R.string.workout_cancel), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                             Button(
                                 onClick = {
@@ -694,7 +695,7 @@ fun PhotoDetailDialog(
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("CONFIRM DELETE", color = PureBlack, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(stringResource(com.example.baselift.R.string.insights_confirm_delete), color = PureBlack, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                         }
                     }
@@ -779,16 +780,16 @@ fun BmiBar(bmi: Float) {
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.weight(18.5f), contentAlignment = Alignment.Center) {
-                Text("UNDER", color = ElectricBlue, fontSize = 10.sp)
+                Text(stringResource(com.example.baselift.R.string.insights_under), color = ElectricBlue, fontSize = 10.sp)
             }
             Box(modifier = Modifier.weight(6.5f), contentAlignment = Alignment.Center) {
-                Text("NORMAL", color = NeonGreen, fontSize = 10.sp)
+                Text(stringResource(com.example.baselift.R.string.insights_normal), color = NeonGreen, fontSize = 10.sp)
             }
             Box(modifier = Modifier.weight(5f), contentAlignment = Alignment.Center) {
-                Text("OVER", color = SunYellow, fontSize = 10.sp)
+                Text(stringResource(com.example.baselift.R.string.insights_over), color = SunYellow, fontSize = 10.sp)
             }
             Box(modifier = Modifier.weight(10f), contentAlignment = Alignment.Center) {
-                Text("OBESE", color = SoftCoral, fontSize = 10.sp)
+                Text(stringResource(com.example.baselift.R.string.insights_obese), color = SoftCoral, fontSize = 10.sp)
             }
         }
     }

@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -195,7 +196,7 @@ fun InsightsScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = (user?.name ?: "SEM NOME").uppercase(),
+                        text = (user?.name ?: stringResource(com.example.baselift.R.string.insights_no_name)).uppercase(),
                         color = CrystalWhite,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -215,18 +216,18 @@ fun InsightsScreen(
 
         item {
             // métricas base
-            Text("Baseline Metrics", color = CrystalWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.example.baselift.R.string.insights_baseline_metrics), color = CrystalWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                MetricCard(label = "GENDER", value = uiState.gender, unit = "", icon = Icons.Default.Person, modifier = Modifier.weight(1f))
-                MetricCard(label = "AGE", value = uiState.age.toString(), unit = "YRS", icon = Icons.Default.DateRange, modifier = Modifier.weight(1f))
+                MetricCard(label = stringResource(com.example.baselift.R.string.insights_gender), value = uiState.gender, unit = "", icon = Icons.Default.Person, modifier = Modifier.weight(1f))
+                MetricCard(label = stringResource(com.example.baselift.R.string.insights_age), value = uiState.age.toString(), unit = stringResource(com.example.baselift.R.string.insights_yrs), icon = Icons.Default.DateRange, modifier = Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                MetricCard(label = "HEIGHT", value = uiState.height.toString(), unit = uiState.preferredHeightUnit, icon = Icons.Default.Height, modifier = Modifier.weight(1f))
+                MetricCard(label = stringResource(com.example.baselift.R.string.insights_height), value = uiState.height.toString(), unit = uiState.preferredHeightUnit, icon = Icons.Default.Height, modifier = Modifier.weight(1f))
                 MetricCard(
-                    label = "CURRENT WEIGHT", 
+                    label = stringResource(com.example.baselift.R.string.insights_current_weight), 
                     value = uiState.weight.toString(), 
                     unit = uiState.preferredWeightUnit, 
                     icon = Icons.Default.FitnessCenter,
@@ -236,7 +237,7 @@ fun InsightsScreen(
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
-            MetricCard(label = "LIFESTYLE", value = uiState.activityLevel.uppercase(), unit = "", icon = Icons.Default.DirectionsRun, modifier = Modifier.fillMaxWidth())
+            MetricCard(label = stringResource(com.example.baselift.R.string.insights_lifestyle), value = uiState.activityLevel.uppercase(), unit = "", icon = Icons.Default.DirectionsRun, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(24.dp))
         }
 
@@ -255,7 +256,7 @@ fun InsightsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Refresh, contentDescription = "Recalibrate", tint = NeonGreen, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("RECALIBRATE BASELINE", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.example.baselift.R.string.insights_recalibrate), color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -278,7 +279,7 @@ fun InsightsScreen(
                     .padding(16.dp)
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("BODY MASS INDEX", color = CrystalWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.example.baselift.R.string.insights_bmi), color = CrystalWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
@@ -298,7 +299,7 @@ fun InsightsScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "Your current BMI indicates ${getBmiCategory(uiState.bmi)} levels for your height and weight metrics.",
+                    text = stringResource(com.example.baselift.R.string.insights_bmi_description, getBmiCategory(uiState.bmi)),
                     color = MediumGrey,
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -316,7 +317,7 @@ fun InsightsScreen(
                     Icon(Icons.Default.Info, contentDescription = "Info", tint = ElectricBlue, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Note: BMI is not an absolute health indicator. It does not evaluate body composition, muscle mass, or localized fat.",
+                        stringResource(com.example.baselift.R.string.insights_bmi_disclaimer),
                         color = MediumGrey,
                         fontSize = 12.sp,
                         lineHeight = 16.sp
@@ -388,7 +389,7 @@ fun InsightsScreen(
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "ASSOCIATE DATE TO PHOTOS",
+                            text = stringResource(com.example.baselift.R.string.insights_associate_date),
                             color = NeonGreen,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
@@ -396,7 +397,7 @@ fun InsightsScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Select the date for the ${selectedUrisForLogging?.size ?: 0} selected progress photos:",
+                            text = stringResource(com.example.baselift.R.string.insights_select_date_desc, selectedUrisForLogging?.size ?: 0),
                             color = CrystalWhite,
                             fontSize = 14.sp
                         )
@@ -426,7 +427,7 @@ fun InsightsScreen(
                             horizontalArrangement = Arrangement.End
                         ) {
                             TextButton(onClick = { selectedUrisForLogging = null }) {
-                                Text("CANCEL", color = MediumGrey)
+                                Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Button(
@@ -439,7 +440,7 @@ fun InsightsScreen(
                                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("SAVE PHOTOS", color = PureBlack, fontWeight = FontWeight.Bold)
+                                Text(stringResource(com.example.baselift.R.string.insights_save_photos), color = PureBlack, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -508,7 +509,7 @@ fun InsightsScreen(
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "EDITAR NOME",
+                            text = stringResource(com.example.baselift.R.string.insights_edit_name),
                             color = NeonGreen,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
@@ -518,7 +519,7 @@ fun InsightsScreen(
                         OutlinedTextField(
                             value = nameInput,
                             onValueChange = { nameInput = it },
-                            label = { Text("Nome", color = MediumGrey) },
+                            label = { Text(stringResource(com.example.baselift.R.string.insights_name_label), color = MediumGrey) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -536,7 +537,7 @@ fun InsightsScreen(
                             horizontalArrangement = Arrangement.End
                         ) {
                             TextButton(onClick = { showNameDialog = false }) {
-                                Text("CANCELAR", color = MediumGrey)
+                                Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Button(
@@ -547,7 +548,7 @@ fun InsightsScreen(
                                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("GRAVAR", color = PureBlack, fontWeight = FontWeight.Bold)
+                                Text(stringResource(com.example.baselift.R.string.insights_save), color = PureBlack, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

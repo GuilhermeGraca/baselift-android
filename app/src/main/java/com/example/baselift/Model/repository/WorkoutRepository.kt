@@ -6,6 +6,13 @@ import com.example.baselift.Model.local.entity.SetLogEntity
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import kotlinx.coroutines.flow.Flow
+import android.content.Context
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import androidx.work.ExistingWorkPolicy
+import java.util.concurrent.TimeUnit
+import com.example.baselift.Model.worker.WorkoutReminderWorker
 
 /**
  * Interface do repositório de treino.
@@ -33,13 +40,17 @@ interface IWorkoutRepository {
     fun getAllCompletedSetLogs(): Flow<List<SetLogEntity>>
     fun getCompletedSetLogsForExercise(exerciseId: Int): Flow<List<SetLogEntity>>
     fun getCompletedSessionsForWorkout(workoutId: Int): Flow<List<WorkoutSessionEntity>>
+    suspend fun getAnyActiveSession(): WorkoutSessionEntity?
     suspend fun clearAllWorkoutData()
 }
 
 /**
  * Implementação real que delega para o WorkoutDao (Room).
  */
-class WorkoutRepository(private val workoutDao: WorkoutDao) : IWorkoutRepository {
+class WorkoutRepository(
+    private val workoutDao: WorkoutDao,
+    private val context: Context
+) : IWorkoutRepository {
 
     // --- WORKOUT TEMPLATES ---
     override val allWorkouts: Flow<List<WorkoutEntity>> = workoutDao.getAllWorkouts()
@@ -98,6 +109,10 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) : IWorkoutRepository
         return workoutDao.getActiveSessionFlow(workoutId)
     }
 
+    override suspend fun getAnyActiveSession(): WorkoutSessionEntity? {
+        return workoutDao.getAnyActiveSession()
+    }
+
     override suspend fun startOrGetSession(workoutId: Int): WorkoutSessionEntity {
         var session = workoutDao.getActiveSession(workoutId)
         if (session == null) {
@@ -108,6 +123,20 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) : IWorkoutRepository
             val id = workoutDao.insertSession(newSession)
             session = newSession.copy(id = id.toInt())
         }
+        
+        // Agendar notificação para daqui a 5 horas
+        val data = workDataOf("SESSION_ID" to session.id)
+        val workRequest = OneTimeWorkRequestBuilder<WorkoutReminderWorker>()
+            .setInitialDelay(5, TimeUnit.HOURS)
+            .setInputData(data)
+            .build()
+            
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "REMINDER_${session.id}", 
+            ExistingWorkPolicy.REPLACE, 
+            workRequest
+        )
+        
         return session
     }
 
@@ -117,6 +146,9 @@ class WorkoutRepository(private val workoutDao: WorkoutDao) : IWorkoutRepository
             endTime = System.currentTimeMillis()
         )
         workoutDao.updateSession(completedSession)
+        
+        // Cancelar notificação agendada
+        WorkManager.getInstance(context).cancelUniqueWork("REMINDER_${session.id}")
     }
 
     // --- SETS & PR LOGIC ---
