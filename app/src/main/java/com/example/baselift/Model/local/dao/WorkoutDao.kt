@@ -40,6 +40,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_sessions WHERE workoutId = :workoutId AND isCompleted = 0 LIMIT 1")
     suspend fun getActiveSession(workoutId: Int): WorkoutSessionEntity?
 
+    @Query("SELECT * FROM workout_sessions WHERE isCompleted = 0 ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getAnyActiveSession(): WorkoutSessionEntity?
+
     @Query("SELECT * FROM workout_sessions WHERE workoutId = :workoutId AND isCompleted = 0 LIMIT 1")
     fun getActiveSessionFlow(workoutId: Int): Flow<WorkoutSessionEntity?>
 

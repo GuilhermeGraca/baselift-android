@@ -11,9 +11,25 @@ import androidx.compose.ui.Modifier
 import com.example.baselift.View.theme.BaseLiftTheme
 import com.example.baselift.View.navigation.AppNavigation
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+
 class MainActivity : ComponentActivity() {
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        // Ignorar se negado, a app funciona na mesma sem agendar
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Pedir permissão no Android 13+ logo na primeira vez
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        
         enableEdgeToEdge()
         val appContainer = (application as BaseLiftApplication).container
         

@@ -92,9 +92,14 @@ class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel()
     init {
         // obter todos os treinos
         viewModelScope.launch {
+            val anyActive = repository.getAnyActiveSession()
             repository.allWorkouts.collect { workouts ->
                 _uiState.update { state ->
-                    val newSelected = state.selectedWorkout ?: workouts.firstOrNull()
+                    val activeWorkout = if (anyActive != null) {
+                        workouts.find { it.id == anyActive.workoutId }
+                    } else null
+                    
+                    val newSelected = state.selectedWorkout ?: activeWorkout ?: workouts.firstOrNull()
                     if (newSelected != state.selectedWorkout) {
                         selectWorkout(newSelected)
                     }

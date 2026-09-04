@@ -105,11 +105,22 @@ fun AppNavigation(
     val userState by progressViewModel.user.collectAsStateWithLifecycle()
     var resetType by remember { mutableStateOf<ResetType?>(null) }
 
-    // redirecionar para onboarding quando os dados são eliminados
-    LaunchedEffect(isLoaded, userState) {
-        if (isLoaded && userState == null && navController.currentDestination?.route != Routes.ONBOARDING) {
+    // redirecionamentos baseados no estado do utilizador
+    LaunchedEffect(isLoaded, userState, hasUser, isRecalibrating) {
+        if (!isLoaded) return@LaunchedEffect
+        
+        val currentRoute = navController.currentDestination?.route
+        
+        // Se os dados foram eliminados, ir para onboarding
+        if (userState == null && currentRoute != Routes.ONBOARDING) {
             navController.navigate(Routes.ONBOARDING) {
                 popUpTo(0) { inclusive = true }
+            }
+        } 
+        // Se tem utilizador e está no onboarding (mas não quer recalibrar), ir para insights
+        else if (hasUser && !isRecalibrating && currentRoute == Routes.ONBOARDING) {
+            navController.navigate(Routes.INSIGHTS) {
+                popUpTo(Routes.ONBOARDING) { inclusive = true }
             }
         }
     }
@@ -259,7 +270,10 @@ fun AppNavigation(
                     )
                 }
                 
-                composable(Routes.WORKOUT) {
+                composable(
+                    route = Routes.WORKOUT,
+                    deepLinks = listOf(androidx.navigation.navDeepLink { uriPattern = "baselift://workout" })
+                ) {
                     WorkoutScreen(viewModel = workoutViewModel)
                 }
                 
