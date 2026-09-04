@@ -266,6 +266,8 @@ fun InsightsScreen(
         item {
             // secção de IMC
             val bmiColor = getBmiColor(uiState.bmi)
+            var showIdealWeightDialog by remember { mutableStateOf(false) }
+            
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -323,7 +325,39 @@ fun InsightsScreen(
                         lineHeight = 16.sp
                     )
                 }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Ideal Body Weight Button
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    Box(
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(SunYellow.copy(alpha = 0.1f))
+                            .clickable { showIdealWeightDialog = true }
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            stringResource(com.example.baselift.R.string.insights_ideal_body_weight),
+                            color = SunYellow,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
             }
+            
+            if (showIdealWeightDialog) {
+                com.example.baselift.View.insights.components.IdealWeightDialog(
+                    heightCm = uiState.height,
+                    gender = uiState.gender,
+                    onDismiss = { showIdealWeightDialog = false }
+                )
+            }
+            
             Spacer(modifier = Modifier.height(48.dp))
         }
 
