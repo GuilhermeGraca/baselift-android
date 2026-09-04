@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -25,6 +26,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.baselift.R
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -172,15 +174,15 @@ fun AppNavigation(
         ) { innerPadding ->
             if (resetType != null) {
                 val title = when (resetType) {
-                    ResetType.ALL -> "ELIMINAR TODOS OS DADOS"
-                    ResetType.WORKOUT -> "ELIMINAR DADOS DE WORKOUT"
-                    ResetType.NUTRITION -> "ELIMINAR DADOS DE NUTRIÇÃO"
+                    ResetType.ALL -> stringResource(R.string.dialog_title_delete_all)
+                    ResetType.WORKOUT -> stringResource(R.string.dialog_title_delete_workout)
+                    ResetType.NUTRITION -> stringResource(R.string.dialog_title_delete_nutrition)
                     null -> ""
                 }
                 val message = when (resetType) {
-                    ResetType.ALL -> "Tem a certeza que deseja eliminar todos os seus dados? Esta ação é completamente irreversível e irá apagar todo o seu histórico de pesos, fotografias e baseline do utilizador."
-                    ResetType.WORKOUT -> "Tem a certeza que deseja eliminar todos os dados de treino? Esta ação irá apagar todos os seus exercícios, rotinas e histórico de treinos de forma irreversível."
-                    ResetType.NUTRITION -> "Tem a certeza que deseja eliminar todos os dados de nutrição? Esta ação irá apagar todos os seus registos diários e refeições de forma irreversível."
+                    ResetType.ALL -> stringResource(R.string.dialog_msg_delete_all)
+                    ResetType.WORKOUT -> stringResource(R.string.dialog_msg_delete_workout)
+                    ResetType.NUTRITION -> stringResource(R.string.dialog_msg_delete_nutrition)
                     null -> ""
                 }
 
@@ -384,7 +386,7 @@ fun TopHeaderBar(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = "Eliminar dados de workout",
+                                text = stringResource(R.string.menu_delete_workout_data),
                                 color = CrystalWhite,
                                 fontWeight = FontWeight.Bold
                             )
@@ -397,7 +399,7 @@ fun TopHeaderBar(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = "Eliminar dados de nutrição",
+                                text = stringResource(R.string.menu_delete_nutrition_data),
                                 color = CrystalWhite,
                                 fontWeight = FontWeight.Bold
                             )
@@ -411,7 +413,7 @@ fun TopHeaderBar(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = "Eliminar todos os dados",
+                                text = stringResource(R.string.menu_delete_all_data),
                                 color = SoftCoral,
                                 fontWeight = FontWeight.Bold
                             )
@@ -430,8 +432,8 @@ fun TopHeaderBar(
 
 @Composable
 fun ResetConfirmationDialog(
-    title: String = "ELIMINAR TODOS OS DADOS",
-    message: String = "Tem a certeza que deseja eliminar todos os seus dados? Esta ação é completamente irreversível e irá apagar todo o seu histórico de pesos, fotografias e baseline do utilizador.",
+    title: String,
+    message: String,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -474,7 +476,7 @@ fun ResetConfirmationDialog(
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(onClick = onDismiss) {
-                            Text("CANCELAR", color = MediumGrey, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.btn_cancel), color = MediumGrey, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
@@ -482,7 +484,7 @@ fun ResetConfirmationDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = SoftCoral),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("ELIMINAR", color = PureBlack, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.btn_delete), color = PureBlack, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

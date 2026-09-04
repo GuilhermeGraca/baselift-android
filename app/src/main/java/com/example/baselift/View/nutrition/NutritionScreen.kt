@@ -21,6 +21,7 @@ import com.example.baselift.View.nutrition.components.DailyProgressSection
 import com.example.baselift.View.nutrition.components.QuickLogSection
 import com.example.baselift.View.theme.NeonGreen
 import com.example.baselift.View.theme.PureBlack
+import androidx.compose.ui.res.stringResource
 import com.example.baselift.ViewModel.nutrition.NutritionViewModel
 
 // ecrã principal de nutrição
@@ -95,7 +96,7 @@ fun NutritionScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Default.Sync, contentDescription = "Set Custom Target", modifier = Modifier.size(16.dp), tint = com.example.baselift.View.theme.MediumGrey)
                     Spacer(modifier = Modifier.width(8.dp))
-                    androidx.compose.material3.Text("SET NEW TARGET", fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
+                    androidx.compose.material3.Text(stringResource(com.example.baselift.R.string.nutrition_set_new_target), fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
                 }
             }
 

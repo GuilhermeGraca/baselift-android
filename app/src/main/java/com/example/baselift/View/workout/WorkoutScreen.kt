@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.View.theme.*
@@ -64,8 +65,8 @@ fun WorkoutScreen(
 
     if (workoutToDelete != null) {
         ConfirmDeleteDialog(
-            title = "Eliminar treino",
-            message = "Tens a certeza que queres eliminar o treino \"${workoutToDelete!!.name}\"? Esta ação é irreversível.",
+            title = stringResource(com.example.baselift.R.string.workout_delete_workout),
+            message = stringResource(com.example.baselift.R.string.workout_delete_workout_msg, workoutToDelete!!.name),
             onConfirm = {
                 viewModel.deleteWorkout(workoutToDelete!!)
                 workoutToDelete = null
@@ -140,7 +141,7 @@ fun WorkoutScreen(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No routines found. Click '+' to create one.", color = MediumGrey)
+                    Text(stringResource(com.example.baselift.R.string.workout_no_routines), color = MediumGrey)
                 }
             }
 
@@ -197,7 +198,7 @@ fun WorkoutScreen(
                                     Icon(Icons.Default.Add, contentDescription = "Add Exercise", tint = CrystalWhite)
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("+ ADD EXERCISE TO SESSION", color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Text(stringResource(com.example.baselift.R.string.workout_add_exercise_session), color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                             }
                         }
                         
@@ -231,7 +232,7 @@ fun WorkoutScreen(
                                 ),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("FINALIZE WORKOUT", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                                Text(stringResource(com.example.baselift.R.string.workout_finalize), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
                             }
                         }
                     }
@@ -291,7 +292,7 @@ fun WorkoutScreen(
         var newWorkoutName by remember { mutableStateOf("") }
         Dialog(onDismissRequest = { showAddWorkoutDialog = false }) {
             GenericInputDialog(
-                title = "NEW ROUTINE",
+                title = stringResource(com.example.baselift.R.string.workout_new_routine),
                 content = {
                     BasicTextField(
                         value = newWorkoutName,
@@ -318,24 +319,24 @@ fun WorkoutScreen(
 
         Dialog(onDismissRequest = { showAddExerciseDialog = false }) {
             GenericInputDialog(
-                title = "ADD EXERCISE",
+                title = stringResource(com.example.baselift.R.string.workout_add_exercise),
                 content = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Exercise Name", color = MediumGrey, fontSize = 12.sp)
+                        Text(stringResource(com.example.baselift.R.string.workout_ex_name), color = MediumGrey, fontSize = 12.sp)
                         BasicTextField(
                             value = exName,
                             onValueChange = { exName = it },
                             modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(12.dp),
                             textStyle = Typography.bodyLarge.copy(color = CrystalWhite)
                         )
-                        Text("Equipment/Variant", color = MediumGrey, fontSize = 12.sp)
+                        Text(stringResource(com.example.baselift.R.string.workout_ex_equipment), color = MediumGrey, fontSize = 12.sp)
                         BasicTextField(
                             value = exEquipment,
                             onValueChange = { exEquipment = it },
                             modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(12.dp),
                             textStyle = Typography.bodyLarge.copy(color = CrystalWhite)
                         )
-                        Text("Muscle Tags (comma separated)", color = MediumGrey, fontSize = 12.sp)
+                        Text(stringResource(com.example.baselift.R.string.workout_ex_muscles), color = MediumGrey, fontSize = 12.sp)
                         BasicTextField(
                             value = exMuscles,
                             onValueChange = { exMuscles = it.uppercase() },

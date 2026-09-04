@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.baselift.Model.local.entity.MealTemplateEntity
@@ -99,9 +100,9 @@ fun ConfigureMealDialog(
                     verticalAlignment = Alignment.Top
                 ) {
                     Column {
-                        Text("Configure Meal", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.example.baselift.R.string.nutrition_configure_meal), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("MACRO OVERRIDE", color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.example.baselift.R.string.nutrition_macro_override), color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                     Box(
                         modifier = Modifier
@@ -118,7 +119,7 @@ fun ConfigureMealDialog(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Template Name
-                Text("TEMPLATE NAME", color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.nutrition_template_name), color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
@@ -140,7 +141,7 @@ fun ConfigureMealDialog(
                     }
                     Box(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
                         if (name.isEmpty()) {
-                            Text("Meal Name", color = MediumGrey.copy(alpha = 0.5f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(com.example.baselift.R.string.nutrition_meal_name), color = MediumGrey.copy(alpha = 0.5f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         }
                         BasicTextField(
                             value = name,
@@ -167,7 +168,7 @@ fun ConfigureMealDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("ESTIMATED TOTAL", color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(com.example.baselift.R.string.nutrition_estimated_total), color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Row(verticalAlignment = Alignment.Bottom) {
                             Box(contentAlignment = Alignment.BottomStart) {
                                 if (calories.isEmpty()) {
@@ -184,7 +185,7 @@ fun ConfigureMealDialog(
                                 )
                             }
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("KCAL", color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 6.dp))
+                            Text(stringResource(com.example.baselift.R.string.nutrition_kcal_label), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 6.dp))
                         }
                     }
 
@@ -201,11 +202,11 @@ fun ConfigureMealDialog(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Macros
-                MealMacroAdjustBox(label = "PROTEIN", color = SunYellow, value = protein, onValueChange = { protein = it })
+                MealMacroAdjustBox(label = stringResource(com.example.baselift.R.string.nutrition_protein), color = SunYellow, value = protein, onValueChange = { protein = it })
                 Spacer(modifier = Modifier.height(12.dp))
-                MealMacroAdjustBox(label = "CARBS", color = ElectricBlue, value = carbs, onValueChange = { carbs = it })
+                MealMacroAdjustBox(label = stringResource(com.example.baselift.R.string.nutrition_carbs), color = ElectricBlue, value = carbs, onValueChange = { carbs = it })
                 Spacer(modifier = Modifier.height(12.dp))
-                MealMacroAdjustBox(label = "FATS", color = VibrantPurple, value = fats, onValueChange = { fats = it })
+                MealMacroAdjustBox(label = stringResource(com.example.baselift.R.string.nutrition_fats), color = VibrantPurple, value = fats, onValueChange = { fats = it })
 
                 Spacer(modifier = Modifier.height(40.dp))
 
@@ -229,7 +230,7 @@ fun ConfigureMealDialog(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().height(56.dp)
                 ) {
-                    Text("CONFIRM TEMPLATE", color = PureBlack, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(stringResource(com.example.baselift.R.string.nutrition_confirm_template), color = PureBlack, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }

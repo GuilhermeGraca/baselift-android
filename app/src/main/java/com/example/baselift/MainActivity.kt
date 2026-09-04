@@ -24,16 +24,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Pedir permissão no Android 13+ logo na primeira vez
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        
+
         enableEdgeToEdge()
         val appContainer = (application as BaseLiftApplication).container
-        
+
         // Injetar dados de demonstração localmente (utiliza reflexão para evitar erros de compilação a quem clonar o repositório sem o ficheiro)
+        //Comentar o que está dentro do if se nao quiser mock data
         if (savedInstanceState == null) {
             try {
                 val clazz = Class.forName("com.example.baselift.MockDataInjector")
@@ -43,7 +44,7 @@ class MainActivity : ComponentActivity() {
                 // Ignora silenciosamente se o ficheiro não existir (ex: repositório clonado)
             }
         }
-        
+
         setContent {
             BaseLiftTheme {
                 AppNavigation(appContainer = appContainer, modifier = Modifier.fillMaxSize())

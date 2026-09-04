@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +42,7 @@ fun ConsistencyJournalSection(
     onSetNutritionRestDays: (Int) -> Unit = {}
 ) {
     Text(
-        "Consistency Journal",
+        stringResource(com.example.baselift.R.string.dash_consistency_journal),
         color = CrystalWhite,
         fontSize = 22.sp,
         fontWeight = FontWeight.Bold
@@ -66,14 +67,14 @@ fun ConsistencyJournalSection(
         StreakCard(
             icon = Icons.Default.Restaurant,
             value = nutritionStreak,
-            label = "NUTRITION STREAK",
+            label = stringResource(com.example.baselift.R.string.dash_nutrition_streak),
             accentColor = ElectricBlue,
             modifier = Modifier.weight(1f).clickable { showNutritionRestDaysDialog = true }
         )
         StreakCard(
             icon = Icons.Default.FitnessCenter,
             value = workoutStreak,
-            label = "WORKOUT STREAK",
+            label = stringResource(com.example.baselift.R.string.dash_workout_streak),
             accentColor = NeonGreen,
             modifier = Modifier.weight(1f).clickable { showRestDaysDialog = true }
         )
@@ -92,8 +93,8 @@ fun ConsistencyJournalSection(
     ) {
         // secção da nutrição
         WeekCalendarRow(
-            title = "NUTRITION",
-            rightLabel = "This week",
+            title = stringResource(com.example.baselift.R.string.dash_nutrition_tab),
+            rightLabel = stringResource(com.example.baselift.R.string.dash_this_week),
             isActiveDay = { it in nutritionDaysThisWeek.keys },
             icon = Icons.Default.Restaurant,
             activeColor = ElectricBlue,
@@ -137,8 +138,8 @@ fun ConsistencyJournalSection(
 
         // secção do workout
         WeekCalendarRow(
-            title = "WORKOUT",
-            rightLabel = "$workoutSessionsThisWeek workouts",
+            title = stringResource(com.example.baselift.R.string.dash_workout_tab),
+            rightLabel = stringResource(com.example.baselift.R.string.dash_workouts_count, workoutSessionsThisWeek),
             isActiveDay = { it in workoutDaysThisWeek.keys },
             icon = Icons.Default.FitnessCenter,
             activeColor = NeonGreen,
@@ -166,7 +167,7 @@ fun ConsistencyJournalSection(
             modifier = Modifier.fillMaxWidth().height(40.dp).padding(top = 4.dp),
             contentPadding = PaddingValues(0.dp)
         ) {
-            Text("VIEW CALENDAR", color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(com.example.baselift.R.string.dash_view_calendar), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 
@@ -209,7 +210,7 @@ fun ConsistencyJournalSection(
                     .padding(16.dp)
             ) {
                 if (marker.hasWorkout) {
-                    Text("WORKOUTS", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.example.baselift.R.string.dash_workouts_label), color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     marker.workoutNames.forEach { wName ->
                         Text("• $wName", color = CrystalWhite, fontSize = 14.sp)
@@ -221,7 +222,7 @@ fun ConsistencyJournalSection(
                 }
 
                 if (marker.hasNutrition) {
-                    Text("NUTRITION", color = ElectricBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.example.baselift.R.string.dash_nutrition_tab), color = ElectricBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("${marker.nutritionCalories ?: 0} kcal", color = CrystalWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -257,11 +258,11 @@ fun ConsistencyJournalSection(
                     .border(1.dp, NeonGreen.copy(alpha=0.2f), RoundedCornerShape(12.dp))
                     .padding(24.dp)
             ) {
-                Text("WORKOUT STREAK", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(stringResource(com.example.baselift.R.string.dash_workout_streak), color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Set the number of Rest Days per week (0 to 7). If you set 2, you need to workout 5 days a week to keep the streak.", color = MediumGrey, fontSize = 12.sp)
+                Text(stringResource(com.example.baselift.R.string.dash_rest_days_desc), color = MediumGrey, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Note: If you set 7 rest days, the streak never resets and just acts as a total workout counter.", color = MediumGrey, fontSize = 12.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                Text(stringResource(com.example.baselift.R.string.dash_rest_days_note), color = MediumGrey, fontSize = 12.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(
@@ -298,7 +299,7 @@ fun ConsistencyJournalSection(
                     modifier = Modifier.fillMaxWidth(),
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = NeonGreen)
                 ) {
-                    Text("SAVE", color = PureBlack, fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.example.baselift.R.string.dash_save), color = PureBlack, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -313,11 +314,11 @@ fun ConsistencyJournalSection(
                     .border(1.dp, ElectricBlue.copy(alpha=0.2f), RoundedCornerShape(12.dp))
                     .padding(24.dp)
             ) {
-                Text("NUTRITION STREAK", color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(stringResource(com.example.baselift.R.string.dash_nutrition_streak), color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Set the number of Rest Days per week (0 to 7). If you set 2, you need to log nutrition 5 days a week to keep the streak.", color = MediumGrey, fontSize = 12.sp)
+                Text(stringResource(com.example.baselift.R.string.dash_nut_rest_days_desc), color = MediumGrey, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Note: If you set 7 rest days, the streak never resets and just acts as a total nutrition days counter.", color = MediumGrey, fontSize = 12.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                Text(stringResource(com.example.baselift.R.string.dash_nut_rest_days_note), color = MediumGrey, fontSize = 12.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(
@@ -354,7 +355,7 @@ fun ConsistencyJournalSection(
                     modifier = Modifier.fillMaxWidth(),
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = ElectricBlue)
                 ) {
-                    Text("SAVE", color = PureBlack, fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.example.baselift.R.string.dash_save), color = PureBlack, fontWeight = FontWeight.Bold)
                 }
             }
         }

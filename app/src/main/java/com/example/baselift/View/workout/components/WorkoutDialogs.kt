@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
 import com.example.baselift.View.theme.*
@@ -61,7 +62,7 @@ fun RestTimerWidget(modifier: Modifier = Modifier) {
     ) {
         Column {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("REST TIMER", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.baselift.R.string.workout_rest_timer), color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Icon(Icons.Default.Timer, contentDescription = "Timer", tint = NeonGreen, modifier = Modifier.size(16.dp))
             }
             
@@ -85,7 +86,7 @@ fun RestTimerWidget(modifier: Modifier = Modifier) {
                     colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text("RESET", color = PureBlack, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(com.example.baselift.R.string.workout_reset), color = PureBlack, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 
                 Box(
@@ -111,7 +112,7 @@ fun RestTimerWidget(modifier: Modifier = Modifier) {
 
         Dialog(onDismissRequest = { showEditDialog = false }) {
             GenericInputDialog(
-                title = "SET REST TIMER",
+                title = stringResource(com.example.baselift.R.string.workout_set_rest_timer),
                 content = {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                         BasicTextField(
@@ -167,11 +168,11 @@ fun GenericInputDialog(
             Spacer(modifier = Modifier.height(24.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) {
-                    Text("CANCEL", color = MediumGrey)
+                    Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)) {
-                    Text("SAVE", color = PureBlack)
+                    Text(stringResource(com.example.baselift.R.string.workout_save), color = PureBlack)
                 }
             }
         }
@@ -192,7 +193,7 @@ fun EditExerciseDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         GenericInputDialog(
-            title = "EDITAR EXERCÍCIO",
+            title = stringResource(com.example.baselift.R.string.workout_edit_ex_title),
             content = {
                 // nome
                 BasicTextField(
@@ -201,7 +202,7 @@ fun EditExerciseDialog(
                     modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(16.dp),
                     textStyle = Typography().bodyLarge.copy(color = CrystalWhite),
                     decorationBox = { inner ->
-                        if (name.isEmpty()) Text("Nome do Exercício", color = MediumGrey)
+                        if (name.isEmpty()) Text(stringResource(com.example.baselift.R.string.workout_edit_ex_name_hint), color = MediumGrey)
                         inner()
                     }
                 )
@@ -213,7 +214,7 @@ fun EditExerciseDialog(
                     modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(16.dp),
                     textStyle = Typography().bodyLarge.copy(color = CrystalWhite),
                     decorationBox = { inner ->
-                        if (equipment.isEmpty()) Text("Equipamento (opcional)", color = MediumGrey)
+                        if (equipment.isEmpty()) Text(stringResource(com.example.baselift.R.string.workout_edit_ex_eq_hint), color = MediumGrey)
                         inner()
                     }
                 )
@@ -225,7 +226,7 @@ fun EditExerciseDialog(
                     modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(16.dp),
                     textStyle = Typography().bodyLarge.copy(color = CrystalWhite),
                     decorationBox = { inner ->
-                        if (muscleGroups.isEmpty()) Text("Grupos Musculares (separados por vírgula)", color = MediumGrey)
+                        if (muscleGroups.isEmpty()) Text(stringResource(com.example.baselift.R.string.workout_edit_ex_musc_hint), color = MediumGrey)
                         inner()
                     }
                 )
@@ -261,11 +262,11 @@ fun ConfirmDeleteDialog(
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) {
-                        Text("CANCEL", color = MediumGrey)
+                        Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4444))) {
-                        Text("ELIMINAR", color = CrystalWhite)
+                        Text(stringResource(com.example.baselift.R.string.workout_delete), color = CrystalWhite)
                     }
                 }
             }
