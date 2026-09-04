@@ -106,6 +106,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "baselift_database"
                 )
                 .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance
                 instance

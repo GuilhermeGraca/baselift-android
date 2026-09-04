@@ -71,6 +71,9 @@ dependencies {
     // Coil for Images
     implementation("io.coil-kt:coil-compose:2.5.0")
     
+    // Konfetti for Animations
+    implementation("nl.dionsegijn:konfetti-compose:2.0.4")
+    
     testImplementation(libs.junit)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("app.cash.turbine:turbine:1.1.0")
