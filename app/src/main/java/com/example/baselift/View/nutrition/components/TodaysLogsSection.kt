@@ -142,7 +142,7 @@ fun TodaysLogsSection(
                                     color = MediumGrey,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(bottom = 2.dp)
+                                    modifier = Modifier.padding(start = 2.dp, bottom = 2.dp)
                                 )
                             }
                         }

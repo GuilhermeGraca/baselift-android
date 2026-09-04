@@ -106,7 +106,8 @@ fun InteractiveChartWithControls(
             } else {
                 dataPoints
             }
-            val validPoints = if (filteredPoints.isEmpty()) dataPoints.takeLast(1) else filteredPoints
+            val rawPoints = if (filteredPoints.isEmpty()) dataPoints.takeLast(1) else filteredPoints
+            val validPoints = downsampleLTTB(rawPoints, 35)
 
             CustomCanvasChart(
                 validPoints = validPoints,
@@ -534,4 +535,68 @@ fun CustomCanvasChart(
             }
         }
     )
+}
+
+fun downsampleLTTB(data: List<ChartDataPoint>, threshold: Int): List<ChartDataPoint> {
+    if (threshold >= data.size || threshold == 0) return data
+
+    val sampled = ArrayList<ChartDataPoint>(threshold)
+    sampled.add(data.first()) // Always add the first point
+
+    val bucketSize = (data.size - 2).toDouble() / (threshold - 2)
+    var a = 0 // Initially a is the first point in the triangle
+
+    for (i in 0 until threshold - 2) {
+        var avgX = 0.0
+        var avgY = 0.0
+        var avgRangeStart = (kotlin.math.floor((i + 1) * bucketSize) + 1).toInt()
+        var avgRangeEnd = (kotlin.math.floor((i + 2) * bucketSize) + 1).toInt()
+        
+        avgRangeStart = avgRangeStart.coerceAtMost(data.size - 1)
+        avgRangeEnd = avgRangeEnd.coerceAtMost(data.size)
+        
+        val avgRangeLength = avgRangeEnd - avgRangeStart
+        
+        if (avgRangeLength > 0) {
+            for (j in avgRangeStart until avgRangeEnd) {
+                avgX += data[j].xValue.toDouble()
+                avgY += data[j].yValue.toDouble()
+            }
+            avgX /= avgRangeLength
+            avgY /= avgRangeLength
+        } else {
+            avgX = data.last().xValue.toDouble()
+            avgY = data.last().yValue.toDouble()
+        }
+
+        val rangeStart = (kotlin.math.floor(i * bucketSize) + 1).toInt()
+        val rangeEnd = (kotlin.math.floor((i + 1) * bucketSize) + 1).toInt()
+        
+        val safeRangeStart = rangeStart.coerceAtMost(data.size - 1)
+        val safeRangeEnd = rangeEnd.coerceAtMost(data.size)
+
+        var maxArea = -1.0
+        var maxAreaIndex = safeRangeStart
+
+        val pointAx = data[a].xValue.toDouble()
+        val pointAy = data[a].yValue.toDouble()
+
+        for (j in safeRangeStart until safeRangeEnd) {
+            val area = kotlin.math.abs(
+                (pointAx - avgX) * (data[j].yValue.toDouble() - pointAy) -
+                (pointAx - data[j].xValue.toDouble()) * (avgY - pointAy)
+            ) * 0.5
+            
+            if (area > maxArea) {
+                maxArea = area
+                maxAreaIndex = j
+            }
+        }
+        
+        sampled.add(data[maxAreaIndex])
+        a = maxAreaIndex
+    }
+
+    sampled.add(data.last())
+    return sampled
 }
