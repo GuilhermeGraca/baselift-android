@@ -106,7 +106,7 @@ fun InteractiveChartWithControls(
                 dataPoints
             }
             val rawPoints = if (filteredPoints.isEmpty()) dataPoints.takeLast(1) else filteredPoints
-            val validPoints = downsampleLTTB(rawPoints, 35)
+            val validPoints = downsampleLTTB(rawPoints, 20)
 
             CustomCanvasChart(
                 validPoints = validPoints,
