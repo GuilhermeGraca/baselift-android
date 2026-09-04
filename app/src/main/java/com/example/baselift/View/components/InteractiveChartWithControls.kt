@@ -55,8 +55,7 @@ fun InteractiveChartWithControls(
     
     var showGoalDialog by remember { mutableStateOf(false) }
     var goalInput by remember { mutableStateOf(targetValue?.toString() ?: "") }
-    
-    var isChronologicalScale by remember { mutableStateOf(false) }
+    var isChronologicalScale by remember { mutableStateOf(true) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (showTimeFilters) {
@@ -140,7 +139,7 @@ fun InteractiveChartWithControls(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .background(if (isChronologicalScale) lineColor else Color.Transparent)
+                    .background(if (!isChronologicalScale) lineColor else Color.Transparent)
                     .border(1.dp, lineColor, RoundedCornerShape(6.dp))
                     .clickable { isChronologicalScale = !isChronologicalScale }
                     .padding(horizontal = 10.dp, vertical = 4.dp),
@@ -149,7 +148,7 @@ fun InteractiveChartWithControls(
                 Icon(
                     Icons.Default.LinearScale, 
                     contentDescription = "Toggle Scale", 
-                    tint = if (isChronologicalScale) PureBlack else lineColor, 
+                    tint = if (!isChronologicalScale) PureBlack else lineColor, 
                     modifier = Modifier.size(12.dp)
                 )
             }
