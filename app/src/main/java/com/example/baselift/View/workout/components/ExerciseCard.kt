@@ -89,12 +89,11 @@ fun ExerciseCard(
     ) {
         Column(
             modifier = Modifier
-                .then(dragModifier)
                 .padding(top = 16.dp, bottom = if (isAnyDragging) 16.dp else 0.dp)
         ) {
             // cabeçalho
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).then(dragModifier),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -153,7 +152,11 @@ fun ExerciseCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            AnimatedVisibility(visible = !isAnyDragging) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !isAnyDragging,
+                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+            ) {
                 Column {
                     // cabeçalho da tabela de séries
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -171,8 +174,12 @@ fun ExerciseCard(
                 }
             }
         }
-
-        AnimatedVisibility(visible = !isAnyDragging) {
+        
+        androidx.compose.animation.AnimatedVisibility(
+            visible = !isAnyDragging,
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+        ) {
             Column(modifier = Modifier.padding(vertical = 0.dp)) {
                 exerciseModel.sets.forEach { setModel ->
                     androidx.compose.runtime.key(setModel.setNumber) {

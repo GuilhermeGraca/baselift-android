@@ -77,9 +77,7 @@ dependencies {
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     
-    // Reorderable LazyColumn
-    implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
-    
+
     testImplementation(libs.junit)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("app.cash.turbine:turbine:1.1.0")
