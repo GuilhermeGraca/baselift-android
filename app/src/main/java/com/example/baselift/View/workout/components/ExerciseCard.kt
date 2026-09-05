@@ -1,6 +1,7 @@
 package com.example.baselift.View.workout.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -15,8 +16,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -38,7 +43,10 @@ fun ExerciseCard(
     onAddSet: () -> Unit,
     onLogSet: (Int, Float, Int, Boolean, Int) -> Unit,
     onDeleteExercise: () -> Unit,
-    onEditExercise: (String, String, String) -> Unit
+    onEditExercise: (String, String, String) -> Unit,
+    isDragging: Boolean = false,
+    isAnyDragging: Boolean = false,
+    dragModifier: Modifier = Modifier
 ) {
     val exercise = exerciseModel.exercise
     var showMenu by remember { mutableStateOf(false) }
@@ -69,14 +77,21 @@ fun ExerciseCard(
             onDismiss = { showDeleteDialog = false }
         )
     }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFF1B1B1B))
+            .then(
+                if (isDragging) Modifier.border(2.dp, NeonGreen.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
+                else Modifier
+            )
     ) {
-        Column(modifier = Modifier.padding(top = 16.dp)) {
+        Column(
+            modifier = Modifier
+                .then(dragModifier)
+                .padding(top = 16.dp, bottom = if (isAnyDragging) 16.dp else 0.dp)
+        ) {
             // cabeçalho
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -136,51 +151,57 @@ fun ExerciseCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // cabeçalho da tabela de séries
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(com.example.baselift.R.string.workout_set_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.5f).padding(start = 8.dp))
-                Text(stringResource(com.example.baselift.R.string.workout_prev_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text(stringResource(com.example.baselift.R.string.workout_kg_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(stringResource(com.example.baselift.R.string.workout_reps_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
-                Spacer(modifier = Modifier.width(64.dp))
-            }
+            AnimatedVisibility(visible = !isAnyDragging) {
+                Column {
+                    // cabeçalho da tabela de séries
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(com.example.baselift.R.string.workout_set_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.5f).padding(start = 8.dp))
+                        Text(stringResource(com.example.baselift.R.string.workout_prev_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text(stringResource(com.example.baselift.R.string.workout_kg_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(com.example.baselift.R.string.workout_reps_col), color = Color(0xFFC4C9AC), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.width(64.dp))
+                    }
 
-            Spacer(modifier = Modifier.height(4.dp))
-            HorizontalDivider(color = Color(0xFF232323), thickness = 1.dp)
-            Spacer(modifier = Modifier.height(2.dp))
-        }
-
-        Column(modifier = Modifier.padding(vertical = 0.dp)) {
-            exerciseModel.sets.forEach { setModel ->
-                androidx.compose.runtime.key(setModel.setNumber) {
-                    SetRow(
-                        exerciseId = exerciseModel.exercise.id,
-                        setModel = setModel,
-                        draftWeights = draftWeights,
-                        draftReps = draftReps,
-                        onUpdateDraftWeight = onUpdateDraftWeight,
-                        onUpdateDraftReps = onUpdateDraftReps,
-                        onRemove = onRemoveLastSet,
-                        onLogSet = onLogSet
-                    )
                     Spacer(modifier = Modifier.height(4.dp))
+                    HorizontalDivider(color = Color(0xFF232323), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(2.dp))
                 }
             }
         }
 
-        // botão para adicionar série
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF222222))
-                .clickable { onAddSet() }
-                .padding(vertical = 12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = stringResource(com.example.baselift.R.string.workout_add_set), color = Color(0xFFC4C9AC), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        AnimatedVisibility(visible = !isAnyDragging) {
+            Column(modifier = Modifier.padding(vertical = 0.dp)) {
+                exerciseModel.sets.forEach { setModel ->
+                    androidx.compose.runtime.key(setModel.setNumber) {
+                        SetRow(
+                            exerciseId = exerciseModel.exercise.id,
+                            setModel = setModel,
+                            draftWeights = draftWeights,
+                            draftReps = draftReps,
+                            onUpdateDraftWeight = onUpdateDraftWeight,
+                            onUpdateDraftReps = onUpdateDraftReps,
+                            onRemove = onRemoveLastSet,
+                            onLogSet = onLogSet
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+
+                // botão para adicionar série
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF222222))
+                        .clickable { onAddSet() }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = stringResource(com.example.baselift.R.string.workout_add_set), color = Color(0xFFC4C9AC), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

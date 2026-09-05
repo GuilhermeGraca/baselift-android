@@ -41,7 +41,14 @@ import nl.dionsegijn.konfetti.core.Position
 import nl.dionsegijn.konfetti.core.emitter.Emitter
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
-
+import org.burnoutcrew.reorderable.rememberReorderableLazyListState
+import org.burnoutcrew.reorderable.reorderable
+import org.burnoutcrew.reorderable.ReorderableItem
+import org.burnoutcrew.reorderable.detectReorderAfterLongPress
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.graphics.graphicsLayer
 @Composable
 fun WorkoutScreen(
     viewModel: WorkoutViewModel,
@@ -55,6 +62,7 @@ fun WorkoutScreen(
     
     var showConfetti by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
     
     // Defer rendering of heavy lists by a few frames to make tab transition perfectly smooth
     var isContentReady by remember { mutableStateOf(false) }
@@ -149,33 +157,71 @@ fun WorkoutScreen(
 
             // lista de exercícios
             if (uiState.selectedWorkout != null && isContentReady) {
+                var isDraggingAny by remember { mutableStateOf(false) }
+
+                val reorderState = rememberReorderableLazyListState(
+                    onMove = { from, to ->
+                        viewModel.moveExercise(from.index, to.index)
+                    },
+                    onDragEnd = { _, _ ->
+                        viewModel.saveExerciseOrder()
+                        isDraggingAny = false
+                    }
+                )
+                
                 LazyColumn(
-                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+                    state = reorderState.listState,
+                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp).reorderable(reorderState),
                     contentPadding = PaddingValues(bottom = 120.dp) // espaço para elementos flutuantes
                 ) {
                     items(uiState.exercises, key = { it.exercise.id }) { exerciseModel ->
-                        ExerciseCard(
-                            exerciseModel = exerciseModel,
-                            draftWeights = viewModel.draftWeights,
-                            draftReps = viewModel.draftReps,
-                            onUpdateDraftWeight = { exId, setNum, v -> viewModel.updateDraftWeight(exId, setNum, v) },
-                            onUpdateDraftReps = { exId, setNum, v -> viewModel.updateDraftReps(exId, setNum, v) },
-                            onAddSet = { viewModel.addSetToExercise(exerciseModel.exercise.id) },
-                            onRemoveLastSet = { viewModel.removeLastSet(exerciseModel.exercise.id) },
-                            onDeleteExercise = { viewModel.deleteExercise(exerciseModel.exercise.id) },
-                            onEditExercise = { name, eq, mg -> viewModel.updateExercise(exerciseModel.exercise.id, name, eq, mg) },
-                            onLogSet = { setNumber, weight, reps, isCompleted, existingId ->
-                                viewModel.logSet(
-                                    exerciseId = exerciseModel.exercise.id,
-                                    setNumber = setNumber,
-                                    weight = weight,
-                                    reps = reps,
-                                    isCompleted = isCompleted,
-                                    existingSetId = existingId
+                        ReorderableItem(reorderState, key = exerciseModel.exercise.id) { isDragging ->
+                            val elevation by animateFloatAsState(if (isDragging) 32f else 0f)
+                            val scale by animateFloatAsState(if (isDragging) 1.05f else 1f)
+                            
+                            LaunchedEffect(isDragging) {
+                                if (isDragging) {
+                                    isDraggingAny = true
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
+                            }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 16.dp)
+                                    .graphicsLayer { 
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                    .shadow(elevation.dp, RoundedCornerShape(12.dp))
+                            ) {
+                                ExerciseCard(
+                                    exerciseModel = exerciseModel,
+                                    draftWeights = viewModel.draftWeights,
+                                    draftReps = viewModel.draftReps,
+                                    onUpdateDraftWeight = { exId, setNum, v -> viewModel.updateDraftWeight(exId, setNum, v) },
+                                    onUpdateDraftReps = { exId, setNum, v -> viewModel.updateDraftReps(exId, setNum, v) },
+                                    onAddSet = { viewModel.addSetToExercise(exerciseModel.exercise.id) },
+                                    onRemoveLastSet = { viewModel.removeLastSet(exerciseModel.exercise.id) },
+                                    onDeleteExercise = { viewModel.deleteExercise(exerciseModel.exercise.id) },
+                                    onEditExercise = { name, eq, mg -> viewModel.updateExercise(exerciseModel.exercise.id, name, eq, mg) },
+                                    onLogSet = { setNumber, weight, reps, isCompleted, existingId ->
+                                        viewModel.logSet(
+                                            exerciseId = exerciseModel.exercise.id,
+                                            setNumber = setNumber,
+                                            weight = weight,
+                                            reps = reps,
+                                            isCompleted = isCompleted,
+                                            existingSetId = existingId
+                                        )
+                                    },
+                                    isDragging = isDragging,
+                                    isAnyDragging = isDraggingAny,
+                                    dragModifier = Modifier.detectReorderAfterLongPress(reorderState)
                                 )
                             }
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        }
                     }
 
                     item {

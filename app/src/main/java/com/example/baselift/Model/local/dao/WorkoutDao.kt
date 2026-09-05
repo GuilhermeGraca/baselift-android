@@ -30,6 +30,9 @@ interface WorkoutDao {
     @Update
     suspend fun updateExercise(exercise: ExerciseEntity)
 
+    @Update
+    suspend fun updateExercises(exercises: List<ExerciseEntity>)
+
     @Delete
     suspend fun deleteExercise(exercise: ExerciseEntity)
 

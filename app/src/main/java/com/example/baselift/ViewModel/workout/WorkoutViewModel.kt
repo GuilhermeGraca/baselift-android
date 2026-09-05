@@ -248,6 +248,28 @@ class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel()
             )
         }
     }
+    fun moveExercise(from: Int, to: Int) {
+        _uiState.update { state ->
+            val mutableExercises = state.exercises.toMutableList()
+            if (from in mutableExercises.indices && to in mutableExercises.indices) {
+                val item = mutableExercises.removeAt(from)
+                mutableExercises.add(to, item)
+                state.copy(exercises = mutableExercises)
+            } else {
+                state
+            }
+        }
+    }
+
+    fun saveExerciseOrder() {
+        viewModelScope.launch {
+            val exercises = _uiState.value.exercises
+            val updatedEntities = exercises.mapIndexed { index, uiModel ->
+                uiModel.exercise.copy(orderIndex = index)
+            }
+            repository.updateExercises(updatedEntities)
+        }
+    }
 
     fun finalizeWorkout() {
         val session = _uiState.value.activeSession ?: return

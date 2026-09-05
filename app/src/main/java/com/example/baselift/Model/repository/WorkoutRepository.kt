@@ -26,6 +26,7 @@ interface IWorkoutRepository {
     fun getExercisesForWorkout(workoutId: Int): Flow<List<ExerciseEntity>>
     suspend fun createExercise(workoutId: Int, name: String, equipment: String, muscleGroups: String, orderIndex: Int = 0)
     suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String)
+    suspend fun updateExercises(exercises: List<ExerciseEntity>)
     suspend fun deleteExercise(exercise: ExerciseEntity)
     suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int)
     suspend fun addSet(exercise: ExerciseEntity)
@@ -85,6 +86,10 @@ class WorkoutRepository(
 
     override suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String) {
         workoutDao.updateExercise(exercise.copy(name = name, equipment = equipment, muscleGroups = muscleGroups))
+    }
+
+    override suspend fun updateExercises(exercises: List<ExerciseEntity>) {
+        workoutDao.updateExercises(exercises)
     }
 
     override suspend fun deleteExercise(exercise: ExerciseEntity) {
