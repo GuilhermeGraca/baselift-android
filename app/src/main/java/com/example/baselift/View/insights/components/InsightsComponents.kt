@@ -475,7 +475,7 @@ fun VisualDiarySection(
                                     Text(
                                         text = "${associatedWeight.weightValue} KG",
                                         color = CrystalWhite,
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.ExtraBold
                                     )
                                 }

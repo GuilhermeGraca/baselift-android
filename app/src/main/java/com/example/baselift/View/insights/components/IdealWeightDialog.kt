@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -133,14 +134,29 @@ fun IdealWeightDialog(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = stringResource(com.example.baselift.R.string.insights_ideal_weight_note),
-                color = MediumGrey.copy(alpha = 0.7f),
-                fontSize = 10.sp,
-                textAlign = TextAlign.Center,
-                lineHeight = 14.sp,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(com.example.baselift.View.theme.DarkSurface)
+                    .padding(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = com.example.baselift.View.theme.ElectricBlue,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(com.example.baselift.R.string.insights_ideal_weight_note),
+                    color = com.example.baselift.View.theme.MediumGrey,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }

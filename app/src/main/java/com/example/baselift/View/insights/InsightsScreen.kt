@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Male
 import androidx.compose.material.icons.filled.Female
@@ -315,26 +316,7 @@ fun InsightsScreen(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(DarkSurface)
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(Icons.Default.Info, contentDescription = "Info", tint = ElectricBlue, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        stringResource(com.example.baselift.R.string.insights_bmi_disclaimer),
-                        color = MediumGrey,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Ideal Body Weight Button
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                     Box(
@@ -346,13 +328,22 @@ fun InsightsScreen(
                             .padding(horizontal = 16.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            stringResource(com.example.baselift.R.string.insights_ideal_body_weight),
-                            color = SunYellow,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.HelpOutline,
+                                contentDescription = "Help",
+                                tint = SunYellow,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                stringResource(com.example.baselift.R.string.insights_ideal_body_weight),
+                                color = SunYellow,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
                     }
                 }
             }
