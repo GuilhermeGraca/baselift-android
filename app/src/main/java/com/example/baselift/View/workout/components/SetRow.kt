@@ -67,7 +67,8 @@ fun SetRow(
     // sincronização inicial
     LaunchedEffect(exerciseId, setModel.setNumber, log?.id) {
         if (weightInput.isEmpty() && log != null && log.weight > 0f) {
-            onUpdateDraftWeight(exerciseId, setModel.setNumber, log.weight.toString().removeSuffix(".0"))
+            val df = java.text.DecimalFormat("#.##", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.US))
+            onUpdateDraftWeight(exerciseId, setModel.setNumber, df.format(log.weight))
         }
         if (repsInput.isEmpty() && log != null && log.reps > 0) {
             onUpdateDraftReps(exerciseId, setModel.setNumber, log.reps.toString())
@@ -154,15 +155,27 @@ fun SetRow(
         )
 
         // anterior
-        val prevText = if (setModel.prevWeight != null && setModel.prevReps != null)
-            "${setModel.prevWeight.toString().removeSuffix(".0")}kg x\n${setModel.prevReps}"
-        else "-"
+        val prevText = if (setModel.prevWeight != null && setModel.prevReps != null) {
+            val df = java.text.DecimalFormat("#.##", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.US))
+            "${df.format(setModel.prevWeight)}kg x ${setModel.prevReps}"
+        } else "-"
         Text(prevText, color = Color(0xFFC4C9AC), fontSize = 14.sp, modifier = Modifier.weight(1f))
 
         // entrada de peso
         BasicTextField(
             value = weightInput,
-            onValueChange = { onUpdateDraftWeight(exerciseId, setModel.setNumber, it) },
+            onValueChange = { newValue ->
+                var text = newValue.replace(',', '.').filter { it.isDigit() || it == '.' }
+                if (text.count { it == '.' } > 1) {
+                    text = text.substringBeforeLast('.')
+                }
+                val parts = text.split('.')
+                if (parts.size == 2 && parts[1].length > 2) {
+                    text = parts[0] + "." + parts[1].take(2)
+                }
+                if (text.length > 6) text = text.take(6)
+                onUpdateDraftWeight(exerciseId, setModel.setNumber, text)
+            },
             enabled = !setModel.isCompleted,
             modifier = Modifier
                 .weight(0.8f)
@@ -170,7 +183,7 @@ fun SetRow(
                 .onFocusChanged { isWeightFocused = it.isFocused },
             textStyle = Typography().bodyLarge.copy(
                 color = inputTextColor,
-                fontSize = 24.sp,
+                fontSize = 20.sp,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Black
             ),
@@ -180,14 +193,32 @@ fun SetRow(
             decorationBox = { innerTextField ->
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 12.dp, horizontal = 2.dp)) {
                     if (weightInput.isEmpty()) {
+                        val df = java.text.DecimalFormat("#.##", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.US))
+                        val hint = setModel.prevWeight?.let { df.format(it) } ?: "-"
                         Text(
-                            setModel.prevWeight?.toString()?.removeSuffix(".0") ?: "-",
+                            hint,
                             color = if (isFocused) MediumGrey else MediumGrey.copy(alpha = 0.5f),
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Black
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
                         )
+                    } else if (setModel.isCompleted) {
+                        Text(
+                            weightInput,
+                            color = inputTextColor,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        innerTextField()
                     }
-                    innerTextField()
                 }
             }
         )
@@ -196,7 +227,10 @@ fun SetRow(
         // entrada de repetições
         BasicTextField(
             value = repsInput,
-            onValueChange = { onUpdateDraftReps(exerciseId, setModel.setNumber, it) },
+            onValueChange = { newValue ->
+                val text = newValue.filter { it.isDigit() }.take(4)
+                onUpdateDraftReps(exerciseId, setModel.setNumber, text)
+            },
             enabled = !setModel.isCompleted,
             modifier = Modifier
                 .weight(0.8f)
@@ -204,7 +238,7 @@ fun SetRow(
                 .onFocusChanged { isRepsFocused = it.isFocused },
             textStyle = Typography().bodyLarge.copy(
                 color = inputTextColor,
-                fontSize = 24.sp,
+                fontSize = 20.sp,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Black
             ),
@@ -217,11 +251,27 @@ fun SetRow(
                         Text(
                             setModel.prevReps?.toString() ?: "-",
                             color = if (isFocused) MediumGrey else MediumGrey.copy(alpha = 0.5f),
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Black
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
                         )
+                    } else if (setModel.isCompleted) {
+                        Text(
+                            repsInput,
+                            color = inputTextColor,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        innerTextField()
                     }
-                    innerTextField()
                 }
             }
         )
@@ -260,7 +310,8 @@ fun SetRow(
                     val w = weightInput.toFloatOrNull() ?: setModel.prevWeight ?: 0f
                     val r = repsInput.toIntOrNull() ?: setModel.prevReps ?: 0
                     if (!setModel.isCompleted) {
-                        onUpdateDraftWeight(exerciseId, setModel.setNumber, w.toString().removeSuffix(".0"))
+                        val df = java.text.DecimalFormat("#.##", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.US))
+                        onUpdateDraftWeight(exerciseId, setModel.setNumber, df.format(w))
                         onUpdateDraftReps(exerciseId, setModel.setNumber, r.toString())
                     }
                     onLogSet(setModel.setNumber, w, r, !setModel.isCompleted, existingId)

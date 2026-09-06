@@ -378,7 +378,13 @@ fun WorkoutScreen(
                                 Spacer(modifier = Modifier.height(32.dp))
                                 
                                 // temporizador de descanso
-                                RestTimerWidget(modifier = Modifier.fillMaxWidth())
+                                RestTimerWidget(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    initialTimerSeconds = uiState.selectedWorkout?.defaultRestTimer ?: 105,
+                                    onTimerSaved = { seconds ->
+                                        viewModel.updateWorkoutRestTimer(seconds)
+                                    }
+                                )
 
                                 Spacer(modifier = Modifier.height(16.dp))
 

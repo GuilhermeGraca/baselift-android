@@ -33,9 +33,13 @@ import kotlinx.coroutines.delay
 import com.example.baselift.View.theme.*
 
 @Composable
-fun RestTimerWidget(modifier: Modifier = Modifier) {
-    var totalSeconds by remember { mutableStateOf(105) } // padrão é 01:45
-    var defaultSeconds by remember { mutableStateOf(105) }
+fun RestTimerWidget(
+    modifier: Modifier = Modifier,
+    initialTimerSeconds: Int = 105,
+    onTimerSaved: (Int) -> Unit = {}
+) {
+    var totalSeconds by remember { mutableIntStateOf(initialTimerSeconds) }
+    var defaultSeconds by remember(initialTimerSeconds) { mutableIntStateOf(initialTimerSeconds) }
     var isRunning by remember { mutableStateOf(false) }
 
     // lógica do temporizador
@@ -117,18 +121,20 @@ fun RestTimerWidget(modifier: Modifier = Modifier) {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                         BasicTextField(
                             value = minInput,
-                            onValueChange = { minInput = it },
+                            onValueChange = { minInput = it.filter { char -> char.isDigit() } },
                             modifier = Modifier.weight(1f).background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(16.dp),
                             textStyle = Typography().bodyLarge.copy(color = CrystalWhite, textAlign = TextAlign.Center),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
                         )
                         Text(":", color = CrystalWhite, fontSize = 24.sp, modifier = Modifier.align(Alignment.CenterVertically))
                         BasicTextField(
                             value = secInput,
-                            onValueChange = { secInput = it },
+                            onValueChange = { secInput = it.filter { char -> char.isDigit() } },
                             modifier = Modifier.weight(1f).background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(16.dp),
                             textStyle = Typography().bodyLarge.copy(color = CrystalWhite, textAlign = TextAlign.Center),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
                         )
                     }
                 },
@@ -137,6 +143,7 @@ fun RestTimerWidget(modifier: Modifier = Modifier) {
                     val s = secInput.toIntOrNull() ?: 0
                     defaultSeconds = (m * 60) + s
                     totalSeconds = defaultSeconds
+                    onTimerSaved(defaultSeconds)
                     isRunning = false
                     showEditDialog = false
                 },

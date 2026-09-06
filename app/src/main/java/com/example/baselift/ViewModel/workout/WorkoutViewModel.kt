@@ -195,6 +195,16 @@ class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel()
         }
     }
 
+    fun updateWorkoutRestTimer(seconds: Int) {
+        val currentWorkout = _uiState.value.selectedWorkout ?: return
+        viewModelScope.launch {
+            val updatedWorkout = currentWorkout.copy(defaultRestTimer = seconds)
+            repository.updateWorkout(updatedWorkout)
+            // Atualizar o selectedWorkout no UI state
+            _uiState.update { it.copy(selectedWorkout = updatedWorkout) }
+        }
+    }
+
     fun addSetToExercise(exerciseId: Int) {
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
         viewModelScope.launch {
