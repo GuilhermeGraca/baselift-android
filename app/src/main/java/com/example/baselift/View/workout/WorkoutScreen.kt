@@ -42,6 +42,7 @@ import nl.dionsegijn.konfetti.core.emitter.Emitter
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.scrollBy
@@ -259,7 +260,6 @@ fun WorkoutScreen(
                                                 
                                                 if (draggedIndex != dropIdx) {
                                                     viewModel.moveExercise(draggedIndex!!, dropIdx)
-                                                    viewModel.saveExerciseOrder()
                                                 }
                                                 
                                                 coroutineScope.launch {

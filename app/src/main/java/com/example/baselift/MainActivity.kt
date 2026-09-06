@@ -36,13 +36,13 @@ class MainActivity : ComponentActivity() {
         // Injetar dados de demonstração localmente (utiliza reflexão para evitar erros de compilação a quem clonar o repositório sem o ficheiro)
         //Comentar o que está dentro do if se nao quiser mock data
         if (savedInstanceState == null) {
-            try {
-                val clazz = Class.forName("com.example.baselift.MockDataInjector")
-                val instance = clazz.getDeclaredField("INSTANCE").get(null)
-                clazz.methods.find { it.name == "inject" }?.invoke(instance, this, true)
-            } catch (_: Exception) {
-                // Ignora silenciosamente se o ficheiro não existir (ex: repositório clonado)
-            }
+            // try {
+            //     val clazz = Class.forName("com.example.baselift.MockDataInjector")
+            //     val instance = clazz.getDeclaredField("INSTANCE").get(null)
+            //     clazz.methods.find { it.name == "inject" }?.invoke(instance, this, true)
+            // } catch (_: Exception) {
+            //     // Ignora silenciosamente se o ficheiro não existir (ex: repositório clonado)
+            // }
         }
 
         setContent {
