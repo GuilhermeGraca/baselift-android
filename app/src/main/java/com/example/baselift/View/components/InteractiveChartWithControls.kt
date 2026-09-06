@@ -118,9 +118,9 @@ fun InteractiveChartWithControls(
                 formatXLabel = formatXLabel
             )
             
-            if (validPoints.isNotEmpty()) {
-                val latestPoint = validPoints.last()
-                val previousPoint = if (validPoints.size > 1) validPoints[validPoints.size - 2] else latestPoint
+            if (dataPoints.isNotEmpty()) {
+                val latestPoint = dataPoints.last()
+                val previousPoint = if (dataPoints.size > 1) dataPoints[dataPoints.size - 2] else latestPoint
                 val delta = latestPoint.yValue - previousPoint.yValue
                 val sign = if (delta > 0) "+" else ""
                 
@@ -138,18 +138,18 @@ fun InteractiveChartWithControls(
             // Toggle scale button
             Box(
                 modifier = Modifier
+                    .size(28.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(if (!isChronologicalScale) lineColor else Color.Transparent)
                     .border(1.dp, lineColor, RoundedCornerShape(6.dp))
-                    .clickable { isChronologicalScale = !isChronologicalScale }
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .clickable { isChronologicalScale = !isChronologicalScale },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.LinearScale, 
                     contentDescription = "Toggle Scale", 
                     tint = if (!isChronologicalScale) PureBlack else lineColor, 
-                    modifier = Modifier.size(12.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
             
@@ -159,10 +159,11 @@ fun InteractiveChartWithControls(
                 if (targetValue != null) {
                     Row(
                         modifier = Modifier
+                            .height(28.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .border(1.dp, SoftCoral, RoundedCornerShape(6.dp))
                             .clickable { onSetTargetValue(null) }
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .padding(horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = "Remove Goal", tint = SoftCoral, modifier = Modifier.size(12.dp))
@@ -172,10 +173,12 @@ fun InteractiveChartWithControls(
                 } else {
                     Box(
                         modifier = Modifier
+                            .height(28.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(ElectricBlue.copy(alpha = 0.2f))
                             .clickable { showGoalDialog = true }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .padding(horizontal = 10.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text("ADD GOAL +", color = ElectricBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
