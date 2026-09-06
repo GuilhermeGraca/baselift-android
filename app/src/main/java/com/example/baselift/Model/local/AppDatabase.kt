@@ -43,7 +43,7 @@ import com.example.baselift.Model.local.dao.NutritionDao
     ], // lista de entidades que a base de dados vai ter
                    // cada entidade é uma data class anotada com @Entity
 
-    version = 10, // versão 10 com a adição de índices para performance
+    version = 11, // versão 11 com a adição de defaultRestTimer em workouts
 
     exportSchema = false // false porque não precisamos exportar o esquema para JSON
                          // e assim evitamos configurar a pasta de destino
@@ -95,6 +95,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // migração 10 para 11 adiciona defaultRestTimer aos treinos
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE workouts ADD COLUMN defaultRestTimer INTEGER NOT NULL DEFAULT 105")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -105,7 +112,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "baselift_database"
                 )
-                .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance

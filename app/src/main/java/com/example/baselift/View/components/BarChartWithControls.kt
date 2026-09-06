@@ -103,6 +103,8 @@ fun BarChartWithControls(
             } else {
                 dataPoints
             }
+            
+            val validPoints = aggregateBarData(filteredPoints, 35)
 
         // Resumo no topo (não sobreposto)
         if (summaryValue != null) {
@@ -157,7 +159,7 @@ fun BarChartWithControls(
                 .weight(1f)
         ) {
             CustomCanvasBarChart(
-                validPoints = filteredPoints,
+                validPoints = validPoints,
                 barColor = barColor,
                 formatYLabel = formatYLabel,
                 formatXLabel = formatXLabel,
@@ -389,4 +391,29 @@ fun CustomCanvasBarChart(
             }
         }
     }
+}
+
+fun aggregateBarData(data: List<ChartDataPoint>, maxBars: Int): List<ChartDataPoint> {
+    if (data.size <= maxBars || data.isEmpty()) return data
+    
+    val aggregated = mutableListOf<ChartDataPoint>()
+    val bucketSize = data.size.toDouble() / maxBars
+    
+    for (i in 0 until maxBars) {
+        val start = (i * bucketSize).toInt()
+        val end = minOf(((i + 1) * bucketSize).toInt(), data.size)
+        
+        if (start < end) {
+            val bucket = data.subList(start, end)
+            val avgX = bucket.map { it.xValue }.average().toLong()
+            val avgY = bucket.map { it.yValue }.average().toFloat()
+            
+            val startDate = java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(bucket.first().xValue))
+            val endDate = java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(bucket.last().xValue))
+            val tooltip = if (start == end - 1) bucket.first().tooltipLabel else "Avg: ${String.format(java.util.Locale.US, "%.1f", avgY)}\n$startDate - $endDate"
+            
+            aggregated.add(ChartDataPoint(avgX, avgY, tooltip))
+        }
+    }
+    return aggregated
 }

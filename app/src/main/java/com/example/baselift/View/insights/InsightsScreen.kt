@@ -31,7 +31,10 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Male
+import androidx.compose.material.icons.filled.Female
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -220,7 +223,12 @@ fun InsightsScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                MetricCard(label = stringResource(com.example.baselift.R.string.insights_gender), value = uiState.gender, unit = "", icon = Icons.Default.Person, modifier = Modifier.weight(1f))
+                val genderIcon = when (uiState.gender.lowercase(Locale.ROOT)) {
+                    "male", "masculino" -> Icons.Default.Male
+                    "female", "feminino" -> Icons.Default.Female
+                    else -> Icons.Default.Person
+                }
+                MetricCard(label = stringResource(com.example.baselift.R.string.insights_gender), value = uiState.gender, unit = "", icon = genderIcon, modifier = Modifier.weight(1f))
                 MetricCard(label = stringResource(com.example.baselift.R.string.insights_age), value = uiState.age.toString(), unit = stringResource(com.example.baselift.R.string.insights_yrs), icon = Icons.Default.DateRange, modifier = Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -266,6 +274,8 @@ fun InsightsScreen(
         item {
             // secção de IMC
             val bmiColor = getBmiColor(uiState.bmi)
+            var showIdealWeightDialog by remember { mutableStateOf(false) }
+            
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -306,24 +316,46 @@ fun InsightsScreen(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(DarkSurface)
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(Icons.Default.Info, contentDescription = "Info", tint = ElectricBlue, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        stringResource(com.example.baselift.R.string.insights_bmi_disclaimer),
-                        color = MediumGrey,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
+
+                // Ideal Body Weight Button
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    Box(
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(SunYellow.copy(alpha = 0.1f))
+                            .clickable { showIdealWeightDialog = true }
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.HelpOutline,
+                                contentDescription = "Help",
+                                tint = SunYellow,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                stringResource(com.example.baselift.R.string.insights_ideal_body_weight),
+                                color = SunYellow,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
                 }
             }
+            
+            if (showIdealWeightDialog) {
+                com.example.baselift.View.insights.components.IdealWeightDialog(
+                    heightCm = uiState.height,
+                    gender = uiState.gender,
+                    onDismiss = { showIdealWeightDialog = false }
+                )
+            }
+            
             Spacer(modifier = Modifier.height(48.dp))
         }
 
@@ -355,6 +387,7 @@ fun InsightsScreen(
             // diário visual
             VisualDiarySection(
                 photoLogs = photoLogs,
+                weightLogs = weightLogs,
                 onPhotoClick = { clickedPhoto = it }
             ) {
                 photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))

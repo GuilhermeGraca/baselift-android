@@ -188,12 +188,17 @@ fun QuickAddMealsSection(
                         }
                         
                         // Foreground content
+                        val context = androidx.compose.ui.platform.LocalContext.current
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .offset { IntOffset(animatedOffset.roundToInt(), 0) }
                                 .background(PureBlack)
-                                .clickable { onLogMeal(template) }
+                                .clickable { 
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    onLogMeal(template)
+                                    android.widget.Toast.makeText(context, "${template.name} added", android.widget.Toast.LENGTH_SHORT).show()
+                                }
                                 .pointerInput(Unit) {
                                     detectHorizontalDragGestures(
                                         onDragStart = { isDragging = true },

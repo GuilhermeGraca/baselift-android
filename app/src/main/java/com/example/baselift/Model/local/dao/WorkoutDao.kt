@@ -14,6 +14,9 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkout(workout: WorkoutEntity): Long
 
+    @Update
+    suspend fun updateWorkout(workout: WorkoutEntity)
+
     @Delete
     suspend fun deleteWorkout(workout: WorkoutEntity)
 
@@ -29,6 +32,9 @@ interface WorkoutDao {
 
     @Update
     suspend fun updateExercise(exercise: ExerciseEntity)
+
+    @Update
+    suspend fun updateExercises(exercises: List<ExerciseEntity>)
 
     @Delete
     suspend fun deleteExercise(exercise: ExerciseEntity)

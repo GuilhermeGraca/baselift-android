@@ -22,7 +22,8 @@ class WorkoutRepositoryTest {
     @Before
     fun setup() {
         workoutDao = mockk(relaxed = true)
-        repository = WorkoutRepository(workoutDao)
+        val context: android.content.Context = mockk(relaxed = true)
+        repository = WorkoutRepository(workoutDao, context)
     }
 
     @Test

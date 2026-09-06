@@ -142,6 +142,11 @@
     <string name="insights_bmi">BODY MASS INDEX</string>
     <string name="insights_bmi_description">Your current BMI indicates %1$s levels for your height and weight metrics.</string>
     <string name="insights_bmi_disclaimer">Note: BMI is not an absolute health indicator. It does not evaluate body composition, muscle mass, or localized fat.</string>
+    <string name="insights_ideal_body_weight">IDEAL BODY WEIGHT</string>
+    <string name="insights_ideal_weight_desc">The ideal weight based on popular formulas, calculated for your height and gender.</string>
+    <string name="insights_formula">Formula</string>
+    <string name="insights_ideal_weight">Ideal Weight</string>
+    <string name="insights_ideal_weight_note">Note: These formulas provide estimations. Actual ideal weight depends on muscle mass, bone density, and individual health factors.</string>
     <string name="insights_associate_date">ASSOCIATE DATE TO PHOTOS</string>
     <string name="insights_select_date_desc">Select the date for the %1$d selected progress photos:</string>
     <string name="insights_save_photos">SAVE PHOTOS</string>

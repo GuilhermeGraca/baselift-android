@@ -226,4 +226,8 @@ class FakeWorkoutRepository : IWorkoutRepository {
         nextSessionId = 1
         nextSetLogId = 1
     }
+
+    override suspend fun getAnyActiveSession(): WorkoutSessionEntity? {
+        return sessionsFlow.value.find { !it.isCompleted }
+    }
 }

@@ -55,8 +55,7 @@ fun InteractiveChartWithControls(
     
     var showGoalDialog by remember { mutableStateOf(false) }
     var goalInput by remember { mutableStateOf(targetValue?.toString() ?: "") }
-    
-    var isChronologicalScale by remember { mutableStateOf(false) }
+    var isChronologicalScale by remember { mutableStateOf(true) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (showTimeFilters) {
@@ -106,7 +105,8 @@ fun InteractiveChartWithControls(
             } else {
                 dataPoints
             }
-            val validPoints = if (filteredPoints.isEmpty()) dataPoints.takeLast(1) else filteredPoints
+            val rawPoints = if (filteredPoints.isEmpty()) dataPoints.takeLast(1) else filteredPoints
+            val validPoints = downsampleLTTB(rawPoints, 20)
 
             CustomCanvasChart(
                 validPoints = validPoints,
@@ -118,9 +118,9 @@ fun InteractiveChartWithControls(
                 formatXLabel = formatXLabel
             )
             
-            if (validPoints.isNotEmpty()) {
-                val latestPoint = validPoints.last()
-                val previousPoint = if (validPoints.size > 1) validPoints[validPoints.size - 2] else latestPoint
+            if (dataPoints.isNotEmpty()) {
+                val latestPoint = dataPoints.last()
+                val previousPoint = if (dataPoints.size > 1) dataPoints[dataPoints.size - 2] else latestPoint
                 val delta = latestPoint.yValue - previousPoint.yValue
                 val sign = if (delta > 0) "+" else ""
                 
@@ -138,18 +138,18 @@ fun InteractiveChartWithControls(
             // Toggle scale button
             Box(
                 modifier = Modifier
+                    .size(28.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(if (isChronologicalScale) lineColor else Color.Transparent)
+                    .background(if (!isChronologicalScale) lineColor else Color.Transparent)
                     .border(1.dp, lineColor, RoundedCornerShape(6.dp))
-                    .clickable { isChronologicalScale = !isChronologicalScale }
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .clickable { isChronologicalScale = !isChronologicalScale },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.LinearScale, 
                     contentDescription = "Toggle Scale", 
-                    tint = if (isChronologicalScale) PureBlack else lineColor, 
-                    modifier = Modifier.size(12.dp)
+                    tint = if (!isChronologicalScale) PureBlack else lineColor, 
+                    modifier = Modifier.size(16.dp)
                 )
             }
             
@@ -159,10 +159,11 @@ fun InteractiveChartWithControls(
                 if (targetValue != null) {
                     Row(
                         modifier = Modifier
+                            .height(28.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .border(1.dp, SoftCoral, RoundedCornerShape(6.dp))
                             .clickable { onSetTargetValue(null) }
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .padding(horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = "Remove Goal", tint = SoftCoral, modifier = Modifier.size(12.dp))
@@ -172,10 +173,12 @@ fun InteractiveChartWithControls(
                 } else {
                     Box(
                         modifier = Modifier
+                            .height(28.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(ElectricBlue.copy(alpha = 0.2f))
                             .clickable { showGoalDialog = true }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .padding(horizontal = 10.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text("ADD GOAL +", color = ElectricBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
@@ -534,4 +537,68 @@ fun CustomCanvasChart(
             }
         }
     )
+}
+
+fun downsampleLTTB(data: List<ChartDataPoint>, threshold: Int): List<ChartDataPoint> {
+    if (threshold >= data.size || threshold == 0) return data
+
+    val sampled = ArrayList<ChartDataPoint>(threshold)
+    sampled.add(data.first()) // Always add the first point
+
+    val bucketSize = (data.size - 2).toDouble() / (threshold - 2)
+    var a = 0 // Initially a is the first point in the triangle
+
+    for (i in 0 until threshold - 2) {
+        var avgX = 0.0
+        var avgY = 0.0
+        var avgRangeStart = (kotlin.math.floor((i + 1) * bucketSize) + 1).toInt()
+        var avgRangeEnd = (kotlin.math.floor((i + 2) * bucketSize) + 1).toInt()
+        
+        avgRangeStart = avgRangeStart.coerceAtMost(data.size - 1)
+        avgRangeEnd = avgRangeEnd.coerceAtMost(data.size)
+        
+        val avgRangeLength = avgRangeEnd - avgRangeStart
+        
+        if (avgRangeLength > 0) {
+            for (j in avgRangeStart until avgRangeEnd) {
+                avgX += data[j].xValue.toDouble()
+                avgY += data[j].yValue.toDouble()
+            }
+            avgX /= avgRangeLength
+            avgY /= avgRangeLength
+        } else {
+            avgX = data.last().xValue.toDouble()
+            avgY = data.last().yValue.toDouble()
+        }
+
+        val rangeStart = (kotlin.math.floor(i * bucketSize) + 1).toInt()
+        val rangeEnd = (kotlin.math.floor((i + 1) * bucketSize) + 1).toInt()
+        
+        val safeRangeStart = rangeStart.coerceAtMost(data.size - 1)
+        val safeRangeEnd = rangeEnd.coerceAtMost(data.size)
+
+        var maxArea = -1.0
+        var maxAreaIndex = safeRangeStart
+
+        val pointAx = data[a].xValue.toDouble()
+        val pointAy = data[a].yValue.toDouble()
+
+        for (j in safeRangeStart until safeRangeEnd) {
+            val area = kotlin.math.abs(
+                (pointAx - avgX) * (data[j].yValue.toDouble() - pointAy) -
+                (pointAx - data[j].xValue.toDouble()) * (avgY - pointAy)
+            ) * 0.5
+            
+            if (area > maxArea) {
+                maxArea = area
+                maxAreaIndex = j
+            }
+        }
+        
+        sampled.add(data[maxAreaIndex])
+        a = maxAreaIndex
+    }
+
+    sampled.add(data.last())
+    return sampled
 }

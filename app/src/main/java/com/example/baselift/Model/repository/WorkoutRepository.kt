@@ -22,10 +22,12 @@ interface IWorkoutRepository {
     val allWorkouts: Flow<List<WorkoutEntity>>
     val allExercises: Flow<List<ExerciseEntity>>
     suspend fun createWorkout(name: String, orderIndex: Int = 0): Int
+    suspend fun updateWorkout(workout: WorkoutEntity)
     suspend fun deleteWorkout(workout: WorkoutEntity)
     fun getExercisesForWorkout(workoutId: Int): Flow<List<ExerciseEntity>>
     suspend fun createExercise(workoutId: Int, name: String, equipment: String, muscleGroups: String, orderIndex: Int = 0)
     suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String)
+    suspend fun updateExercises(exercises: List<ExerciseEntity>)
     suspend fun deleteExercise(exercise: ExerciseEntity)
     suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int)
     suspend fun addSet(exercise: ExerciseEntity)
@@ -60,6 +62,10 @@ class WorkoutRepository(
         return workoutDao.insertWorkout(workout).toInt()
     }
 
+    override suspend fun updateWorkout(workout: WorkoutEntity) {
+        workoutDao.updateWorkout(workout)
+    }
+
     override suspend fun deleteWorkout(workout: WorkoutEntity) {
         workoutDao.deleteWorkout(workout)
     }
@@ -85,6 +91,10 @@ class WorkoutRepository(
 
     override suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String) {
         workoutDao.updateExercise(exercise.copy(name = name, equipment = equipment, muscleGroups = muscleGroups))
+    }
+
+    override suspend fun updateExercises(exercises: List<ExerciseEntity>) {
+        workoutDao.updateExercises(exercises)
     }
 
     override suspend fun deleteExercise(exercise: ExerciseEntity) {

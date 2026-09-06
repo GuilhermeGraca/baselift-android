@@ -195,6 +195,16 @@ class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel()
         }
     }
 
+    fun updateWorkoutRestTimer(seconds: Int) {
+        val currentWorkout = _uiState.value.selectedWorkout ?: return
+        viewModelScope.launch {
+            val updatedWorkout = currentWorkout.copy(defaultRestTimer = seconds)
+            repository.updateWorkout(updatedWorkout)
+            // Atualizar o selectedWorkout no UI state
+            _uiState.update { it.copy(selectedWorkout = updatedWorkout) }
+        }
+    }
+
     fun addSetToExercise(exerciseId: Int) {
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
         viewModelScope.launch {
@@ -246,6 +256,24 @@ class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel()
                 isCompleted = isCompleted,
                 existingSetId = existingSetId
             )
+        }
+    }
+    fun moveExercise(from: Int, to: Int) {
+        val currentExercises = _uiState.value.exercises.toMutableList()
+        if (from in currentExercises.indices && to in currentExercises.indices) {
+            val item = currentExercises.removeAt(from)
+            currentExercises.add(to, item)
+            
+            // Atualizar UI imediatamente
+            _uiState.update { it.copy(exercises = currentExercises) }
+            
+            // Guardar ordem na base de dados garantindo que usamos a lista certa
+            viewModelScope.launch {
+                val updatedEntities = currentExercises.mapIndexed { index, uiModel ->
+                    uiModel.exercise.copy(orderIndex = index)
+                }
+                repository.updateExercises(updatedEntities)
+            }
         }
     }
 
