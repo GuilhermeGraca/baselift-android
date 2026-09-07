@@ -22,3 +22,7 @@ implementation_plan.md
 # Ignorar ficheiros de configuração local do Android Studio
 /.idea/deploymentTargetDropDown.xml
 /.idea/deploymentTargetSelector.xml
+
+# Selling points draft
+SELLING_POINTS.md
+preview/pixel8frame/
