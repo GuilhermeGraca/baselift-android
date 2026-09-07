@@ -51,7 +51,7 @@ BaseLift centralizes workout tracking, nutrition journaling, and body metric ana
 > **Note:** Developed as a personal project and final evaluation for the Mobile Applications Development (DAM) course at ISEL (Instituto Superior de Engenharia de Lisboa).
 
 ### Onboarding & Setup
-Frictionless flow to establish baseline metrics and custom macronutrient targets.
+Intuitive flow to establish baseline metrics and custom macronutrient targets.
 
 <div align="center">
   <table>
@@ -95,7 +95,7 @@ Visualize weight trends and track physique evolution with a private photo diary.
 </div>
 
 ### Nutrition Tracking
-Frictionless logging. Track detailed macros or use the Quick Add feature. Targets automatically recalibrate as your body weight changes.
+Effortless logging. Track detailed macros or use the Quick Add feature. Targets automatically recalibrate as your body weight changes.
 
 <div align="center">
   <table>
@@ -159,6 +159,25 @@ Monitor consistency with visual streaks, activity calendars, and granular volume
     </tr>
   </table>
 </div>
+
+#### Background Reminders
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <b>BaseLift safely tracks your ongoing session in the background.</b>
+      <br><br>
+      <ul>
+        <li><b>Smart Notifications:</b> If you leave the app or lock your phone with an active session, it issues a timely reminder.</li>
+        <li><b>Protect Your Streaks:</b> Prevents you from forgetting to hit <i>"Finalize Workout"</i>, ensuring your effort is always logged and your weekly streaks are never lost.</li>
+        <li><b>Data Accuracy:</b> Keeps your total training duration and analytics perfectly precise.</li>
+      </ul>
+    </td>
+    <td width="50%" align="center">
+      <img src="preview/notificationScreenshot.jpg" alt="Active Workout Notification" width="100%" style="border: 2px solid black; border-radius: 12px;"><br />
+      <sub>Smart Active Workout Reminder</sub>
+    </td>
+  </tr>
+</table>
 
 ### Built With
 
