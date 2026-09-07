@@ -197,7 +197,7 @@ fun SetRow(
                         val hint = setModel.prevWeight?.let { df.format(it) } ?: "-"
                         Text(
                             hint,
-                            color = if (isFocused) MediumGrey else MediumGrey.copy(alpha = 0.5f),
+                            color = if (setModel.isCompleted) inputTextColor else if (isFocused) MediumGrey else MediumGrey.copy(alpha = 0.5f),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Black,
                             maxLines = 1,
@@ -205,17 +205,21 @@ fun SetRow(
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center
                         )
-                    } else if (setModel.isCompleted) {
-                        Text(
-                            weightInput,
-                            color = inputTextColor,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
+                    }
+                    
+                    if (setModel.isCompleted) {
+                        if (weightInput.isNotEmpty()) {
+                            Text(
+                                weightInput,
+                                color = inputTextColor,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Black,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     } else {
                         innerTextField()
                     }
@@ -250,7 +254,7 @@ fun SetRow(
                     if (repsInput.isEmpty()) {
                         Text(
                             setModel.prevReps?.toString() ?: "-",
-                            color = if (isFocused) MediumGrey else MediumGrey.copy(alpha = 0.5f),
+                            color = if (setModel.isCompleted) inputTextColor else if (isFocused) MediumGrey else MediumGrey.copy(alpha = 0.5f),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Black,
                             maxLines = 1,
@@ -258,17 +262,21 @@ fun SetRow(
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center
                         )
-                    } else if (setModel.isCompleted) {
-                        Text(
-                            repsInput,
-                            color = inputTextColor,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
+                    }
+                    
+                    if (setModel.isCompleted) {
+                        if (repsInput.isNotEmpty()) {
+                            Text(
+                                repsInput,
+                                color = inputTextColor,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Black,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     } else {
                         innerTextField()
                     }

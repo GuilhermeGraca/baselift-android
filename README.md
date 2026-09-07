@@ -42,50 +42,123 @@ https://github.com/user-attachments/assets/29fe1e18-6336-40d4-a7de-b441c04df91d
 
 ---
 
-## App Screenshots
+## About BaseLift
+
+*A minimalist, offline-first fitness tracker built by a lifter, for lifters.*
+
+BaseLift centralizes workout tracking, nutrition journaling, and body metric analytics into a single private interface. All data stays securely on your device—no cloud sync, no accounts, no subscriptions. Designed as a distraction-free utility, it features a premium dark-mode aesthetic with satisfying micro-interactions.
+
+> **Note:** Developed as a personal project and final evaluation for the Mobile Applications Development (DAM) course at ISEL (Instituto Superior de Engenharia de Lisboa).
+
+### Onboarding & Setup
+Frictionless flow to establish baseline metrics and custom macronutrient targets.
 
 <div align="center">
   <table>
     <tr>
       <td align="center">
-        <img src="preview/DashBoardView1.png" alt="Dashboard View" width="240"><br />
-        <strong>Dashboard</strong><br />
-        <sub>Activity overview & weekly streaks</sub>
+        <img src="preview/onboarding_build_profile.png" alt="Build Profile" width="240"><br />
+        <sub>Profile Creation</sub>
       </td>
       <td align="center">
-        <img src="preview/workoutView.png" alt="Workout View" width="240"><br />
-        <strong>Workouts</strong><br />
-        <sub>Routines & automatic PR tracking</sub>
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <img src="preview/nutritionView.png" alt="Nutrition View" width="240"><br />
-        <strong>Nutrition</strong><br />
-        <sub>Calories & macro breakdown</sub>
+        <img src="preview/onboarding_calculated_targets.png" alt="Calculated Targets" width="240"><br />
+        <sub>Auto-Calculated Targets</sub>
       </td>
       <td align="center">
-        <img src="preview/InsightsView1.png" alt="Insights View" width="240"><br />
-        <strong>Insights</strong><br />
-        <sub>Weight charts & photo diary</sub>
+        <img src="preview/onboarding_custom_targets.png" alt="Custom Targets" width="240"><br />
+        <sub>Custom Macro Overrides</sub>
       </td>
     </tr>
   </table>
 </div>
 
-<p align="center" style="font-size: 0.9em; color: #666;">
-  <em>Note: The screenshots above highlight the core navigation screens. For additional previews showing detailed exercise breakdowns, custom Canvas charts, and the visual physique diary, explore the <a href="preview/"><strong>preview/</strong></a> directory.</em>
-</p>
+### Insights & Visual Diary
+Visualize weight trends and track physique evolution with a private photo diary. Includes health metric calculators.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="preview/insights_weight_trend.png" alt="Weight Trend" width="240"><br />
+        <sub>Interactive Weight Chart</sub>
+      </td>
+      <td align="center">
+        <img src="preview/insights_ideal_weight_dialog.png" alt="Ideal Weight Dialog" width="240"><br />
+        <sub>Ideal Weight Calculator</sub>
+      </td>
+      <td align="center">
+        <img src="preview/insights_visual_diary.png" alt="Visual Diary" width="240"><br />
+        <sub>Private Photo Journal</sub>
+      </td>
+    </tr>
+  </table>
+</div>
 
----
+### Nutrition Tracking
+Frictionless logging. Track detailed macros or use the Quick Add feature. Targets automatically recalibrate as your body weight changes.
 
-## About BaseLift
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="preview/nutrition_macro_targets.png" alt="Macro Targets" width="240"><br />
+        <sub>Daily Macro Breakdown</sub>
+      </td>
+      <td align="center">
+        <img src="preview/nutrition_quick_log.png" alt="Quick Log" width="240"><br />
+        <sub>Quick Add Meals</sub>
+      </td>
+      <td align="center">
+        <img src="preview/nutrition_configure_meal.png" alt="Configure Meal" width="240"><br />
+        <sub>Configure Meal Template</sub>
+      </td>
+    </tr>
+  </table>
+</div>
 
-BaseLift is an all-in-one mobile application designed to centralize workout tracking, nutritional journaling, and body metric analytics into a single clean interface. Many fitness apps force users into paid subscriptions, require constant internet connectivity, or separate training logs from nutrition tracking. BaseLift solves this by offering a completely offline, privacy-focused experience where all data stays on your device.
+### Workouts & Training
+Ultimate customization for exercises. Enjoy seamless progressive overload with previous set data displayed inline, custom rest timers, and drag-and-drop reordering.
 
-> **Note:** Conceived and developed as a personal project, BaseLift was also presented as the final evaluation project for the Mobile Applications Development (DAM) course at ISEL — Instituto Superior de Engenharia de Lisboa, and continues to be actively developed.
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="preview/workout_active_logging.png" alt="Active Workout Logging" width="240"><br />
+        <sub>Active Workout Logging</sub>
+      </td>
+      <td align="center">
+        <img src="preview/workout_timer.png" alt="Workout Timer" width="240"><br />
+        <sub>Custom Rest Timers</sub>
+      </td>
+      <td align="center">
+        <img src="preview/workout_edit_exercise.png" alt="Edit Exercise" width="240"><br />
+        <sub>Edit Custom Exercises</sub>
+      </td>
+    </tr>
+  </table>
+</div>
+
+### Dashboard & Analytics
+Monitor consistency with visual streaks, activity calendars, and granular volume tracking for routines and specific exercises.
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="preview/dashboard_training_volume.png" alt="Training Volume" width="240"><br />
+        <sub>Total Training Volume</sub>
+      </td>
+      <td align="center">
+        <img src="preview/dashboard_routine_volume.png" alt="Routine Volume Trend" width="240"><br />
+        <sub>Routine Progression</sub>
+      </td>
+      <td align="center">
+        <img src="preview/dashboard_exercise_detail.png" alt="Exercise Details" width="240"><br />
+        <sub>Granular Exercise Details</sub>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ### Built With
 
@@ -100,13 +173,15 @@ BaseLift is an all-in-one mobile application designed to centralize workout trac
 
 ## Key Features
 
-* **100% Offline Storage**: All biometric data, workout sessions, and nutrition logs are saved locally using Room SQLite, ensuring instant load times and complete privacy.
-* **Unified Fitness & Macro Hub**: Track daily calories, protein, carbs, and fats alongside customized gym workout routines without switching between different apps.
-* **Automatic PR Detection**: Analyzes logged workout sets to automatically detect and highlight Personal Records for maximum weight and estimated 1RM.
-* **Interactive Canvas Charts**: Custom-built weight progress charts and daily macro breakdown bars rendered directly in Jetpack Compose without external charting libraries.
-* **Smart Target Recalibration**: Automatically recalculates daily calorie and macronutrient goals whenever you update your weight or fitness objective.
-* **Physique Photo Journal**: Record visual progress photos alongside your weight entries, complete with gesture zoom support.
-* **Weekly Streaks & Activity Calendar**: Monitor your consistency with dedicated training and nutrition streaks and a unified historical calendar on the main dashboard.
+* **100% Offline & Private**: Data is saved locally using Room SQLite. Instant load times, no internet required.
+* **Unified Hub**: Track calories, macros, and customized gym routines in one place.
+* **Seamless Progressive Overload**: Previous workout performance is displayed directly inside the current set row.
+* **Automatic PR Detection**: Highlights Personal Records for maximum weight and estimated 1RM.
+* **Interactive Canvas Charts**: Custom-built charts rendered directly in Jetpack Compose without external libraries.
+* **Smart Target Recalibration**: Automatically adjusts daily calorie and macronutrient goals based on weight updates.
+* **Private Physique Journal**: Progress photos with gesture zoom, kept separate from your phone's main camera roll.
+* **Consistency Tracking**: Weekly streaks and a unified historical calendar.
+* **Premium UX**: Haptic feedback, custom swipe-to-delete gestures, and fluid animations.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
