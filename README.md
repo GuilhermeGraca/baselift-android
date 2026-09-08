@@ -1,5 +1,13 @@
 <a id="readme-top"></a>
 
+<!-- PROJECT SHIELDS -->
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![project_license][license-shield]][license-url]
+[![LinkedIn][linkedin-shield]][linkedin-url]
+
 <!-- PROJECT LOGO & HEADER -->
 <br />
 <div align="center">
@@ -277,3 +285,18 @@ Guilherme Graça
 * **Mobile Applications Development (DAM) Course**: For the technical foundation that supported the development of this project.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+[contributors-shield]: https://img.shields.io/github/contributors/GuilhermeGraca/baselift-android.svg?style=for-the-badge
+[contributors-url]: https://github.com/GuilhermeGraca/baselift-android/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/GuilhermeGraca/baselift-android.svg?style=for-the-badge
+[forks-url]: https://github.com/GuilhermeGraca/baselift-android/network/members
+[stars-shield]: https://img.shields.io/github/stars/GuilhermeGraca/baselift-android.svg?style=for-the-badge
+[stars-url]: https://github.com/GuilhermeGraca/baselift-android/stargazers
+[issues-shield]: https://img.shields.io/github/issues/GuilhermeGraca/baselift-android.svg?style=for-the-badge
+[issues-url]: https://github.com/GuilhermeGraca/baselift-android/issues
+[license-shield]: https://img.shields.io/badge/License-Personal%20Use%20Only-blue.svg?style=for-the-badge
+[license-url]: https://github.com/GuilhermeGraca/baselift-android/blob/main/LICENSE
+[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
+[linkedin-url]: https://www.linkedin.com/in/guilherme-graça-653153351/
