@@ -30,9 +30,14 @@ internal data class DailyExerciseVolume(
 
 internal data class SetHistory(
     val weeklyVolumes: List<WeeklyVolume>,
-    val dailyVolumes: List<DailyExerciseVolume>,
-    val exerciseVolumeTrends: Map<Int, List<ChartDataPoint>>,
-    val exerciseMaxWeightTrends: Map<Int, List<ChartDataPoint>>
+    val dailyVolumes: List<DailyExerciseVolume>
+)
+
+data class ExerciseCharts(
+    val volumeTrend: List<ChartDataPoint> = emptyList(),
+    val maxWeightTrend: List<ChartDataPoint> = emptyList(),
+    val isLoading: Boolean = true,
+    val loadFailed: Boolean = false
 )
 
 // Pure history preparation. No shared Calendar/formatter state crosses coroutine branches.
@@ -125,8 +130,6 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
         }
         val shortDateFormatter = SimpleDateFormat("MMM dd", Locale.US)
         val dailyVolumes = mutableListOf<DailyExerciseVolume>()
-        val volumeTrends = mutableMapOf<Int, MutableList<ChartDataPoint>>()
-        val maxWeightTrends = mutableMapOf<Int, MutableList<ChartDataPoint>>()
         logsByDate.forEach { (_, logs) ->
             cal.timeInMillis = logs.first().timestamp
             atMidnight(cal)
@@ -135,24 +138,37 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
             logs.groupBy { it.exerciseId }.forEach { (exerciseId, exerciseLogs) ->
                 // Keep Double sums until the final point, including routine totals.
                 val totalVolume = exerciseLogs.sumOf { (it.weight * it.reps).toDouble() }
-                val maxLog = exerciseLogs.maxWithOrNull(compareBy({ it.weight }, { it.reps }))
-                val maxWeight = maxLog?.weight ?: 0f
-                val est1RM = if (maxLog != null) maxWeight * (1 + maxLog.reps / 30f) else 0f
                 dailyVolumes += DailyExerciseVolume(exerciseId, midnightTs, totalVolume, dateLabel)
-                volumeTrends.getOrPut(exerciseId) { mutableListOf() }.add(
-                    ChartDataPoint(midnightTs, totalVolume.toFloat(), volumeLabel(totalVolume.toFloat(), dateLabel))
-                )
-                maxWeightTrends.getOrPut(exerciseId) { mutableListOf() }.add(
-                    ChartDataPoint(
-                        midnightTs, maxWeight, "${String.format(Locale.US, "%.1f", maxWeight)} kg\n$dateLabel",
-                        extraValue = est1RM
-                    )
-                )
             }
         }
-        volumeTrends.values.forEach { it.sortBy { point -> point.xValue } }
-        maxWeightTrends.values.forEach { it.sortBy { point -> point.xValue } }
-        return SetHistory(weeklyVolumes, dailyVolumes, volumeTrends, maxWeightTrends)
+        return SetHistory(weeklyVolumes, dailyVolumes)
+    }
+
+    fun exerciseCharts(setLogs: List<SetLogEntity>): ExerciseCharts {
+        val cal = Calendar.getInstance()
+        val logsByDate = setLogs.groupBy {
+            cal.timeInMillis = it.timestamp
+            dateKey(cal)
+        }
+        val formatter = SimpleDateFormat("MMM dd", Locale.US)
+        val volumes = mutableListOf<ChartDataPoint>()
+        val weights = mutableListOf<ChartDataPoint>()
+        logsByDate.values.forEach { logs ->
+            cal.timeInMillis = logs.first().timestamp
+            atMidnight(cal)
+            val timestamp = cal.timeInMillis
+            val label = formatter.format(cal.time)
+            val volume = logs.sumOf { (it.weight * it.reps).toDouble() }.toFloat()
+            val maxLog = logs.maxWithOrNull(compareBy({ it.weight }, { it.reps }))
+            val weight = maxLog?.weight ?: 0f
+            val est1RM = if (maxLog != null) weight * (1 + maxLog.reps / 30f) else 0f
+            volumes += ChartDataPoint(timestamp, volume, volumeLabel(volume, label))
+            weights += ChartDataPoint(timestamp, weight,
+                "${String.format(Locale.US, "%.1f", weight)} kg\n$label", extraValue = est1RM)
+        }
+        volumes.sortBy { it.xValue }
+        weights.sortBy { it.xValue }
+        return ExerciseCharts(volumes, weights, isLoading = false)
     }
 
     fun workoutVolumeTrends(history: SetHistory, workoutByExercise: Map<Int, Int>): Map<Int, List<ChartDataPoint>> {

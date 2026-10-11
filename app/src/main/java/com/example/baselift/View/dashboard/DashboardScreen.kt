@@ -11,6 +11,8 @@ import com.example.baselift.View.dashboard.components.TotalTrainingVolumeSection
 import com.example.baselift.View.dashboard.components.RoutinesSection
 import com.example.baselift.View.theme.PureBlack
 import com.example.baselift.ViewModel.dashboard.DashboardUiState
+import com.example.baselift.ViewModel.dashboard.ExerciseCharts
+import kotlinx.coroutines.flow.Flow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
@@ -19,7 +21,8 @@ import androidx.compose.runtime.setValue
 fun DashboardScreen(
     uiState: DashboardUiState,
     onSetRestDays: (Int) -> Unit = {},
-    onSetNutritionRestDays: (Int) -> Unit = {}
+    onSetNutritionRestDays: (Int) -> Unit = {},
+    exerciseCharts: (Int) -> Flow<ExerciseCharts>
 ) {
     var isContentReady by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -61,8 +64,7 @@ fun DashboardScreen(
                 workouts = uiState.workouts,
                 exercisesMap = uiState.exercises,
                 workoutVolumeTrends = uiState.workoutVolumeTrends,
-                exerciseVolumeTrends = uiState.exerciseVolumeTrends,
-                exerciseMaxWeightTrends = uiState.exerciseMaxWeightTrends
+                exerciseCharts = exerciseCharts
             )
         }
     }

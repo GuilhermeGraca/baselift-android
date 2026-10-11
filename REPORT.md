@@ -329,7 +329,7 @@ O Dashboard agrega dados de nutrição e treino para dar uma visão geral da con
   - Cartão de PR de Volume Máximo (peso × reps)
   - Gráfico de Volume ao longo do tempo (verde néon)
   - Gráfico de Peso Máximo ao longo do tempo (azul elétrico)
-- Carregamento lazy: os dados de cada exercício só são carregados quando o submenu é expandido
+- Carregamento lazy: cada submenu expandido observa `getCompletedSetLogsForExercise()` via um flow frio, prepara os gráficos em `Dispatchers.Default` e cancela a coleção quando sai da composição. Mostra carregamento e permite repetir uma consulta que falhou; os gráficos por exercício não são preparados pelo resumo do Dashboard.
 
 **Calendário histórico**: registo global de todos os dias com nutrição e/ou treino, disponível no componente `CustomCalendar`.
 

@@ -27,6 +27,27 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class WorkoutDaoTest {
 
+    @Test
+    fun exerciseChartQuery_scopesCompletedHistoryAndRefreshesAfterDeletion() = runTest {
+        val workout = insertWorkout("Push")
+        val firstExercise = insertExercise(workout, "Bench")
+        val secondExercise = insertExercise(workout, "Press")
+        val complete = insertSession(workout, isCompleted = true)
+        val active = insertSession(workout)
+        val expected = insertCompletedSet(complete, firstExercise, 1, 100f, 10)
+        insertCompletedSet(complete, secondExercise, 1, 60f, 10)
+        insertCompletedSet(active, firstExercise, 1, 999f, 10)
+        workoutDao.insertSet(SetLogEntity(sessionId = complete, exerciseId = firstExercise,
+            setNumber = 2, weight = 888f, reps = 10, isCompleted = false))
+        val history = workoutDao.getCompletedSetLogsForExercise(firstExercise).first()
+        assertEquals(listOf(expected), history.map { it.id })
+        assertEquals(60f, workoutDao.getCompletedSetLogsForExercise(secondExercise).first().single().weight, 0f)
+        val exercise = workoutDao.getExercisesForWorkout(workout).first().first { it.id == firstExercise }
+        workoutDao.deleteExercise(exercise)
+        assertTrue(workoutDao.getCompletedSetLogsForExercise(firstExercise).first().isEmpty())
+        assertEquals(1, workoutDao.getCompletedSetLogsForExercise(secondExercise).first().size)
+    }
+
     private lateinit var database: AppDatabase
     private lateinit var workoutDao: WorkoutDao
 

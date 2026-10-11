@@ -211,27 +211,28 @@ class DashboardAnalyticsTest {
             id = id, sessionId = 1, exerciseId = exercise, setNumber = id,
             weight = weight, reps = reps, isCompleted = true, timestamp = time
         )
-        val history = analytics.setHistory(listOf(
+        val logs = listOf(
             set(1, 1, 105f, 2, tuesday), // Deliberately unsorted timestamps.
             set(2, 1, 100f, 3, monday),
             set(3, 1, 100f, 5, monday),
             set(4, 1, 80f, 20, monday), // Greater estimated 1RM, but not the max-weight winner.
             set(5, 2, 20f, 10, monday),
             set(6, 99, 12f, 5, monday) // Orphan metadata: exercise/global charts retain it.
-        ))
+        )
+        val history = analytics.setHistory(logs)
         assertEquals(2_870f, history.weeklyVolumes.single().totalVolume, 0f)
         assertEquals(timestamp(2026, 10, 12, 0), history.weeklyVolumes.single().weekStartTimestamp)
         val routine = analytics.workoutVolumeTrends(history, mapOf(1 to 1, 2 to 1)).getValue(1)
         assertEquals(listOf(2_600f, 210f), routine.map { it.yValue })
         assertEquals(listOf(timestamp(2026, 10, 12, 0), timestamp(2026, 10, 13, 0)), routine.map { it.xValue })
         assertEquals("2600 kg\nOct 12", routine.first().tooltipLabel)
-        val exercise = history.exerciseVolumeTrends.getValue(1)
-        assertEquals(listOf(2_400f, 210f), exercise.map { it.yValue })
-        val maximum = history.exerciseMaxWeightTrends.getValue(1).first()
+        val exercise = analytics.exerciseCharts(logs.filter { it.exerciseId == 1 })
+        assertEquals(listOf(2_400f, 210f), exercise.volumeTrend.map { it.yValue })
+        val maximum = exercise.maxWeightTrend.first()
         assertEquals(100f, maximum.yValue, 0f)
         assertEquals(100f * (1 + 5 / 30f), maximum.extraValue, 0f)
         assertEquals("100.0 kg\nOct 12", maximum.tooltipLabel)
-        assertTrue(history.exerciseVolumeTrends.containsKey(99))
+        assertTrue(analytics.exerciseCharts(logs.filter { it.exerciseId == 99 }).volumeTrend.isNotEmpty())
     }
 
     @Test
@@ -252,11 +253,11 @@ class DashboardAnalyticsTest {
         assertEquals(100, calendar.getValue("2026-10-11").nutritionCalories)
         assertFalse(calendar.getValue("2026-10-12").hasWorkout)
         assertTrue(calendar.getValue("2026-10-12").hasNutrition)
-        val sets = analytics.setHistory(listOf(SetLogEntity(
+        val sets = analytics.exerciseCharts(listOf(SetLogEntity(
             id = 1, sessionId = 1, exerciseId = 1, setNumber = 1, weight = 100f,
             reps = 10, isCompleted = true, timestamp = setTime
         )))
-        assertEquals(setTime, sets.exerciseVolumeTrends.getValue(1).single().xValue)
+        assertEquals(setTime, sets.volumeTrend.single().xValue)
     }
 
     @Test
@@ -270,6 +271,6 @@ class DashboardAnalyticsTest {
         val history = analytics.setHistory(logs)
         assertEquals(2_000f, history.weeklyVolumes.single().totalVolume, 0f)
         assertEquals(timestamp(2024, 1, 1, 0), history.weeklyVolumes.single().weekStartTimestamp)
-        assertEquals(2, history.exerciseVolumeTrends.getValue(1).size)
+        assertEquals(2, analytics.exerciseCharts(logs).volumeTrend.size)
     }
 }

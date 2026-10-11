@@ -26,6 +26,9 @@
     <string name="dash_consistency_journal">Consistency Journal</string>
     <string name="dash_nutrition_streak">NUTRITION STREAK</string>
     <string name="dash_workout_streak">WORKOUT STREAK</string>
+    <string name="dash_exercise_loading">Loading exercise history…</string>
+    <string name="dash_exercise_load_error">Unable to load exercise history.</string>
+    <string name="dash_retry">Retry</string>
     <string name="dash_nutrition_tab">NUTRITION</string>
     <string name="dash_this_week">This week</string>
     <string name="dash_workout_tab">WORKOUT</string>

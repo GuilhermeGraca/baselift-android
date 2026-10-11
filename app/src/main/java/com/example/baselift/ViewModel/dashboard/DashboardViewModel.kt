@@ -8,8 +8,12 @@ import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.repository.INutritionRepository
 import com.example.baselift.Model.repository.IWorkoutRepository
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -55,8 +59,6 @@ data class DashboardUiState(
     val workouts: List<WorkoutEntity> = emptyList(),
     val exercises: Map<Int, List<com.example.baselift.Model.local.entity.ExerciseEntity>> = emptyMap(),
     val workoutVolumeTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>> = emptyMap(),
-    val exerciseVolumeTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>> = emptyMap(),
-    val exerciseMaxWeightTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>> = emptyMap(),
     val historicalCalendarData: Map<String, com.example.baselift.View.components.DayMarkerState> = emptyMap(),
     val restDays: Int = 4,
     val nutritionRestDays: Int = 0,
@@ -83,6 +85,17 @@ class DashboardViewModel(
     }
 
     private val analytics = DashboardAnalytics(clockMillis)
+
+    // A cold flow: query creation and preparation begin only when a detail panel collects.
+    fun exerciseCharts(exerciseId: Int): Flow<ExerciseCharts> = flow {
+        emitAll(workoutRepository.getCompletedSetLogsForExercise(exerciseId)
+            .distinctUntilChanged().map(analytics::exerciseCharts))
+    }.onStart { emit(ExerciseCharts()) }
+        .catch {
+            if (it is CancellationException) throw it
+            emit(ExerciseCharts(isLoading = false, loadFailed = true))
+        }
+        .flowOn(analyticsDispatcher)
 
     private data class Metadata(
         val workouts: List<WorkoutEntity>,
@@ -181,8 +194,6 @@ class DashboardViewModel(
                     workouts = meta.workouts,
                     exercises = meta.exercises,
                     workoutVolumeTrends = chartData.workoutTrends,
-                    exerciseVolumeTrends = chartData.history.exerciseVolumeTrends,
-                    exerciseMaxWeightTrends = chartData.history.exerciseMaxWeightTrends,
                     historicalCalendarData = analytics.mergeCalendar(nutritionData.history.calendar, sessionData.calendar),
                     restDays = sessionData.restDays,
                     nutritionRestDays = nutritionData.restDays,

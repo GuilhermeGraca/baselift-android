@@ -26,14 +26,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.lazy.LazyListScope
 import com.example.baselift.Model.local.entity.ExerciseEntity
 import com.example.baselift.Model.local.entity.WorkoutEntity
+import com.example.baselift.ViewModel.dashboard.ExerciseCharts
+import kotlinx.coroutines.flow.Flow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import com.example.baselift.View.theme.*
 
 fun LazyListScope.RoutinesSection(
     workouts: List<WorkoutEntity>,
     exercisesMap: Map<Int, List<ExerciseEntity>>,
     workoutVolumeTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>> = emptyMap(),
-    exerciseVolumeTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>> = emptyMap(),
-    exerciseMaxWeightTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>> = emptyMap()
+    exerciseCharts: (Int) -> Flow<ExerciseCharts>
 ) {
     item {
         Text(
@@ -68,8 +72,7 @@ fun LazyListScope.RoutinesSection(
                 workout = workout,
                 exercises = exercises,
                 workoutVolumeTrend = workoutVolumeTrends[workout.id] ?: emptyList(),
-                exerciseVolumeTrends = exerciseVolumeTrends,
-                exerciseMaxWeightTrends = exerciseMaxWeightTrends,
+                exerciseCharts = exerciseCharts,
                 routineColor = rColor
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -82,8 +85,7 @@ fun WorkoutCollapsibleCard(
     workout: WorkoutEntity, 
     exercises: List<ExerciseEntity>,
     workoutVolumeTrend: List<com.example.baselift.View.components.ChartDataPoint>,
-    exerciseVolumeTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>>,
-    exerciseMaxWeightTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>>,
+    exerciseCharts: (Int) -> Flow<ExerciseCharts>,
     routineColor: Color = NeonGreen
 ) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -211,12 +213,13 @@ fun WorkoutCollapsibleCard(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 exercises.forEach { exercise ->
-                    ExerciseCollapsibleCard(
-                        exercise = exercise,
-                        volumeTrend = exerciseVolumeTrends[exercise.id] ?: emptyList(),
-                        maxWeightTrend = exerciseMaxWeightTrends[exercise.id] ?: emptyList()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    key(exercise.id) {
+                        ExerciseCollapsibleCard(
+                            exercise = exercise,
+                            exerciseCharts = exerciseCharts
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
         }
@@ -226,23 +229,23 @@ fun WorkoutCollapsibleCard(
 @Composable
 fun ExerciseCollapsibleCard(
     exercise: ExerciseEntity,
-    volumeTrend: List<com.example.baselift.View.components.ChartDataPoint>,
-    maxWeightTrend: List<com.example.baselift.View.components.ChartDataPoint>
+    exerciseCharts: (Int) -> Flow<ExerciseCharts>
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
-    var selectedFilter by remember { mutableStateOf("ALL") }
+    var isExpanded by remember(exercise.id) { mutableStateOf(false) }
+    var selectedFilter by remember(exercise.id) { mutableStateOf("ALL") }
+    var retryVersion by remember(exercise.id) { mutableIntStateOf(0) }
     val filters = listOf("1M", "3M", "1Y", "ALL")
 
     val context = androidx.compose.ui.platform.LocalContext.current
-    var targetWeight by remember { mutableStateOf<Float?>(null) }
+    var targetWeight by remember(exercise.id) { mutableStateOf<Float?>(null) }
     
-    LaunchedEffect(exercise.id) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val sharedPrefs = context.getSharedPreferences("baselift_targets", android.content.Context.MODE_PRIVATE)
-            val saved = sharedPrefs.getFloat("target_weight_${exercise.id}", -1f)
-            if (saved != -1f) {
-                targetWeight = saved
+    LaunchedEffect(exercise.id, isExpanded) {
+        if (isExpanded) {
+            val saved = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val sharedPrefs = context.getSharedPreferences("baselift_targets", android.content.Context.MODE_PRIVATE)
+                sharedPrefs.getFloat("target_weight_${exercise.id}", -1f)
             }
+            targetWeight = saved.takeIf { it != -1f }
         }
     }
 
@@ -298,148 +301,167 @@ fun ExerciseCollapsibleCard(
         }
 
         AnimatedVisibility(visible = isExpanded) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
-            ) {
-
-                // Max Weight & Volume stats
-                val now = System.currentTimeMillis()
-                val filteredMaxWeight = when(selectedFilter) {
-                    "1M" -> maxWeightTrend.filter { now - it.xValue <= 30L * 24 * 60 * 60 * 1000 }
-                    "3M" -> maxWeightTrend.filter { now - it.xValue <= 90L * 24 * 60 * 60 * 1000 }
-                    "1Y" -> maxWeightTrend.filter { now - it.xValue <= 365L * 24 * 60 * 60 * 1000 }
-                    else -> maxWeightTrend
+            val chartFlow = remember(exercise.id, exerciseCharts, retryVersion) { exerciseCharts(exercise.id) }
+            val charts by chartFlow.collectAsStateWithLifecycle(initialValue = ExerciseCharts())
+            if (charts.isLoading) {
+                Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = NeonGreen)
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(com.example.baselift.R.string.dash_exercise_loading), color = MediumGrey)
                 }
-                val filteredVolume = when(selectedFilter) {
-                    "1M" -> volumeTrend.filter { now - it.xValue <= 30L * 24 * 60 * 60 * 1000 }
-                    "3M" -> volumeTrend.filter { now - it.xValue <= 90L * 24 * 60 * 60 * 1000 }
-                    "1Y" -> volumeTrend.filter { now - it.xValue <= 365L * 24 * 60 * 60 * 1000 }
-                    else -> volumeTrend
-                }
-
-                val bestMaxWeightPoint = filteredMaxWeight.maxByOrNull { it.yValue }
-                val overallEst1RM = bestMaxWeightPoint?.extraValue ?: 0f
-                val maxW = filteredMaxWeight.maxOfOrNull { it.yValue } ?: 0f
-                val maxV = filteredVolume.maxOfOrNull { it.yValue } ?: 0f
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        NeonGreen.copy(alpha = 0.15f),
-                                        NeonGreen.copy(alpha = 0.05f)
-                                    )
-                                )
-                            )
-                            .padding(12.dp)
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(stringResource(com.example.baselift.R.string.dash_max_weight), color = CrystalWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("${String.format(java.util.Locale.US, "%.1f", maxW)} kg", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, ElectricBlue.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        ElectricBlue.copy(alpha = 0.15f),
-                                        ElectricBlue.copy(alpha = 0.05f)
-                                    )
-                                )
-                            )
-                            .padding(12.dp)
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = ElectricBlue, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(stringResource(com.example.baselift.R.string.dash_max_volume), color = CrystalWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("${String.format(java.util.Locale.US, "%.0f", maxV)} kg", color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        }
+            } else if (charts.loadFailed) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(stringResource(com.example.baselift.R.string.dash_exercise_load_error), color = MediumGrey)
+                    TextButton(onClick = { retryVersion++ }) {
+                        Text(stringResource(com.example.baselift.R.string.dash_retry), color = NeonGreen)
                     }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(stringResource(com.example.baselift.R.string.dash_est_1rm, String.format(java.util.Locale.US, "%.1f", overallEst1RM)), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    stringResource(com.example.baselift.R.string.dash_volume),
-                    color = CrystalWhite.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                if (filteredVolume.isNotEmpty()) {
-                    com.example.baselift.View.components.BarChartWithControls(
-                        title = "",
-                        dataPoints = filteredVolume,
-                        barColor = ElectricBlue,
-                        yUnit = "kg",
-                        formatYLabel = { String.format(java.util.Locale.US, "%.0f", it) },
-                        formatXLabel = { java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(it)) },
-                        summaryValue = null,
-                        summarySubtitle = null,
-                        summarySubtitleColor = CrystalWhite,
-                        showTimeFilters = false,
-                        chartHeight = 150.dp
-                    )
-                } else {
-                    Box(modifier = Modifier.fillMaxWidth().height(40.dp).background(Color(0xFF242424), RoundedCornerShape(4.dp)))
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    stringResource(com.example.baselift.R.string.dash_absolute_weight),
-                    color = CrystalWhite.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                if (filteredMaxWeight.isNotEmpty()) {
-                    com.example.baselift.View.components.InteractiveChartWithControls(
-                        title = "",
-                        dataPoints = filteredMaxWeight,
-                        lineColor = NeonGreen,
-                        yUnit = "kg",
-                        formatYLabel = { String.format(java.util.Locale.US, "%.1f", it) },
-                        formatXLabel = { java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(it)) },
-                        targetValue = targetWeight,
-                        onSetTargetValue = { newTarget: Float? ->
-                            targetWeight = newTarget
-                            val ctx = context
-                            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                val sharedPrefs = ctx.getSharedPreferences("baselift_targets", android.content.Context.MODE_PRIVATE)
-                                val editor = sharedPrefs.edit()
-                                if (newTarget == null) editor.remove("target_weight_${exercise.id}")
-                                else editor.putFloat("target_weight_${exercise.id}", newTarget)
-                                editor.apply()
+            } else {
+                val volumeTrend = charts.volumeTrend
+                val maxWeightTrend = charts.maxWeightTrend
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                ) {
+
+                    // Max Weight & Volume stats
+                    val now = System.currentTimeMillis()
+                    val filteredMaxWeight = when(selectedFilter) {
+                        "1M" -> maxWeightTrend.filter { now - it.xValue <= 30L * 24 * 60 * 60 * 1000 }
+                        "3M" -> maxWeightTrend.filter { now - it.xValue <= 90L * 24 * 60 * 60 * 1000 }
+                        "1Y" -> maxWeightTrend.filter { now - it.xValue <= 365L * 24 * 60 * 60 * 1000 }
+                        else -> maxWeightTrend
+                    }
+                    val filteredVolume = when(selectedFilter) {
+                        "1M" -> volumeTrend.filter { now - it.xValue <= 30L * 24 * 60 * 60 * 1000 }
+                        "3M" -> volumeTrend.filter { now - it.xValue <= 90L * 24 * 60 * 60 * 1000 }
+                        "1Y" -> volumeTrend.filter { now - it.xValue <= 365L * 24 * 60 * 60 * 1000 }
+                        else -> volumeTrend
+                    }
+
+                    val bestMaxWeightPoint = filteredMaxWeight.maxByOrNull { it.yValue }
+                    val overallEst1RM = bestMaxWeightPoint?.extraValue ?: 0f
+                    val maxW = filteredMaxWeight.maxOfOrNull { it.yValue } ?: 0f
+                    val maxV = filteredVolume.maxOfOrNull { it.yValue } ?: 0f
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            NeonGreen.copy(alpha = 0.15f),
+                                            NeonGreen.copy(alpha = 0.05f)
+                                        )
+                                    )
+                                )
+                                .padding(12.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(stringResource(com.example.baselift.R.string.dash_max_weight), color = CrystalWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${String.format(java.util.Locale.US, "%.1f", maxW)} kg", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             }
-                        },
-                        showTimeFilters = false,
-                        showTargetControls = true,
-                        chartHeight = 220.dp
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, ElectricBlue.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            ElectricBlue.copy(alpha = 0.15f),
+                                            ElectricBlue.copy(alpha = 0.05f)
+                                        )
+                                    )
+                                )
+                                .padding(12.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = ElectricBlue, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(stringResource(com.example.baselift.R.string.dash_max_volume), color = CrystalWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${String.format(java.util.Locale.US, "%.0f", maxV)} kg", color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(stringResource(com.example.baselift.R.string.dash_est_1rm, String.format(java.util.Locale.US, "%.1f", overallEst1RM)), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        stringResource(com.example.baselift.R.string.dash_volume),
+                        color = CrystalWhite.copy(alpha = 0.6f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                } else {
-                    Box(modifier = Modifier.fillMaxWidth().height(40.dp).background(Color(0xFF242424), RoundedCornerShape(4.dp)))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (filteredVolume.isNotEmpty()) {
+                        com.example.baselift.View.components.BarChartWithControls(
+                            title = "",
+                            dataPoints = filteredVolume,
+                            barColor = ElectricBlue,
+                            yUnit = "kg",
+                            formatYLabel = { String.format(java.util.Locale.US, "%.0f", it) },
+                            formatXLabel = { java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(it)) },
+                            summaryValue = null,
+                            summarySubtitle = null,
+                            summarySubtitleColor = CrystalWhite,
+                            showTimeFilters = false,
+                            chartHeight = 150.dp
+                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxWidth().height(40.dp).background(Color(0xFF242424), RoundedCornerShape(4.dp)))
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        stringResource(com.example.baselift.R.string.dash_absolute_weight),
+                        color = CrystalWhite.copy(alpha = 0.6f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (filteredMaxWeight.isNotEmpty()) {
+                        com.example.baselift.View.components.InteractiveChartWithControls(
+                            title = "",
+                            dataPoints = filteredMaxWeight,
+                            lineColor = NeonGreen,
+                            yUnit = "kg",
+                            formatYLabel = { String.format(java.util.Locale.US, "%.1f", it) },
+                            formatXLabel = { java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(it)) },
+                            targetValue = targetWeight,
+                            onSetTargetValue = { newTarget: Float? ->
+                                targetWeight = newTarget
+                                val ctx = context
+                                kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                    val sharedPrefs = ctx.getSharedPreferences("baselift_targets", android.content.Context.MODE_PRIVATE)
+                                    val editor = sharedPrefs.edit()
+                                    if (newTarget == null) editor.remove("target_weight_${exercise.id}")
+                                    else editor.putFloat("target_weight_${exercise.id}", newTarget)
+                                    editor.apply()
+                                }
+                            },
+                            showTimeFilters = false,
+                            showTargetControls = true,
+                            chartHeight = 220.dp
+                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxWidth().height(40.dp).background(Color(0xFF242424), RoundedCornerShape(4.dp)))
+                    }
                 }
             }
         }

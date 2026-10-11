@@ -180,8 +180,6 @@ class DashboardViewModelTest {
             afterMeal.nutritionDaysThisWeek.values.sumOf { it.calories })
         assertSame(before.weeklyVolumes, afterMeal.weeklyVolumes)
         assertSame(before.workoutVolumeTrends, afterMeal.workoutVolumeTrends)
-        assertSame(before.exerciseVolumeTrends, afterMeal.exerciseVolumeTrends)
-        assertSame(before.exerciseMaxWeightTrends, afterMeal.exerciseMaxWeightTrends)
 
         sources.resetReads()
         dashboard.setRestDays(7)
@@ -219,7 +217,6 @@ class DashboardViewModelTest {
         assertEquals(0, sources.sessions.reads)
         assertEquals(0, sources.sets.reads)
         assertSame(before.workoutVolumeTrends, edited.workoutVolumeTrends)
-        assertSame(before.exerciseMaxWeightTrends, edited.exerciseMaxWeightTrends)
 
         sources.exerciseFlow.value = sources.exerciseFlow.value.map {
             if (it.id == 1) it.copy(workoutId = 2) else it
@@ -227,7 +224,6 @@ class DashboardViewModelTest {
         runCurrent()
         val moved = dashboard.uiState.value
         assertEquals(0, sources.sets.reads)
-        assertSame(before.exerciseVolumeTrends, moved.exerciseVolumeTrends)
         assertSame(before.weeklyVolumes, moved.weeklyVolumes)
         assertEquals(before.workoutVolumeTrends.getValue(1).sumOf { it.yValue.toDouble() } / 2,
             moved.workoutVolumeTrends.getValue(1).sumOf { it.yValue.toDouble() }, 0.0)
@@ -261,8 +257,6 @@ class DashboardViewModelTest {
         assertTrue(cleared.historicalCalendarData.isEmpty())
         assertTrue(cleared.weeklyVolumes.isEmpty())
         assertTrue(cleared.workoutVolumeTrends.isEmpty())
-        assertTrue(cleared.exerciseVolumeTrends.isEmpty())
-        assertTrue(cleared.exerciseMaxWeightTrends.isEmpty())
         assertEquals(0, cleared.workoutStreak)
         assertEquals(0, cleared.nutritionStreak)
     }
@@ -394,7 +388,6 @@ class DashboardViewModelTest {
         assertEquals(0, sources.sessions.reads)
         assertEquals(0, sources.sets.reads)
         assertSame(before.workoutVolumeTrends, expired.workoutVolumeTrends)
-        assertSame(before.exerciseVolumeTrends, expired.exerciseVolumeTrends)
     }
 
     @Test
@@ -630,8 +623,9 @@ class DashboardViewModelTest {
         assertEquals(1000f, state.weeklyVolumes[0].totalVolume, 0f)
         
         assertEquals(1, state.workoutVolumeTrends.size)
-        assertEquals(1, state.exerciseVolumeTrends.size)
-        assertEquals(1, state.exerciseMaxWeightTrends.size)
+        val exerciseCharts = viewModel.exerciseCharts(1).first { !it.isLoading }
+        assertEquals(1, exerciseCharts.volumeTrend.size)
+        assertEquals(1, exerciseCharts.maxWeightTrend.size)
         
         job.cancel()
     }
