@@ -9,7 +9,7 @@ import com.example.baselift.Model.local.entity.SetLogEntity
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
-import com.example.baselift.Model.repository.WorkoutRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +42,10 @@ data class WorkoutUiState(
     val isLoading: Boolean = true
 )
 
-class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel() {
+class WorkoutViewModel(
+    private val repository: IWorkoutRepository,
+    private val modelDispatcher: CoroutineDispatcher = Dispatchers.Default
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkoutUiState())
     val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
@@ -68,22 +71,9 @@ class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel()
     fun getDraftReps(exerciseId: Int, setNumber: Int): String =
         draftReps[draftKey(exerciseId, setNumber)] ?: ""
 
-    // cache para as queries de getPreviousSet (evita N+1 queries a cada emissão do combine)
-    private val previousSetsCache = mutableMapOf<String, SetLogEntity?>()
-
-    private suspend fun getCachedPreviousSet(exerciseId: Int, setNumber: Int): SetLogEntity? {
-        val key = "${exerciseId}_$setNumber"
-        if (!previousSetsCache.containsKey(key)) {
-            val prev = repository.getPreviousSet(exerciseId, setNumber)
-            previousSetsCache[key] = prev
-        }
-        return previousSetsCache[key]
-    }
-
     private fun clearDrafts() {
         draftWeights.clear()
         draftReps.clear()
-        previousSetsCache.clear() // limpar a cache quando o treino termina
     }
 
     // guarda o trabalho ativo de seleção de treino para poder cancelar antes de começar outro
@@ -115,57 +105,64 @@ class WorkoutViewModel(private val repository: IWorkoutRepository) : ViewModel()
         // cancelar a coleção anterior antes de começar uma nova
         selectWorkoutJob?.cancel()
 
-        _uiState.update { it.copy(selectedWorkout = workout, exercises = emptyList()) }
+        _uiState.update { it.copy(selectedWorkout = workout, activeSession = null, exercises = emptyList()) }
 
         selectWorkoutJob = viewModelScope.launch {
             // iniciar ou obter a sessão
             val session = repository.startOrGetSession(workout.id)
             _uiState.update { it.copy(activeSession = session) }
             
-            // limpar cache ao trocar de treino
-            previousSetsCache.clear()
+            // Keep immutable history local to this selection; load before publishing actionable rows.
+            val previousSetsByKey = repository.getPreviousSetsForWorkout(workout.id)
+                .associateBy { it.exerciseId to it.setNumber }
 
             // observar exercícios para este treino
-            repository.getExercisesForWorkout(workout.id).combine(repository.getSetsForSession(session.id)) { exercises, setLogs ->
-                // construir o modelo de interface
-                exercises.map { exercise ->
-                    val exerciseSets = setLogs.filter { it.exerciseId == exercise.id }
-
-                    // usar a contagem de séries explícita e mostrar séries adicionadas na sessão
-                    val maxSetNumber = maxOf(
-                        exercise.setCount,
-                        exerciseSets.maxOfOrNull { it.setNumber } ?: 0
-                    )
-
-                    val maxCompleted = exerciseSets.filter { it.isCompleted }.maxOfOrNull { it.setNumber } ?: 0
-
-                    val uiSets = (1..maxSetNumber).map { setNum ->
-                        val currentLog = exerciseSets.find { it.setNumber == setNum }
-                        val prevLog = getCachedPreviousSet(exercise.id, setNum)
-
-                        val isSetCompleted = currentLog?.isCompleted == true
-                        val isLastCompleted = setNum == maxCompleted
-                        val isNextAvailable = setNum == maxCompleted + 1
-                        val canBeChecked = (!isSetCompleted && isNextAvailable) || (isSetCompleted && isLastCompleted)
-                        val isLastSet = setNum == maxSetNumber
-                        val canBeRemoved = isLastSet && maxSetNumber > 1
-
-                        SetUiModel(
-                            setNumber = setNum,
-                            currentLog = currentLog,
-                            prevWeight = prevLog?.weight,
-                            prevReps = prevLog?.reps,
-                            isCompleted = isSetCompleted,
-                            isLastCompleted = isLastCompleted,
-                            canBeChecked = canBeChecked,
-                            canBeRemoved = canBeRemoved
-                        )
-                    }
-                    ExerciseUiModel(exercise, uiSets)
+            repository.getExercisesForWorkout(workout.id).distinctUntilChanged()
+                .combine(repository.getSetsForSession(session.id).distinctUntilChanged()) { exercises, setLogs ->
+                    buildExerciseModels(exercises, setLogs, previousSetsByKey)
                 }
-            }.collect { exerciseModels ->
-                _uiState.update { it.copy(exercises = exerciseModels) }
+                .flowOn(modelDispatcher)
+                .collect { exerciseModels ->
+                    _uiState.update { it.copy(exercises = exerciseModels) }
+                }
+        }
+    }
+
+    private fun buildExerciseModels(
+        exercises: List<ExerciseEntity>,
+        setLogs: List<SetLogEntity>,
+        previousSetsByKey: Map<Pair<Int, Int>, SetLogEntity>
+    ): List<ExerciseUiModel> {
+        val setsByExercise = setLogs.groupBy { it.exerciseId }
+        return exercises.map { exercise ->
+            val currentLogsByNumber = mutableMapOf<Int, SetLogEntity>()
+            var maxSetNumber = exercise.setCount
+            var maxCompleted = 0
+            setsByExercise[exercise.id].orEmpty().forEach { log ->
+                // Preserve first-log behavior if current-session data contains duplicates.
+                currentLogsByNumber.putIfAbsent(log.setNumber, log)
+                maxSetNumber = maxOf(maxSetNumber, log.setNumber)
+                if (log.isCompleted) maxCompleted = maxOf(maxCompleted, log.setNumber)
             }
+
+            val uiSets = (1..maxSetNumber).map { setNum ->
+                val currentLog = currentLogsByNumber[setNum]
+                val prevLog = previousSetsByKey[exercise.id to setNum]
+                val isSetCompleted = currentLog?.isCompleted == true
+                val isLastCompleted = setNum == maxCompleted
+                val isNextAvailable = setNum == maxCompleted + 1
+                SetUiModel(
+                    setNumber = setNum,
+                    currentLog = currentLog,
+                    prevWeight = prevLog?.weight,
+                    prevReps = prevLog?.reps,
+                    isCompleted = isSetCompleted,
+                    isLastCompleted = isLastCompleted,
+                    canBeChecked = (!isSetCompleted && isNextAvailable) || (isSetCompleted && isLastCompleted),
+                    canBeRemoved = setNum == maxSetNumber && maxSetNumber > 1
+                )
+            }
+            ExerciseUiModel(exercise, uiSets)
         }
     }
 

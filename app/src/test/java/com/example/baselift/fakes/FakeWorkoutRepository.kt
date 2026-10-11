@@ -159,6 +159,20 @@ class FakeWorkoutRepository : IWorkoutRepository {
         return null
     }
 
+    override suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity> {
+        val exerciseIds = exercisesFlow.value.filter { it.workoutId == workoutId }.map { it.id }.toSet()
+        val completedSessions = sessionsFlow.value.filter { it.isCompleted }.associateBy { it.id }
+        return setLogsFlow.value
+            .filter { it.exerciseId in exerciseIds && it.isCompleted && it.sessionId in completedSessions }
+            .sortedWith(
+                compareByDescending<SetLogEntity> { completedSessions.getValue(it.sessionId).timestamp }
+                    .thenByDescending { it.sessionId }
+                    .thenByDescending { it.id }
+            )
+            .distinctBy { it.exerciseId to it.setNumber }
+            .sortedWith(compareBy({ it.exerciseId }, { it.setNumber }))
+    }
+
     override suspend fun checkPR(exerciseId: Int, weight: Float, reps: Int): String {
         val logsForExercise = setLogsFlow.value.filter { it.exerciseId == exerciseId && it.isCompleted }
         val maxWeight = logsForExercise.maxOfOrNull { it.weight } ?: 0f

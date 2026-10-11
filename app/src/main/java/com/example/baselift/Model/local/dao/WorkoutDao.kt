@@ -79,9 +79,41 @@ interface WorkoutDao {
         INNER JOIN workout_sessions ws ON sl.sessionId = ws.id
         WHERE sl.exerciseId = :exerciseId AND sl.setNumber = :setNumber
           AND ws.isCompleted = 1 AND sl.isCompleted = 1
-        ORDER BY ws.timestamp DESC LIMIT 1
+        ORDER BY ws.timestamp DESC, ws.id DESC, sl.id DESC LIMIT 1
     """)
     suspend fun getPreviousSet(exerciseId: Int, setNumber: Int): SetLogEntity?
+
+    // Latest completed history per exercise/set number, including fallback to older sessions.
+    // Resolve equal timestamps by session ID, then duplicate logs by log ID.
+    @Query("""
+        WITH latest_timestamps AS (
+            SELECT history.exerciseId, history.setNumber, MAX(session.timestamp) AS timestamp
+            FROM exercises exercise
+            INNER JOIN set_logs history ON history.exerciseId = exercise.id
+            INNER JOIN workout_sessions session ON history.sessionId = session.id
+            WHERE exercise.workoutId = :workoutId
+              AND history.isCompleted = 1 AND session.isCompleted = 1
+            GROUP BY history.exerciseId, history.setNumber
+        ), latest_sessions AS (
+            SELECT latest.exerciseId, latest.setNumber, MAX(session.id) AS sessionId
+            FROM latest_timestamps latest
+            INNER JOIN set_logs history ON history.exerciseId = latest.exerciseId AND history.setNumber = latest.setNumber
+            INNER JOIN workout_sessions session ON history.sessionId = session.id AND session.timestamp = latest.timestamp
+            WHERE history.isCompleted = 1 AND session.isCompleted = 1
+            GROUP BY latest.exerciseId, latest.setNumber
+        )
+        SELECT sl.* FROM set_logs sl
+        WHERE sl.id IN (
+            SELECT MAX(history.id)
+            FROM latest_sessions latest
+            INNER JOIN set_logs history ON history.sessionId = latest.sessionId
+                AND history.exerciseId = latest.exerciseId AND history.setNumber = latest.setNumber
+            WHERE history.isCompleted = 1
+            GROUP BY latest.exerciseId, latest.setNumber
+        )
+        ORDER BY sl.exerciseId ASC, sl.setNumber ASC
+    """)
+    suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity>
 
     // obter o peso máximo levantado neste exercício
     @Query("""

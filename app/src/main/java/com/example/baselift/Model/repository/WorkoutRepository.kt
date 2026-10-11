@@ -36,6 +36,7 @@ interface IWorkoutRepository {
     suspend fun finalizeSession(session: WorkoutSessionEntity)
     fun getSetsForSession(sessionId: Int): Flow<List<SetLogEntity>>
     suspend fun getPreviousSet(exerciseId: Int, setNumber: Int): SetLogEntity?
+    suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity>
     suspend fun checkPR(exerciseId: Int, weight: Float, reps: Int): String
     suspend fun logSet(sessionId: Int, exerciseId: Int, setNumber: Int, weight: Float, reps: Int, isCompleted: Boolean, existingSetId: Int = 0)
     fun getAllCompletedSessions(): Flow<List<WorkoutSessionEntity>>
@@ -168,6 +169,10 @@ class WorkoutRepository(
 
     override suspend fun getPreviousSet(exerciseId: Int, setNumber: Int): SetLogEntity? {
         return workoutDao.getPreviousSet(exerciseId, setNumber)
+    }
+
+    override suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity> {
+        return workoutDao.getPreviousSetsForWorkout(workoutId)
     }
 
     /**

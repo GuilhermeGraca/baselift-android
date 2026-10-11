@@ -1,6 +1,7 @@
 package com.example.baselift.dao
 
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.baselift.Model.local.AppDatabase
@@ -263,6 +264,81 @@ class WorkoutDaoTest {
         assertNotNull(previous)
         assertEquals(70f, previous!!.weight, 0.01f) // da sessão completada, não da ativa
         assertEquals(10, previous.reps)
+    }
+
+    @Test
+    fun getPreviousSetsForWorkout_preservesPerSetFallbackAndEligibility() = runTest {
+        val workoutId = insertWorkout()
+        val exerciseId = insertExercise(workoutId)
+        insertExercise(workoutId, "No history")
+        val older = insertSession(workoutId, isCompleted = true, timestamp = 1_000)
+        insertCompletedSet(older, exerciseId, 1, 70f, 10)
+        val olderSecond = insertCompletedSet(older, exerciseId, 2, 65f, 12)
+        val latest = insertSession(workoutId, isCompleted = true, timestamp = 2_000)
+        val latestFirst = insertCompletedSet(latest, exerciseId, 1, 80f, 8)
+        val active = insertSession(workoutId, timestamp = 3_000)
+        insertCompletedSet(active, exerciseId, 1, 999f, 1)
+        val incomplete = insertSession(workoutId, isCompleted = true, timestamp = 4_000)
+        workoutDao.insertSet(
+            SetLogEntity(sessionId = incomplete, exerciseId = exerciseId, setNumber = 1,
+                weight = 999f, reps = 1, isCompleted = false)
+        )
+        val otherWorkout = insertWorkout("Pull")
+        val otherExercise = insertExercise(otherWorkout)
+        val otherSession = insertSession(otherWorkout, isCompleted = true, timestamp = 5_000)
+        insertCompletedSet(otherSession, otherExercise, 1, 100f, 10)
+
+        val previous = workoutDao.getPreviousSetsForWorkout(workoutId)
+        assertEquals(listOf(latestFirst, olderSecond), previous.map { it.id })
+        previous.forEach { log ->
+            assertEquals(workoutDao.getPreviousSet(log.exerciseId, log.setNumber), log)
+        }
+    }
+
+    @Test
+    fun getPreviousSetsForWorkout_resolvesTimestampAndDuplicateTiesDeterministically() = runTest {
+        val workoutId = insertWorkout()
+        val exerciseId = insertExercise(workoutId)
+        val earlierSession = insertSession(workoutId, isCompleted = true, timestamp = 1_000)
+        val laterSession = insertSession(workoutId, isCompleted = true, timestamp = 1_000)
+        insertCompletedSet(laterSession, exerciseId, 1, 80f, 8)
+        val expected = insertCompletedSet(laterSession, exerciseId, 1, 85f, 6)
+        // A higher log ID in an older tied session must not win over the later session.
+        insertCompletedSet(earlierSession, exerciseId, 1, 999f, 1)
+
+        val previous = workoutDao.getPreviousSetsForWorkout(workoutId).single()
+        assertEquals(expected, previous.id)
+        assertEquals(workoutDao.getPreviousSet(exerciseId, 1), previous)
+    }
+
+    @Test
+    fun getPreviousSetsForWorkout_returnsEmptyWithoutCompletedHistory() = runTest {
+        val workoutId = insertWorkout()
+        val exerciseId = insertExercise(workoutId)
+        val active = insertSession(workoutId)
+        insertCompletedSet(active, exerciseId, 1, 80f, 10)
+        assertTrue(workoutDao.getPreviousSetsForWorkout(workoutId).isEmpty())
+        assertTrue(workoutDao.getPreviousSetsForWorkout(-1).isEmpty())
+    }
+
+    @Test
+    fun getPreviousSetsForWorkout_returnsOnlyLatestRowsFromLargeHistory() = runTest {
+        val workoutId = insertWorkout()
+        val exerciseIds = (1..6).map { insertExercise(workoutId, "Exercise $it", setCount = 4) }
+        database.withTransaction {
+            repeat(100) { index ->
+                val session = insertSession(workoutId, isCompleted = true, timestamp = index * 1_000L)
+                exerciseIds.forEach { exerciseId ->
+                    (1..4).forEach { setNumber ->
+                        insertCompletedSet(session, exerciseId, setNumber, index.toFloat(), 10)
+                    }
+                }
+            }
+        }
+        val previous = workoutDao.getPreviousSetsForWorkout(workoutId)
+        assertEquals(24, previous.size)
+        assertEquals(24, previous.map { it.exerciseId to it.setNumber }.distinct().size)
+        assertTrue(previous.all { it.weight == 99f })
     }
 
     @Test
