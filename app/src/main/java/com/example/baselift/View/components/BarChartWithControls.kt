@@ -27,6 +27,7 @@ import com.example.baselift.View.theme.DarkSurface
 import com.example.baselift.View.theme.MediumGrey
 import com.example.baselift.View.theme.NeonGreen
 import com.example.baselift.View.theme.PureBlack
+import java.util.TimeZone
 
 @Composable
 fun BarChartWithControls(
@@ -79,8 +80,17 @@ fun BarChartWithControls(
         }
 
         // caixa do gráfico
-        var selectedIndex by remember { mutableStateOf<Int?>(null) }
-        var selectedOffset by remember { mutableStateOf(Offset.Zero) }
+        val rangeDays = if (showTimeFilters) when (selectedFilter) {
+            "1M" -> 30
+            "3M" -> 90
+            "1Y" -> 365
+            else -> null
+        } else null
+        val filteredPoints = rememberChartRange(dataPoints, rangeDays)
+        val zoneId = TimeZone.getDefault().id
+        val validPoints = remember(filteredPoints, zoneId) { aggregateBarData(filteredPoints, 35) }
+        var selectedIndex by remember(validPoints) { mutableStateOf<Int?>(null) }
+        var selectedOffset by remember(validPoints) { mutableStateOf(Offset.Zero) }
 
         Column(
             modifier = Modifier
@@ -88,24 +98,10 @@ fun BarChartWithControls(
                 .height(chartHeight)
                 .clip(RoundedCornerShape(12.dp))
                 .background(DarkSurface)
-                .pointerInput(Unit) {
+                .pointerInput(validPoints) {
                     detectTapGestures { selectedIndex = null }
                 }
         ) {
-            val now = System.currentTimeMillis()
-            val filteredPoints = if (showTimeFilters) {
-                when (selectedFilter) {
-                    "1M" -> dataPoints.filter { now - it.xValue <= 30L * 24 * 60 * 60 * 1000 }
-                    "3M" -> dataPoints.filter { now - it.xValue <= 90L * 24 * 60 * 60 * 1000 }
-                    "1Y" -> dataPoints.filter { now - it.xValue <= 365L * 24 * 60 * 60 * 1000 }
-                    else -> dataPoints
-                }
-            } else {
-                dataPoints
-            }
-            
-            val validPoints = aggregateBarData(filteredPoints, 35)
-
         // Resumo no topo (não sobreposto)
         if (summaryValue != null) {
             Column(
@@ -194,6 +190,7 @@ fun CustomCanvasBarChart(
 
     val minY = 0f
     val maxY = validPoints.maxOf { it.yValue }
+    val validSelection = selectedIndex?.takeIf { it in validPoints.indices }
 
     val textPaint = remember {
         android.graphics.Paint().apply {
@@ -284,8 +281,8 @@ fun CustomCanvasBarChart(
             val barHeight = ((log.yValue - minY) / yRange) * drawHeight
             val yTop = chartHeight - barHeight
 
-            val isSelected = index == selectedIndex
-            val alpha = if (isSelected || selectedIndex == null) 1f else 0.3f
+            val isSelected = index == validSelection
+            val alpha = if (isSelected || validSelection == null) 1f else 0.3f
             val baseColor = barColor.copy(alpha = alpha)
             val gradient = androidx.compose.ui.graphics.Brush.verticalGradient(
                 colors = listOf(baseColor, baseColor.copy(alpha = 0.1f)),
@@ -327,7 +324,7 @@ fun CustomCanvasBarChart(
         }
 
         // Desenhar Tooltip se selecionado
-        selectedIndex?.let { index ->
+        validSelection?.let { index ->
             val log = validPoints[index]
             val textStr = log.tooltipLabel
 
@@ -398,6 +395,7 @@ fun aggregateBarData(data: List<ChartDataPoint>, maxBars: Int): List<ChartDataPo
     
     val aggregated = mutableListOf<ChartDataPoint>()
     val bucketSize = data.size.toDouble() / maxBars
+    val dateFormat = java.text.SimpleDateFormat("MMM dd", java.util.Locale.US)
     
     for (i in 0 until maxBars) {
         val start = (i * bucketSize).toInt()
@@ -408,8 +406,8 @@ fun aggregateBarData(data: List<ChartDataPoint>, maxBars: Int): List<ChartDataPo
             val avgX = bucket.map { it.xValue }.average().toLong()
             val avgY = bucket.map { it.yValue }.average().toFloat()
             
-            val startDate = java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(bucket.first().xValue))
-            val endDate = java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(bucket.last().xValue))
+            val startDate = dateFormat.format(java.util.Date(bucket.first().xValue))
+            val endDate = dateFormat.format(java.util.Date(bucket.last().xValue))
             val tooltip = if (start == end - 1) bucket.first().tooltipLabel else "Avg: ${String.format(java.util.Locale.US, "%.1f", avgY)}\n$startDate - $endDate"
             
             aggregated.add(ChartDataPoint(avgX, avgY, tooltip))

@@ -85,13 +85,16 @@ import kotlin.math.abs
 @Composable
 
 fun WeightTrendSection(weightLogs: List<WeightLogEntity>, targetWeight: Float?, onSetTargetWeight: (Float?) -> Unit) {
-    val dataPoints = weightLogs.map { log ->
-        val dateStr = SimpleDateFormat("dd/MM/yyyy", Locale.US).format(Date(log.timestamp))
-        ChartDataPoint(
-            xValue = log.timestamp,
-            yValue = log.weightValue,
-            tooltipLabel = "${log.weightValue} KG - $dateStr"
-        )
+    val zone = TimeZone.getDefault()
+    val dataPoints = remember(weightLogs, zone.id) {
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.US).apply { timeZone = zone }
+        weightLogs.map { log ->
+            ChartDataPoint(
+                xValue = log.timestamp,
+                yValue = log.weightValue,
+                tooltipLabel = "${log.weightValue} KG - ${dateFormat.format(Date(log.timestamp))}"
+            )
+        }
     }
 
     InteractiveChartWithControls(

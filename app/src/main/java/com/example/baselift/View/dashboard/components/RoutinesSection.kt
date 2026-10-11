@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import com.example.baselift.Model.local.entity.ExerciseEntity
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.ViewModel.dashboard.ExerciseCharts
+import com.example.baselift.View.components.rememberChartRange
 import kotlinx.coroutines.flow.Flow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.CircularProgressIndicator
@@ -174,13 +175,13 @@ fun WorkoutCollapsibleCard(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                val now = System.currentTimeMillis()
-                val filteredWorkoutTrend = when(selectedFilter) {
-                    "1M" -> workoutVolumeTrend.filter { now - it.xValue <= 30L * 24 * 60 * 60 * 1000 }
-                    "3M" -> workoutVolumeTrend.filter { now - it.xValue <= 90L * 24 * 60 * 60 * 1000 }
-                    "1Y" -> workoutVolumeTrend.filter { now - it.xValue <= 365L * 24 * 60 * 60 * 1000 }
-                    else -> workoutVolumeTrend
+                val rangeDays = when(selectedFilter) {
+                    "1M" -> 30
+                    "3M" -> 90
+                    "1Y" -> 365
+                    else -> null
                 }
+                val filteredWorkoutTrend = rememberChartRange(workoutVolumeTrend, rangeDays)
 
                 if (filteredWorkoutTrend.isNotEmpty()) {
                     com.example.baselift.View.components.InteractiveChartWithControls(
@@ -326,19 +327,14 @@ fun ExerciseCollapsibleCard(
                 ) {
 
                     // Max Weight & Volume stats
-                    val now = System.currentTimeMillis()
-                    val filteredMaxWeight = when(selectedFilter) {
-                        "1M" -> maxWeightTrend.filter { now - it.xValue <= 30L * 24 * 60 * 60 * 1000 }
-                        "3M" -> maxWeightTrend.filter { now - it.xValue <= 90L * 24 * 60 * 60 * 1000 }
-                        "1Y" -> maxWeightTrend.filter { now - it.xValue <= 365L * 24 * 60 * 60 * 1000 }
-                        else -> maxWeightTrend
+                    val rangeDays = when(selectedFilter) {
+                        "1M" -> 30
+                        "3M" -> 90
+                        "1Y" -> 365
+                        else -> null
                     }
-                    val filteredVolume = when(selectedFilter) {
-                        "1M" -> volumeTrend.filter { now - it.xValue <= 30L * 24 * 60 * 60 * 1000 }
-                        "3M" -> volumeTrend.filter { now - it.xValue <= 90L * 24 * 60 * 60 * 1000 }
-                        "1Y" -> volumeTrend.filter { now - it.xValue <= 365L * 24 * 60 * 60 * 1000 }
-                        else -> volumeTrend
-                    }
+                    val filteredMaxWeight = rememberChartRange(maxWeightTrend, rangeDays)
+                    val filteredVolume = rememberChartRange(volumeTrend, rangeDays)
 
                     val bestMaxWeightPoint = filteredMaxWeight.maxByOrNull { it.yValue }
                     val overallEst1RM = bestMaxWeightPoint?.extraValue ?: 0f

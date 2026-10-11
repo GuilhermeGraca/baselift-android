@@ -283,6 +283,7 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 - Tooltips interativos ao tocar num ponto (peso + data)
 - Exibe data de início, média e data de fim no topo; valor médio no eixo Y
 - Filtros temporais: 7D, 30D, 1Y, ALL
+- Preparação reutilizada enquanto os dados não mudam: rótulos de peso/volume semanal, downsampling de linhas (20 pontos) e agregação de barras (35). Os filtros rolling são recalculados na recomposição quando um ponto ultrapassa o limite inclusivo ou o relógio recua; alterações nos pontos, escala ou objetivo limpam seleções que já não correspondem à geometria do gráfico.
 
 **Technical History Ledger**:
 - Lista os registos de peso mais recentes
