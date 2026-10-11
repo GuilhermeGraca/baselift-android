@@ -19,10 +19,12 @@ local.properties
 MockDataInjector.kt
 /app/src/main/assets/demo_images/
 implementation_plan.md
-# Ignorar ficheiros de configuração local do Android Studio
+# Ignorar ficheiros de configuraï¿½ï¿½o local do Android Studio
 /.idea/deploymentTargetDropDown.xml
 /.idea/deploymentTargetSelector.xml
 
 # Selling points draft
 SELLING_POINTS.md
 preview/pixel8frame/
+
+optimization_plan.md
