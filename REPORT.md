@@ -167,13 +167,10 @@ Cada DAO define as queries SQL para a sua tabela. As queries que devolvem dados 
 
 Exemplos de queries relevantes no `WorkoutDao`:
 ```sql
--- peso máximo de um exercício (para detetar PR de peso)
-SELECT MAX(sl.weight) FROM set_logs sl
-INNER JOIN workout_sessions ws ON sl.sessionId = ws.id
-WHERE sl.exerciseId = :exerciseId AND ws.isCompleted = 1 AND sl.isCompleted = 1
-
--- 1RM máximo estimado (para detetar PR de volume)
-SELECT MAX(sl.weight * (1.0 + (sl.reps / 30.0))) FROM set_logs sl
+-- ambos os máximos históricos para PR, numa única consulta
+SELECT MAX(sl.weight) AS maxWeight,
+       MAX(sl.weight * (1.0 + (sl.reps / 30.0))) AS max1RM
+FROM set_logs sl
 INNER JOIN workout_sessions ws ON sl.sessionId = ws.id
 WHERE sl.exerciseId = :exerciseId AND ws.isCompleted = 1 AND sl.isCompleted = 1
 ```
@@ -263,6 +260,7 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 - **PR de Peso**: o peso desta série supera o máximo histórico do exercício
 - **PR de Volume (1RM estimado)**: `peso × (1 + reps/30)` supera o 1RM histórico
 - Deteção automática ao completar uma série, guardada no campo `prType` do `SetLogEntity`
+- `checkPR()` lê os dois máximos independentes através de `getExercisePrMaxima()`, evitando duas consultas ao mesmo histórico. Mantém o epsilon de 0,01, a prioridade de PR de peso e a exclusão de séries/sessões incompletas; a escrita continua com o comportamento anterior.
 
 **Rest Timer**: temporizador de descanso integrado com controlos rápidos (+30s, -10s, Skip)
 

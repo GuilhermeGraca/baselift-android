@@ -181,8 +181,9 @@ class WorkoutRepository(
      * o troféu só é dado quando o novo valor é maior que o anterior
      */
     override suspend fun checkPR(exerciseId: Int, weight: Float, reps: Int): String {
-        val maxWeight = workoutDao.getMaxWeightForExercise(exerciseId) ?: 0f
-        val max1RM = workoutDao.getMax1RMForExercise(exerciseId) ?: 0f
+        val history = workoutDao.getExercisePrMaxima(exerciseId)
+        val maxWeight = history.maxWeight ?: 0f
+        val max1RM = history.max1RM ?: 0f
 
         val current1RM = weight * (1.0f + (reps / 30.0f))
         val epsilon = 0.01f

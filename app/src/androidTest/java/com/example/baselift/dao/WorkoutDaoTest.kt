@@ -237,6 +237,59 @@ class WorkoutDaoTest {
     // =========================================================================
 
     @Test
+    fun getExercisePrMaxima_combinesIndependentMaximaAndPreservesEligibility() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout)
+        val other = insertExercise(workout, "Other")
+        val complete = insertSession(workout, isCompleted = true)
+        insertCompletedSet(complete, exercise, 1, 100f, 1)
+        insertCompletedSet(complete, exercise, 2, 80f, 20) // Higher 1RM from a different row.
+        insertCompletedSet(complete, other, 1, 999f, 30)
+        insertCompletedSet(insertSession(workout), exercise, 1, 900f, 30)
+        workoutDao.insertSet(SetLogEntity(sessionId = complete, exerciseId = exercise,
+            setNumber = 3, weight = 800f, reps = 30, isCompleted = false))
+        val maxima = workoutDao.getExercisePrMaxima(exercise)
+        assertEquals(100f, maxima.maxWeight!!, 0f)
+        assertEquals(80f * (1 + 20 / 30f), maxima.max1RM!!, 0.001f)
+        assertEquals(workoutDao.getMaxWeightForExercise(exercise), maxima.maxWeight)
+        assertEquals(workoutDao.getMax1RMForExercise(exercise), maxima.max1RM)
+    }
+
+    @Test
+    fun getExercisePrMaxima_returnsNullableMaximaForEmptyOrIneligibleHistory() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout)
+        val empty = workoutDao.getExercisePrMaxima(exercise)
+        assertNull(empty.maxWeight)
+        assertNull(empty.max1RM)
+        insertCompletedSet(insertSession(workout), exercise, 1, 100f, 10)
+        val complete = insertSession(workout, isCompleted = true)
+        workoutDao.insertSet(SetLogEntity(sessionId = complete, exerciseId = exercise,
+            setNumber = 2, weight = 900f, reps = 30, isCompleted = false))
+        val ineligible = workoutDao.getExercisePrMaxima(exercise)
+        assertNull(ineligible.maxWeight)
+        assertNull(ineligible.max1RM)
+        val missingExercise = workoutDao.getExercisePrMaxima(-1)
+        assertNull(missingExercise.maxWeight)
+        assertNull(missingExercise.max1RM)
+    }
+
+    @Test
+    fun getExercisePrMaxima_reflectsSessionFinalizationAndCascadeDeletion() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout)
+        val active = insertSession(workout)
+        insertCompletedSet(active, exercise, 1, 100f, 10)
+        assertNull(workoutDao.getExercisePrMaxima(exercise).maxWeight)
+        workoutDao.updateSession(workoutDao.getActiveSession(workout)!!.copy(isCompleted = true))
+        assertEquals(100f, workoutDao.getExercisePrMaxima(exercise).maxWeight!!, 0f)
+        workoutDao.deleteExercise(workoutDao.getExercisesForWorkout(workout).first().single())
+        val cleared = workoutDao.getExercisePrMaxima(exercise)
+        assertNull(cleared.maxWeight)
+        assertNull(cleared.max1RM)
+    }
+
+    @Test
     fun getMaxWeightForExercise_returnsHighestWeight() = runTest {
         val workoutId = insertWorkout()
         val exerciseId = insertExercise(workoutId)

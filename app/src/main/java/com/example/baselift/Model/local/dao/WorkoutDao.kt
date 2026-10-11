@@ -115,6 +115,16 @@ interface WorkoutDao {
     """)
     suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity>
 
+    // Both independent PR maxima in one aggregate read of completed history.
+    @Query("""
+        SELECT MAX(sl.weight) AS maxWeight,
+               MAX(sl.weight * (1.0 + (sl.reps / 30.0))) AS max1RM
+        FROM set_logs sl
+        INNER JOIN workout_sessions ws ON sl.sessionId = ws.id
+        WHERE sl.exerciseId = :exerciseId AND ws.isCompleted = 1 AND sl.isCompleted = 1
+    """)
+    suspend fun getExercisePrMaxima(exerciseId: Int): ExercisePrMaxima
+
     // obter o peso máximo levantado neste exercício
     @Query("""
         SELECT MAX(sl.weight) FROM set_logs sl
