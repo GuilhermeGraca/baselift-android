@@ -4,16 +4,20 @@ import androidx.lifecycle.ViewModelStore
 import com.example.baselift.Model.local.entity.ExerciseEntity
 import com.example.baselift.Model.local.entity.SetLogEntity
 import com.example.baselift.Model.local.entity.WorkoutEntity
+import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
 import com.example.baselift.fakes.FakeWorkoutRepository
 import com.example.baselift.helpers.MainDispatcherRule
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -66,6 +70,21 @@ class WorkoutViewModelTest {
         override suspend fun getPreviousSet(exerciseId: Int, setNumber: Int): SetLogEntity? {
             singleSetReads++
             return source.getPreviousSet(exerciseId, setNumber)
+        }
+    }
+
+    private class ControlledFinalizationRepository(
+        private val source: IWorkoutRepository
+    ) : IWorkoutRepository by source {
+        val startedSessions = mutableListOf<WorkoutSessionEntity>()
+        val release = CompletableDeferred<Unit>()
+        var failure: Exception? = null
+
+        override suspend fun finalizeSession(session: WorkoutSessionEntity) {
+            startedSessions += session
+            release.await()
+            failure?.let { throw it }
+            source.finalizeSession(session)
         }
     }
 
@@ -373,7 +392,8 @@ class WorkoutViewModelTest {
 
     @Test
     fun `finalizeWorkout marks session completed and clears drafts`() = runTest {
-        repository.createWorkout("A", 0)
+        val workoutId = repository.createWorkout("A", 0)
+        repository.createExercise(workoutId, "Bench", "", "", 0)
         initViewModel()
         runCurrent()
         
@@ -396,6 +416,154 @@ class WorkoutViewModelTest {
         val allCompleted = repository.getAllCompletedSessions().first()
         assertEquals(1, allCompleted.size)
         assertEquals(sessionBefore.id, allCompleted[0].id)
+    }
+
+    @Test
+    fun `finalization starts without animation delay and ignores duplicate and stale taps`() = runTest {
+        repository.createWorkout("A", 0)
+        val controlled = ControlledFinalizationRepository(repository)
+        initViewModel(controlled)
+        runCurrent()
+        val sessionId = viewModel.uiState.value.activeSession!!.id
+
+        viewModel.finalizeWorkout(sessionId)
+        assertTrue(viewModel.uiState.value.isFinalizing)
+        viewModel.finalizeWorkout(sessionId)
+        runCurrent()
+        assertEquals(listOf(sessionId), controlled.startedSessions.map { it.id })
+        assertTrue(repository.getAllCompletedSessions().first().isEmpty())
+        assertNull(viewModel.uiState.value.finalizedSessionId)
+
+        controlled.release.complete(Unit)
+        runCurrent()
+        assertEquals(0L, testScheduler.currentTime)
+        assertFalse(viewModel.uiState.value.isFinalizing)
+        assertEquals(sessionId, viewModel.uiState.value.finalizedSessionId)
+        val nextSessionId = viewModel.uiState.value.activeSession!!.id
+        assertNotEquals(sessionId, nextSessionId)
+        viewModel.finalizeWorkout(sessionId)
+        runCurrent()
+        assertEquals(1, controlled.startedSessions.size)
+        assertEquals(nextSessionId, viewModel.uiState.value.activeSession!!.id)
+        assertEquals(1, repository.getAllCompletedSessions().first().size)
+
+        viewModel.acknowledgeFinalization(sessionId + 100)
+        assertEquals(sessionId, viewModel.uiState.value.finalizedSessionId)
+        viewModel.acknowledgeFinalization(sessionId)
+        assertNull(viewModel.uiState.value.finalizedSessionId)
+    }
+
+    @Test
+    fun `failed finalization preserves session and drafts and allows retry`() = runTest {
+        val workoutId = repository.createWorkout("A", 0)
+        repository.createExercise(workoutId, "Bench", "", "", 0)
+        val exerciseId = repository.allExercises.first().single().id
+        val controlled = ControlledFinalizationRepository(repository)
+        controlled.failure = IllegalStateException("Database unavailable")
+        controlled.release.complete(Unit)
+        initViewModel(controlled)
+        runCurrent()
+        val session = viewModel.uiState.value.activeSession
+        viewModel.updateDraftWeight(exerciseId, 1, "100")
+        viewModel.updateDraftReps(exerciseId, 1, "8")
+
+        viewModel.finalizeWorkout()
+        runCurrent()
+        assertTrue(viewModel.uiState.value.finalizationFailed)
+        assertFalse(viewModel.uiState.value.isFinalizing)
+        assertNull(viewModel.uiState.value.finalizedSessionId)
+        assertEquals(session, viewModel.uiState.value.activeSession)
+        assertEquals("100", viewModel.getDraftWeight(exerciseId, 1))
+        assertEquals("8", viewModel.getDraftReps(exerciseId, 1))
+        assertTrue(repository.getAllCompletedSessions().first().isEmpty())
+
+        viewModel.dismissFinalizationError()
+        assertFalse(viewModel.uiState.value.finalizationFailed)
+        controlled.failure = null
+        viewModel.finalizeWorkout()
+        runCurrent()
+        assertEquals(2, controlled.startedSessions.size)
+        assertEquals(1, repository.getAllCompletedSessions().first().size)
+        assertEquals(session!!.id, viewModel.uiState.value.finalizedSessionId)
+        assertEquals("", viewModel.getDraftWeight(exerciseId, 1))
+        assertEquals("", viewModel.getDraftReps(exerciseId, 1))
+    }
+
+    @Test
+    fun `switching routine during finalization preserves its session and drafts`() = runTest {
+        val firstId = repository.createWorkout("A", 0)
+        val secondId = repository.createWorkout("B", 1)
+        repository.createExercise(firstId, "Bench", "", "", 0)
+        repository.createExercise(secondId, "Squat", "", "", 0)
+        val exercises = repository.allExercises.first()
+        val firstExerciseId = exercises.first().id
+        val secondExerciseId = exercises.last().id
+        val controlled = ControlledFinalizationRepository(repository)
+        initViewModel(controlled)
+        runCurrent()
+        val firstSession = viewModel.uiState.value.activeSession!!
+        viewModel.updateDraftWeight(firstExerciseId, 1, "100")
+        viewModel.finalizeWorkout()
+        runCurrent()
+
+        val secondWorkout = repository.allWorkouts.first().last()
+        viewModel.selectWorkout(secondWorkout)
+        runCurrent()
+        val secondSession = viewModel.uiState.value.activeSession
+        viewModel.updateDraftWeight(secondExerciseId, 1, "80")
+        viewModel.updateDraftReps(secondExerciseId, 1, "10")
+        controlled.release.complete(Unit)
+        runCurrent()
+
+        assertEquals(secondWorkout, viewModel.uiState.value.selectedWorkout)
+        assertEquals(secondSession, viewModel.uiState.value.activeSession)
+        assertEquals("80", viewModel.getDraftWeight(secondExerciseId, 1))
+        assertEquals("10", viewModel.getDraftReps(secondExerciseId, 1))
+        assertEquals("", viewModel.getDraftWeight(firstExerciseId, 1))
+        assertEquals(listOf(firstSession.id), repository.getAllCompletedSessions().first().map { it.id })
+        viewModel.selectWorkout(repository.allWorkouts.first().first())
+        runCurrent()
+        assertNotEquals(firstSession.id, viewModel.uiState.value.activeSession!!.id)
+    }
+
+    @Test
+    fun `leaving the screen does not cancel an accepted finalization`() = runTest {
+        repository.createWorkout("A", 0)
+        val controlled = ControlledFinalizationRepository(repository)
+        initViewModel(controlled)
+        runCurrent()
+        val sessionId = viewModel.uiState.value.activeSession!!.id
+        val screenSubscription = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect { }
+        }
+        viewModel.finalizeWorkout(sessionId)
+        runCurrent()
+        screenSubscription.cancel()
+        controlled.release.complete(Unit)
+        runCurrent()
+
+        assertEquals(listOf(sessionId), repository.getAllCompletedSessions().first().map { it.id })
+        assertFalse(viewModel.uiState.value.isFinalizing)
+        assertFalse(viewModel.uiState.value.finalizationFailed)
+    }
+
+    @Test
+    fun `cancelled finalization is not reported as a save failure`() = runTest {
+        repository.createWorkout("A", 0)
+        val controlled = ControlledFinalizationRepository(repository)
+        controlled.failure = CancellationException("ViewModel cleared")
+        controlled.release.complete(Unit)
+        initViewModel(controlled)
+        runCurrent()
+        val session = viewModel.uiState.value.activeSession
+        viewModel.finalizeWorkout()
+        runCurrent()
+
+        assertEquals(session, viewModel.uiState.value.activeSession)
+        assertFalse(viewModel.uiState.value.isFinalizing)
+        assertFalse(viewModel.uiState.value.finalizationFailed)
+        assertNull(viewModel.uiState.value.finalizedSessionId)
+        assertTrue(repository.getAllCompletedSessions().first().isEmpty())
     }
 
     @Test

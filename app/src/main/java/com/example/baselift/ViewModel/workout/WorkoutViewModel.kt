@@ -10,6 +10,7 @@ import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +40,10 @@ data class WorkoutUiState(
     val selectedWorkout: WorkoutEntity? = null,
     val activeSession: WorkoutSessionEntity? = null,
     val exercises: List<ExerciseUiModel> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val isFinalizing: Boolean = false,
+    val finalizationFailed: Boolean = false,
+    val finalizedSessionId: Int? = null
 )
 
 class WorkoutViewModel(
@@ -70,11 +74,6 @@ class WorkoutViewModel(
 
     fun getDraftReps(exerciseId: Int, setNumber: Int): String =
         draftReps[draftKey(exerciseId, setNumber)] ?: ""
-
-    private fun clearDrafts() {
-        draftWeights.clear()
-        draftReps.clear()
-    }
 
     // guarda o trabalho ativo de seleção de treino para poder cancelar antes de começar outro
     private var selectWorkoutJob: kotlinx.coroutines.Job? = null
@@ -274,13 +273,48 @@ class WorkoutViewModel(
         }
     }
 
-    fun finalizeWorkout() {
-        val session = _uiState.value.activeSession ?: return
+    fun finalizeWorkout(expectedSessionId: Int? = _uiState.value.activeSession?.id) {
+        val state = _uiState.value
+        val session = state.activeSession ?: return
+        // Reject duplicate taps, including callbacks from the previous session's UI.
+        if (state.isFinalizing || session.id != expectedSessionId) return
+        val exerciseIds = state.exercises.map { it.exercise.id }.toSet()
+        _uiState.update { it.copy(isFinalizing = true, finalizationFailed = false) }
+
+        // Saving belongs to the ViewModel, so leaving the screen cannot cancel it.
         viewModelScope.launch {
-            repository.finalizeSession(session)
-            clearDrafts() // limpar todos os rascunhos para a próxima sessão começar limpa
-            selectWorkout(_uiState.value.selectedWorkout)
+            try {
+                repository.finalizeSession(session)
+                // A different routine may now be visible; preserve its drafts and selection.
+                val keysToClear = (draftWeights.keys + draftReps.keys).filter {
+                    it.substringBefore('_').toIntOrNull() in exerciseIds
+                }
+                keysToClear.forEach {
+                    draftWeights.remove(it)
+                    draftReps.remove(it)
+                }
+                _uiState.update { it.copy(finalizedSessionId = session.id) }
+                if (_uiState.value.activeSession?.id == session.id) {
+                    selectWorkout(_uiState.value.selectedWorkout)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _uiState.update { it.copy(finalizationFailed = true) }
+            } finally {
+                _uiState.update { it.copy(isFinalizing = false) }
+            }
         }
+    }
+
+    fun acknowledgeFinalization(sessionId: Int) {
+        _uiState.update {
+            if (it.finalizedSessionId == sessionId) it.copy(finalizedSessionId = null) else it
+        }
+    }
+
+    fun dismissFinalizationError() {
+        _uiState.update { it.copy(finalizationFailed = false) }
     }
 
     fun deleteAllWorkouts() {

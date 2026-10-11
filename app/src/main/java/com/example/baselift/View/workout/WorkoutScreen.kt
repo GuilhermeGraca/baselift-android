@@ -62,6 +62,20 @@ fun WorkoutScreen(
     var workoutToDelete by remember { mutableStateOf<WorkoutEntity?>(null) }
     
     var showConfetti by remember { mutableStateOf(false) }
+    // Only presentation waits for the animation; the save has already succeeded.
+    val finalizedSessionId = uiState.finalizedSessionId
+    LaunchedEffect(finalizedSessionId) {
+        if (finalizedSessionId != null) {
+            viewModel.acknowledgeFinalization(finalizedSessionId)
+            showConfetti = true
+        }
+    }
+    LaunchedEffect(showConfetti) {
+        if (showConfetti) {
+            kotlinx.coroutines.delay(2000)
+            showConfetti = false
+        }
+    }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     
@@ -70,6 +84,19 @@ fun WorkoutScreen(
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(50)
         isContentReady = true
+    }
+
+    if (uiState.finalizationFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissFinalizationError,
+            title = { Text(stringResource(com.example.baselift.R.string.workout_finalize_error_title)) },
+            text = { Text(stringResource(com.example.baselift.R.string.workout_finalize_error_message)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissFinalizationError) {
+                    Text(stringResource(com.example.baselift.R.string.workout_finalize_error_dismiss))
+                }
+            }
+        )
     }
 
     if (workoutToDelete != null) {
@@ -391,17 +418,11 @@ fun WorkoutScreen(
                                 // botão para finalizar treino
                                 if (uiState.exercises.isNotEmpty()) {
                                     val hasCompletedSets = uiState.exercises.any { ex -> ex.sets.any { set -> set.isCompleted } }
+                                    val activeSessionId = uiState.activeSession?.id
                                     
                                     Button(
-                                        onClick = { 
-                                            showConfetti = true
-                                            coroutineScope.launch {
-                                                kotlinx.coroutines.delay(2000)
-                                                showConfetti = false
-                                                viewModel.finalizeWorkout()
-                                            }
-                                        },
-                                        enabled = hasCompletedSets,
+                                        onClick = { viewModel.finalizeWorkout(activeSessionId) },
+                                        enabled = hasCompletedSets && !uiState.isFinalizing,
                                         modifier = Modifier.fillMaxWidth().height(56.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = NeonGreen,
@@ -411,7 +432,10 @@ fun WorkoutScreen(
                                         ),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Text(stringResource(com.example.baselift.R.string.workout_finalize), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                                        Text(
+                                            stringResource(if (uiState.isFinalizing) com.example.baselift.R.string.workout_finalizing else com.example.baselift.R.string.workout_finalize),
+                                            fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp
+                                        )
                                     }
                                 }
                             }

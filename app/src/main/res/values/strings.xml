@@ -55,6 +55,10 @@
     <string name="workout_no_routines">No routines found. Click \'+\' to create one.</string>
     <string name="workout_add_exercise_session">+ ADD EXERCISE TO SESSION</string>
     <string name="workout_finalize">FINALIZE WORKOUT</string>
+    <string name="workout_finalizing">SAVING WORKOUT…</string>
+    <string name="workout_finalize_error_title">Unable to finish workout</string>
+    <string name="workout_finalize_error_message">Your workout could not be saved. Please try finalizing it again.</string>
+    <string name="workout_finalize_error_dismiss">OK</string>
     <string name="workout_new_routine">NEW ROUTINE</string>
     <string name="workout_add_exercise">ADD EXERCISE</string>
     <string name="workout_ex_name">Exercise Name</string>
