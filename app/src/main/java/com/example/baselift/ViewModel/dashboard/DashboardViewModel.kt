@@ -8,6 +8,8 @@ import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.INutritionRepository
 import com.example.baselift.Model.repository.IWorkoutRepository
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -56,7 +58,8 @@ data class DashboardUiState(
 // modelo de vista do dashboard
 class DashboardViewModel(
     private val workoutRepository: IWorkoutRepository,
-    private val nutritionRepository: INutritionRepository
+    private val nutritionRepository: INutritionRepository,
+    private val analyticsDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val restDaysFlow = MutableStateFlow(4) // por defeito 4 dias de descanso
@@ -226,11 +229,14 @@ class DashboardViewModel(
             nutritionRestDays = nutritionRestDays,
             isLoading = false
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Lazily,
-        initialValue = DashboardUiState()
-    )
+    }
+        // Move the complete analytics transform off Main, before sharing its UI state.
+        .flowOn(analyticsDispatcher)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Lazily,
+            initialValue = DashboardUiState()
+        )
 
     // conta o número total de DIAS de nutrição registados desde o início da streak atual
     private fun calculateNutritionStreak(logs: List<NutritionLogEntity>, requiredDays: Int): Int {

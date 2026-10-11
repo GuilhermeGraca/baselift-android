@@ -1,14 +1,22 @@
 package com.example.baselift.repository
 
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import com.example.baselift.Model.local.dao.WorkoutDao
 import com.example.baselift.Model.local.entity.SetLogEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.WorkoutRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -18,12 +26,21 @@ class WorkoutRepositoryTest {
 
     private lateinit var workoutDao: WorkoutDao
     private lateinit var repository: WorkoutRepository
+    private lateinit var workManager: WorkManager
 
     @Before
     fun setup() {
         workoutDao = mockk(relaxed = true)
         val context: android.content.Context = mockk(relaxed = true)
+        workManager = mockk(relaxed = true)
+        mockkStatic(WorkManager::class)
+        every { WorkManager.getInstance(context) } returns workManager
         repository = WorkoutRepository(workoutDao, context)
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(WorkManager::class)
     }
 
     @Test
@@ -113,6 +130,9 @@ class WorkoutRepositoryTest {
         assertEquals(5, session.id)
         assertEquals(1, session.workoutId)
         coVerify(exactly = 1) { workoutDao.insertSession(any()) }
+        verify(exactly = 1) {
+            workManager.enqueueUniqueWork("REMINDER_5", ExistingWorkPolicy.REPLACE, any<OneTimeWorkRequest>())
+        }
     }
 
     @Test
@@ -124,5 +144,8 @@ class WorkoutRepositoryTest {
         
         assertEquals(2, session.id)
         coVerify(exactly = 0) { workoutDao.insertSession(any()) }
+        verify(exactly = 1) {
+            workManager.enqueueUniqueWork("REMINDER_2", ExistingWorkPolicy.REPLACE, any<OneTimeWorkRequest>())
+        }
     }
 }

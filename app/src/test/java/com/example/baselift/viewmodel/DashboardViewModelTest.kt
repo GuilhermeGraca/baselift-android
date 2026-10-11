@@ -1,17 +1,22 @@
 package com.example.baselift.viewmodel
 
+import androidx.lifecycle.ViewModelStore
 import com.example.baselift.Model.local.entity.ExerciseEntity
 import com.example.baselift.Model.local.entity.NutritionLogEntity
 import com.example.baselift.Model.local.entity.SetLogEntity
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
+import com.example.baselift.Model.repository.INutritionRepository
 import com.example.baselift.ViewModel.dashboard.DashboardViewModel
 import com.example.baselift.fakes.FakeNutritionRepository
 import com.example.baselift.fakes.FakeWorkoutRepository
 import com.example.baselift.helpers.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -23,6 +28,9 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.util.Calendar
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModelTest {
@@ -38,13 +46,62 @@ class DashboardViewModelTest {
     fun setup() {
         workoutRepository = FakeWorkoutRepository()
         nutritionRepository = FakeNutritionRepository()
-        viewModel = DashboardViewModel(workoutRepository, nutritionRepository)
+        viewModel = DashboardViewModel(
+            workoutRepository,
+            nutritionRepository,
+            analyticsDispatcher = mainDispatcherRule.testDispatcher
+        )
     }
 
     private fun getTimestampDaysAgo(daysAgo: Int): Long {
         val cal = Calendar.getInstance()
         cal.add(Calendar.DAY_OF_YEAR, -daysAgo)
         return cal.timeInMillis
+    }
+
+    @Test
+    fun `history aggregation runs on the analytics dispatcher`() = runTest {
+        val timestamp = Calendar.getInstance().apply {
+            set(2025, Calendar.JULY, 10, 12, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val logs = listOf(
+            NutritionLogEntity(id = 1, calories = 500, protein = 30, carbs = 50, fats = 10, timestamp = timestamp),
+            NutritionLogEntity(id = 2, calories = 250, protein = 15, carbs = 25, fats = 5, timestamp = timestamp)
+        )
+        val historyReadThreads = ConcurrentLinkedQueue<Thread>()
+        // Observe consumption by the analytics transform, rather than Flow emission.
+        val history = object : AbstractList<NutritionLogEntity>() {
+            override val size: Int = logs.size
+
+            override fun get(index: Int): NutritionLogEntity {
+                historyReadThreads.add(Thread.currentThread())
+                return logs[index]
+            }
+        }
+        val repository = object : INutritionRepository by nutritionRepository {
+            override fun getAllNutritionLogs(): Flow<List<NutritionLogEntity>> = flowOf(history)
+        }
+
+        val analyticsThread = AtomicReference<Thread>()
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "dashboard-analytics-test").also { analyticsThread.set(it) }
+        }.asCoroutineDispatcher().use { dispatcher ->
+            val backgroundViewModel = DashboardViewModel(workoutRepository, repository, dispatcher)
+            val store = ViewModelStore().apply { put("dashboard", backgroundViewModel) }
+            try {
+                val state = backgroundViewModel.uiState.first { !it.isLoading }
+                val summary = state.historicalCalendarData.values.single()
+                assertEquals(750, summary.nutritionCalories)
+                assertEquals(45, summary.nutritionProtein)
+                assertEquals(75, summary.nutritionCarbs)
+                assertEquals(15, summary.nutritionFats)
+                assertTrue(historyReadThreads.isNotEmpty())
+                assertTrue(historyReadThreads.all { it === analyticsThread.get() })
+            } finally {
+                store.clear()
+            }
+        }
     }
 
     @Test

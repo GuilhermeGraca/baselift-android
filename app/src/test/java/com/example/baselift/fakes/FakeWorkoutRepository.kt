@@ -35,6 +35,12 @@ class FakeWorkoutRepository : IWorkoutRepository {
         return id
     }
 
+    override suspend fun updateWorkout(workout: WorkoutEntity) {
+        workoutsFlow.value = workoutsFlow.value.map {
+            if (it.id == workout.id) workout else it
+        }
+    }
+
     override suspend fun deleteWorkout(workout: WorkoutEntity) {
         workoutsFlow.value = workoutsFlow.value.filter { it.id != workout.id }
         exercisesFlow.value = exercisesFlow.value.filter { it.workoutId != workout.id }
@@ -71,6 +77,11 @@ class FakeWorkoutRepository : IWorkoutRepository {
             newList[index] = updated
             exercisesFlow.value = newList
         }
+    }
+
+    override suspend fun updateExercises(exercises: List<ExerciseEntity>) {
+        val updatesById = exercises.associateBy { it.id }
+        exercisesFlow.value = exercisesFlow.value.map { updatesById[it.id] ?: it }
     }
 
     override suspend fun deleteExercise(exercise: ExerciseEntity) {
