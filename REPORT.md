@@ -288,6 +288,7 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 - Lista os registos de peso mais recentes
 - Inicialmente mostra 4 registos com fade-out no último
 - Botão "LOAD MORE DATA" para expandir / "LOAD LESS DATA" para colapsar
+- Cada registo é um item com chave estável na `LazyColumn` do ecrã; a expansão compõe apenas as linhas necessárias ao viewport. A ordenação é reutilizada enquanto o histórico não muda e o delta usa diretamente o registo seguinte, sem procurar na lista inteira por linha.
 - Long-press: animação de preenchimento gradual vermelho de 0% a 100% → abre diálogo de confirmação glassmorphic
 
 **Delta inteligente**: o indicador de diferença (+/- KG) usa Verde Néon ou Coral Suave consoante a direção é favorável ou desfavorável ao objetivo do utilizador (perder vs ganhar peso). Recalculado automaticamente em recalibrações.

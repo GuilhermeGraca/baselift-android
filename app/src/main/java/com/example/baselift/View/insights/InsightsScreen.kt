@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -97,6 +98,14 @@ fun InsightsScreen(
     val context = LocalContext.current
     var selectedUrisForLogging by remember { mutableStateOf<List<Uri>?>(null) }
     var clickedPhoto by remember { mutableStateOf<PhotoLogEntity?>(null) }
+    val sortedWeightLogs = remember(weightLogs) { weightLogs.sortedByDescending { it.timestamp } }
+    var weightHistoryExpanded by rememberSaveable { mutableStateOf(false) }
+    var weightLogToDeleteId by remember { mutableStateOf<Int?>(null) }
+    val weightLogToDelete = weightLogToDeleteId?.let { id -> weightLogs.firstOrNull { it.id == id } }
+
+    LaunchedEffect(weightLogToDeleteId, weightLogToDelete) {
+        if (weightLogToDeleteId != null && weightLogToDelete == null) weightLogToDeleteId = null
+    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
@@ -377,13 +386,15 @@ fun InsightsScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        item {
-            // histórico
-            TechnicalHistoryLedger(weightLogs, user, onDelete = { progressViewModel.deleteWeightLog(it) })
-            Spacer(modifier = Modifier.height(48.dp))
-        }
+        TechnicalHistoryLedger(
+            sortedLogs = sortedWeightLogs,
+            isGainGoal = user?.goal?.contains("Gain", ignoreCase = true) ?: false,
+            expanded = weightHistoryExpanded,
+            onToggleExpanded = { weightHistoryExpanded = !weightHistoryExpanded },
+            onRequestDelete = { weightLogToDeleteId = it.id }
+        )
 
-        item {
+        item(key = "insights-visual-diary") {
             // diário visual
             VisualDiarySection(
                 photoLogs = photoLogs,
@@ -394,6 +405,16 @@ fun InsightsScreen(
             }
             Spacer(modifier = Modifier.height(100.dp)) // espaço para navegação inferior
         }
+    }
+
+    weightLogToDelete?.let { log ->
+        WeightHistoryDeleteDialog(
+            onDismiss = { weightLogToDeleteId = null },
+            onConfirm = {
+                progressViewModel.deleteWeightLog(log)
+                weightLogToDeleteId = null
+            }
+        )
     }
 
     // diálogo para adicionar foto

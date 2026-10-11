@@ -14,7 +14,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -47,7 +46,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.CornerRadius
@@ -239,149 +237,6 @@ fun LogWeightSection(onConfirmEntry: (Float, Long) -> Unit) {
                         showCalendarDialog = false
                     }
                 )
-            }
-        }
-    }
-}
-
-@Composable
-fun TechnicalHistoryLedger(weightLogs: List<WeightLogEntity>, user: UserEntity?, onDelete: (WeightLogEntity) -> Unit) {
-    val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.US)
-    val sortedLogs = weightLogs.sortedByDescending { it.timestamp }
-    var showAllLogs by remember { mutableStateOf(false) }
-
-    val isGainGoal = user?.goal?.contains("Gain", ignoreCase = true) ?: false
-
-    var logToDelete by remember { mutableStateOf<WeightLogEntity?>(null) }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(com.example.baselift.R.string.insights_technical_history), color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(NeonGreen.copy(alpha = 0.2f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                Text(stringResource(com.example.baselift.R.string.insights_raw_data_synced), color = NeonGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (sortedLogs.isEmpty()) {
-            Text(stringResource(com.example.baselift.R.string.insights_no_entries), color = MediumGrey, fontSize = 12.sp)
-        } else {
-            val displayLogs = if (showAllLogs) sortedLogs else sortedLogs.take(4)
-            
-            displayLogs.forEachIndexed { index, log ->
-                val previousLogIndex = sortedLogs.indexOf(log) + 1
-                val previousLog = if (previousLogIndex < sortedLogs.size) sortedLogs[previousLogIndex] else null
-                val delta = if (previousLog != null) log.weightValue - previousLog.weightValue else 0f
-                val deltaText = if (delta > 0) "+${String.format(Locale.US, "%.1f", delta)}" else String.format(Locale.US, "%.1f", delta)
-                
-                val deltaColor = if (delta > 0) {
-                    if (isGainGoal) NeonGreen else SoftCoral
-                } else if (delta < 0) {
-                    if (isGainGoal) SoftCoral else NeonGreen
-                } else {
-                    MediumGrey
-                }
-                
-                val alphaValue = if (!showAllLogs && index == 3) 0.4f else 1f
-
-                var isPressed by remember { mutableStateOf(false) }
-                val animatedBgAlpha by animateFloatAsState(targetValue = if (isPressed) 0.3f else 0f, animationSpec = tween(600))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .alpha(alphaValue)
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    SoftCoral.copy(alpha = animatedBgAlpha),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    isPressed = true
-                                    val success = tryAwaitRelease()
-                                    isPressed = false
-                                },
-                                onLongPress = {
-                                    isPressed = false
-                                    logToDelete = log
-                                }
-                            )
-                        }
-                        .padding(vertical = 8.dp, horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(dateFormat.format(Date(log.timestamp)).uppercase(Locale.US), color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("ID: ${log.id}-${log.timestamp.toString().takeLast(4)}", color = MediumGrey, fontSize = 10.sp)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("${log.weightValue} KG", color = CrystalWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        if (previousLog != null) {
-                            Text("$deltaText KG DELTA", color = deltaColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-            
-            if (sortedLogs.size > 4) {
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalDivider(color = MediumGrey.copy(alpha = 0.2f))
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = if (showAllLogs) stringResource(com.example.baselift.R.string.insights_load_less_data) else stringResource(com.example.baselift.R.string.insights_load_more_data),
-                    color = MediumGrey,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.fillMaxWidth().clickable { showAllLogs = !showAllLogs },
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-
-    if (logToDelete != null) {
-        Dialog(onDismissRequest = { logToDelete = null }) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(PureBlack)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.02f))
-                        )
-                    )
-                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                    .padding(24.dp)
-            ) {
-                Text(stringResource(com.example.baselift.R.string.insights_delete_entry), color = SoftCoral, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(stringResource(com.example.baselift.R.string.insights_delete_weight_record_msg), color = CrystalWhite, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { logToDelete = null }) {
-                        Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            logToDelete?.let { onDelete(it) }
-                            logToDelete = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = SoftCoral),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(stringResource(com.example.baselift.R.string.workout_delete), color = PureBlack, fontWeight = FontWeight.Bold)
-                    }
-                }
             }
         }
     }
