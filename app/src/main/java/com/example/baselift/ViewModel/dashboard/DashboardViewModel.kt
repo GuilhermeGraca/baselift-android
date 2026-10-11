@@ -234,7 +234,8 @@ class DashboardViewModel(
         .flowOn(analyticsDispatcher)
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.Lazily,
+            // Tolerate brief UI transitions, then stop offscreen analytics while retaining the last state.
+            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000),
             initialValue = DashboardUiState()
         )
 
