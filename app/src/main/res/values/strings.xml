@@ -114,6 +114,9 @@
     <string name="nutrition_show_less">SHOW LESS</string>
     <string name="nutrition_show_more">SHOW MORE</string>
     <string name="nutrition_delete_template">Delete Template</string>
+    <string name="nutrition_delete_error_title">Unable to delete meal</string>
+    <string name="nutrition_delete_error_message">Could not delete \'%1$s\'. Your template is still saved. Please try again.</string>
+    <string name="nutrition_delete_error_dismiss">OK</string>
     <string name="nutrition_delete_template_msg">Are you sure you want to remove \'%1$s\' from your templates? This action cannot be undone.</string>
     <string name="nutrition_todays_logs">TODAY\'S LOGS</string>
     <string name="nutrition_reset_all">RESET ALL LOGS</string>

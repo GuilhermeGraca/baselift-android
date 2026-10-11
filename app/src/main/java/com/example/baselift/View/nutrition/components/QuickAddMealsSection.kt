@@ -60,10 +60,13 @@ fun QuickAddMealsSection(
     onLogMeal: (MealTemplateEntity) -> Unit,
     onDeleteTemplate: (MealTemplateEntity) -> Unit,
     onConfigureClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    deletingTemplateIds: Set<Int> = emptySet()
 ) {
     var showAllLogs by remember { mutableStateOf(false) }
-    var itemToDelete by remember { mutableStateOf<Pair<MealTemplateEntity, () -> Unit>?>(null) }
+    var itemToDelete by remember { mutableStateOf<MealTemplateEntity?>(null) }
+    // Retain only presentation snapshots so fast database writes do not cut off the exit.
+    val exitingTemplates = remember { mutableStateMapOf<Int, MealTemplateEntity>() }
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -90,7 +93,7 @@ fun QuickAddMealsSection(
             }
         }
 
-        if (templates.isEmpty()) {
+        if (templates.isEmpty() && exitingTemplates.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -116,7 +119,8 @@ fun QuickAddMealsSection(
                 .background(PureBlack)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                val sortedTemplates = templates.sortedByDescending { it.id }
+                val sortedTemplates = (templates + exitingTemplates.values)
+                    .distinctBy { it.id }.sortedByDescending { it.id }
                 val displayTemplates = if (showAllLogs) sortedTemplates else sortedTemplates.take(4)
 
                 displayTemplates.forEachIndexed { index, template ->
@@ -129,7 +133,7 @@ fun QuickAddMealsSection(
 
                         var isDragging by remember { mutableStateOf(false) }
                         var offsetX by remember { mutableFloatStateOf(0f) }
-                        var isDeleted by remember { mutableStateOf(false) }
+                        val isDeleted = template.id in exitingTemplates || template.id in deletingTemplateIds
                         
                         val animatedOffset by animateFloatAsState(
                             targetValue = offsetX, 
@@ -164,15 +168,9 @@ fun QuickAddMealsSection(
                                         )
                                     )
                                 )
-                                .clickable {
+                                .clickable(enabled = !isDeleted) {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    itemToDelete = Pair(template) {
-                                        coroutineScope.launch {
-                                            isDeleted = true
-                                            kotlinx.coroutines.delay(450)
-                                            onDeleteTemplate(template)
-                                        }
-                                    }
+                                    itemToDelete = template
                                 },
                             contentAlignment = Alignment.CenterStart
                         ) {
@@ -194,7 +192,7 @@ fun QuickAddMealsSection(
                                 .fillMaxWidth()
                                 .offset { IntOffset(animatedOffset.roundToInt(), 0) }
                                 .background(PureBlack)
-                                .clickable { 
+                                .clickable(enabled = !isDeleted) {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                     onLogMeal(template)
                                     android.widget.Toast.makeText(context, "${template.name} added", android.widget.Toast.LENGTH_SHORT).show()
@@ -316,7 +314,7 @@ fun QuickAddMealsSection(
     }
 
     if (itemToDelete != null) {
-        val (template, onConfirmDelete) = itemToDelete!!
+        val template = itemToDelete!!
         Dialog(onDismissRequest = { itemToDelete = null }) {
             val animateTrigger = remember { mutableStateOf(false) }
             LaunchedEffect(Unit) { animateTrigger.value = true }
@@ -350,8 +348,15 @@ fun QuickAddMealsSection(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            onConfirmDelete()
+                            val confirmedTemplate = itemToDelete ?: return@Button
                             itemToDelete = null
+                            exitingTemplates[confirmedTemplate.id] = confirmedTemplate
+                            onDeleteTemplate(confirmedTemplate)
+                            coroutineScope.launch {
+                                // This delay only retains the row for its 200 + 250 ms exit.
+                                delay(450)
+                                exitingTemplates.remove(confirmedTemplate.id)
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = SoftCoral),
                         shape = RoundedCornerShape(8.dp)

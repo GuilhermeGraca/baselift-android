@@ -7,6 +7,8 @@ import com.example.baselift.Model.local.entity.NutritionLogEntity
 import com.example.baselift.Model.repository.INutritionRepository
 import com.example.baselift.Model.repository.IUserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -14,7 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import androidx.compose.runtime.Stable
 
@@ -37,6 +39,11 @@ data class NutritionUiState(
     val isLoading: Boolean = true
 )
 
+data class MealTemplateDeletionState(
+    val pendingTemplateIds: Set<Int> = emptySet(),
+    val failedTemplate: MealTemplateEntity? = null
+)
+
 // modelo de vista responsável pela aba de nutrição
 class NutritionViewModel(
     private val nutritionRepository: INutritionRepository,
@@ -44,6 +51,8 @@ class NutritionViewModel(
 ) : ViewModel() {
 
     private val refreshTrigger = MutableStateFlow(System.currentTimeMillis())
+    private val _mealTemplateDeletion = MutableStateFlow(MealTemplateDeletionState())
+    val mealTemplateDeletion: StateFlow<MealTemplateDeletionState> = _mealTemplateDeletion.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<NutritionUiState> = combine(
@@ -121,10 +130,27 @@ class NutritionViewModel(
     }
 
     // apagar um template
-    fun deleteMealTemplate(template: com.example.baselift.Model.local.entity.MealTemplateEntity) {
-        viewModelScope.launch {
-            nutritionRepository.deleteMealTemplate(template)
+    fun deleteMealTemplate(template: MealTemplateEntity) {
+        if (template.id in _mealTemplateDeletion.value.pendingTemplateIds) return
+        _mealTemplateDeletion.update {
+            it.copy(pendingTemplateIds = it.pendingTemplateIds + template.id, failedTemplate = null)
         }
+        // The command starts now; row exit animations and screen disposal do not own it.
+        viewModelScope.launch {
+            try {
+                nutritionRepository.deleteMealTemplate(template)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _mealTemplateDeletion.update { it.copy(failedTemplate = template) }
+            } finally {
+                _mealTemplateDeletion.update { it.copy(pendingTemplateIds = it.pendingTemplateIds - template.id) }
+            }
+        }
+    }
+
+    fun dismissMealTemplateDeletionError() {
+        _mealTemplateDeletion.update { it.copy(failedTemplate = null) }
     }
 
     // usar um template para registar (Quick Add Meal)

@@ -31,6 +31,7 @@ fun NutritionScreen(
     onNavigateToCustomTargets: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val mealTemplateDeletion by viewModel.mealTemplateDeletion.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -53,6 +54,19 @@ fun NutritionScreen(
     }
 
     var showConfigureMealDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    mealTemplateDeletion.failedTemplate?.let { template ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = viewModel::dismissMealTemplateDeletionError,
+            title = { androidx.compose.material3.Text(stringResource(com.example.baselift.R.string.nutrition_delete_error_title)) },
+            text = { androidx.compose.material3.Text(stringResource(com.example.baselift.R.string.nutrition_delete_error_message, template.name)) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = viewModel::dismissMealTemplateDeletionError) {
+                    androidx.compose.material3.Text(stringResource(com.example.baselift.R.string.nutrition_delete_error_dismiss))
+                }
+            }
+        )
+    }
 
     if (showConfigureMealDialog) {
         com.example.baselift.View.nutrition.components.ConfigureMealDialog(
@@ -120,7 +134,8 @@ fun NutritionScreen(
                 templates = uiState.mealTemplates,
                 onLogMeal = { template -> viewModel.logMealTemplate(template) },
                 onDeleteTemplate = { template -> viewModel.deleteMealTemplate(template) },
-                onConfigureClick = { showConfigureMealDialog = true }
+                onConfigureClick = { showConfigureMealDialog = true },
+                deletingTemplateIds = mealTemplateDeletion.pendingTemplateIds
             )
 
             Spacer(modifier = Modifier.height(32.dp))
