@@ -304,7 +304,8 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 - Seleção em lote (batch upload): múltiplas fotos com a mesma data
 - Ordenação cronológica da esquerda (mais antiga) para a direita (mais recente, marcada como `LATEST`)
 - Gradientes de scroll dinâmicos nas extremidades
-- Detalhe ao tocar: zoom gestual (pinch-to-zoom), arrasto, duplo toque para reset, cruzamento automático com o peso registado nesse dia
+- Detalhe ao tocar: zoom gestual (pinch-to-zoom), arrasto, reposição ao soltar o gesto, cruzamento automático com o peso registado nesse dia
+- O diário e o detalhe partilham um índice por dia local, reutilizado até os pesos ou o fuso horário mudarem. Mantém o primeiro peso desse dia na ordem fornecida pelo DAO (cronológica), incluindo empates. O zoom/arrasto lê o estado apenas em `graphicsLayer {}` e nos gestos; não recompõe o diálogo a cada movimento. A imagem volta a 1× ao soltar o gesto e a transformação reinicia ao trocar de foto.
 
 ---
 

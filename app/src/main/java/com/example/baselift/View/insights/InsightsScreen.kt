@@ -99,6 +99,7 @@ fun InsightsScreen(
     var selectedUrisForLogging by remember { mutableStateOf<List<Uri>?>(null) }
     var clickedPhoto by remember { mutableStateOf<PhotoLogEntity?>(null) }
     val sortedWeightLogs = remember(weightLogs) { weightLogs.sortedByDescending { it.timestamp } }
+    val photoWeights = rememberPhotoWeightIndex(weightLogs)
     var weightHistoryExpanded by rememberSaveable { mutableStateOf(false) }
     var weightLogToDeleteId by remember { mutableStateOf<Int?>(null) }
     val weightLogToDelete = weightLogToDeleteId?.let { id -> weightLogs.firstOrNull { it.id == id } }
@@ -398,7 +399,7 @@ fun InsightsScreen(
             // diário visual
             VisualDiarySection(
                 photoLogs = photoLogs,
-                weightLogs = weightLogs,
+                photoWeights = photoWeights,
                 onPhotoClick = { clickedPhoto = it }
             ) {
                 photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -533,7 +534,7 @@ fun InsightsScreen(
     clickedPhoto?.let { photo ->
         PhotoDetailDialog(
             photoLog = photo,
-            weightLogs = weightLogs,
+            photoWeights = photoWeights,
             onDismiss = { clickedPhoto = null },
             onDelete = {
                 progressViewModel.deletePhotoLog(photo)

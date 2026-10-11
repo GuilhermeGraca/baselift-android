@@ -14,9 +14,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -47,9 +44,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -57,7 +52,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -67,9 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.baselift.Model.local.entity.PhotoLogEntity
@@ -248,11 +239,12 @@ fun LogWeightSection(onConfirmEntry: (Float, Long) -> Unit) {
 @Composable
 fun VisualDiarySection(
     photoLogs: List<PhotoLogEntity>,
-    weightLogs: List<WeightLogEntity>,
+    photoWeights: PhotoWeightIndex,
     onPhotoClick: (PhotoLogEntity) -> Unit,
     onAddPhoto: () -> Unit
 ) {
-    val dateFormat = SimpleDateFormat("MMM dd", Locale.US)
+    val zone = TimeZone.getDefault()
+    val dateFormat = remember(zone.id) { SimpleDateFormat("MMM dd", Locale.US).apply { timeZone = zone } }
     val sortedPhotos = remember(photoLogs) { photoLogs.sortedBy { it.timestamp } } // mais antigas à esquerda e recentes à direita
     val lazyListState = rememberLazyListState()
 
@@ -300,7 +292,7 @@ fun VisualDiarySection(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    itemsIndexed(sortedPhotos) { index, photoLog ->
+                    itemsIndexed(sortedPhotos, key = { _, photo -> photo.id }) { index, photoLog ->
                         val isLatest = index == sortedPhotos.size - 1
                         Box(
                             modifier = Modifier
@@ -323,7 +315,9 @@ fun VisualDiarySection(
                                 }
                             }
                             
-                            val associatedWeight = weightLogs.find { isSameCalendarDay(it.timestamp, photoLog.timestamp) }
+                            val associatedWeight = remember(photoLog.timestamp, photoWeights) {
+                                photoWeights.weightAt(photoLog.timestamp)
+                            }
                             if (associatedWeight != null) {
                                 Box(
                                     modifier = Modifier
@@ -339,8 +333,11 @@ fun VisualDiarySection(
                                 }
                             }
 
+                            val dateLabel = remember(photoLog.timestamp, zone.id) {
+                                dateFormat.format(Date(photoLog.timestamp)).uppercase(Locale.US)
+                            }
                             Text(
-                                text = dateFormat.format(Date(photoLog.timestamp)).uppercase(Locale.US),
+                                text = dateLabel,
                                 color = CrystalWhite,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
@@ -384,25 +381,19 @@ fun VisualDiarySection(
     }
 }
 
-fun isSameCalendarDay(t1: Long, t2: Long): Boolean {
-    val cal1 = Calendar.getInstance().apply { timeInMillis = t1 }
-    val cal2 = Calendar.getInstance().apply { timeInMillis = t2 }
-    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-           cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
-}
-
 @Composable
 fun PhotoDetailDialog(
     photoLog: PhotoLogEntity,
-    weightLogs: List<WeightLogEntity>,
+    photoWeights: PhotoWeightIndex,
     onDismiss: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val dateFormat = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.US)
-    val associatedWeight = weightLogs.find { isSameCalendarDay(it.timestamp, photoLog.timestamp) }
-    
-    var scale by remember { mutableStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
+    val zone = TimeZone.getDefault()
+    val dateLabel = remember(photoLog.timestamp, zone.id) {
+        SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.US).apply { timeZone = zone }
+            .format(Date(photoLog.timestamp)).uppercase(Locale.US)
+    }
+    val associatedWeight = remember(photoLog.timestamp, photoWeights) { photoWeights.weightAt(photoLog.timestamp) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -453,67 +444,19 @@ fun PhotoDetailDialog(
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // imagem com zoom
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(420.dp)
-                            .zIndex(1f)
-                            .background(DarkSurface, RoundedCornerShape(8.dp))
-                            .pointerInput(Unit) {
-                                detectTransformGestures { centroid, pan, zoom, _ ->
-                                    val oldScale = scale
-                                    scale = (scale * zoom).coerceIn(1f, 5f)
-                                    
-                                    val fractionalX = centroid.x - size.width / 2
-                                    val fractionalY = centroid.y - size.height / 2
-                                    
-                                    offset = Offset(
-                                        offset.x * (scale / oldScale) + pan.x - fractionalX * (scale - oldScale),
-                                        offset.y * (scale / oldScale) + pan.y - fractionalY * (scale - oldScale)
-                                    )
-                                }
-                            }
-                            .pointerInput(Unit) {
-                                awaitEachGesture {
-                                    awaitFirstDown()
-                                    do {
-                                        val event = awaitPointerEvent()
-                                    } while (event.changes.any { it.pressed })
-                                    scale = 1f
-                                    offset = Offset.Zero
-                                }
-                            }
-                        ,
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AsyncImage(
-                            model = Uri.parse(photoLog.photoUri),
-                            contentDescription = "Zoomed Progress Photo",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer(
-                                    scaleX = scale,
-                                    scaleY = scale,
-                                    translationX = offset.x,
-                                    translationY = offset.y
-                                )
-                        )
-                    }
-                    
+                    ZoomableProgressPhoto(photoLog)
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     // visualização da data
                     Text(
-                        text = dateFormat.format(Date(photoLog.timestamp)).uppercase(Locale.US),
+                        text = dateLabel,
                         color = CrystalWhite,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                     
-                    var showConfirmDelete by remember { mutableStateOf(false) }
+                    var showConfirmDelete by remember(photoLog.id) { mutableStateOf(false) }
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
