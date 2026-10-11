@@ -311,9 +311,9 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 O Dashboard agrega dados de nutrição e treino para dar uma visão geral da consistência do utilizador.
 
 **Consistency Journal** (streaks):
-- **Nutrition Streak**: conta dias com registo de nutrição em semanas consecutivas que cumpriram a meta (configurável: 0-7 dias de descanso por semana)
-- **Workout Streak**: conta dias com treino em semanas consecutivas que cumpriram a meta
-- A semana atual nunca quebra a streak (mesmo que incompleta)
+- **Nutrition Streak** e **Workout Streak**: contam dias únicos com atividade, percorrendo o calendário para trás até exceder os dias de descanso permitidos numa semana de segunda a domingo (configurável: 0–7).
+- Com 0, um dia anterior sem atividade quebra a streak. Com 1–6, os dias sem atividade consomem a tolerância da respetiva semana; a tolerância reinicia ao entrar noutra semana. Aumentar os dias de descanso nunca diminui a streak.
+- Hoje pode estar incompleto e vários registos no mesmo dia contam como um dia. Os dias de descanso não aumentam o contador. Com 7, contam-se todos os dias com atividade até hoje; registos futuros não contam.
 - Cartões com animação de glow quando a streak atinge 7 dias
 - **Calendário semanal**: mostra os 7 dias da semana (Seg–Dom) com marcadores visuais de nutrição e treino
 

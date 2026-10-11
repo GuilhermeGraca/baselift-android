@@ -32,9 +32,9 @@
     <string name="dash_workouts_count">%1$d workouts</string>
     <string name="dash_view_calendar">VIEW CALENDAR</string>
     <string name="dash_workouts_label">WORKOUTS</string>
-    <string name="dash_rest_days_desc">Set the number of Rest Days per week (0 to 7). If you set 2, you need to workout 5 days a week to keep the streak.</string>
-    <string name="dash_rest_days_note">Note: If you set 7 rest days, the streak never resets and just acts as a total workout counter.</string>
-    <string name="dash_nut_rest_days_desc">Set the number of Rest Days per week (0 to 7). If you set 2, you need to log nutrition 5 days a week to keep the streak.</string>
+    <string name="dash_rest_days_desc">Allow 0 to 7 missed workout days per Monday–Sunday week. With 0, every day must have a workout. With 2, up to 2 missed days per week are allowed. Today can remain unfinished; only workout days add to the streak.</string>
+    <string name="dash_rest_days_note">Note: If you set 7 rest days, the streak never resets and counts total workout days.</string>
+    <string name="dash_nut_rest_days_desc">Allow 0 to 7 missed nutrition days per Monday–Sunday week. With 0, every day must have a nutrition log. With 2, up to 2 missed days per week are allowed. Today can remain unfinished; only logged days add to the streak.</string>
     <string name="dash_nut_rest_days_note">Note: If you set 7 rest days, the streak never resets and just acts as a total nutrition days counter.</string>
     <string name="dash_save">SAVE</string>
     <string name="dash_total_volume">Total Training Volume</string>

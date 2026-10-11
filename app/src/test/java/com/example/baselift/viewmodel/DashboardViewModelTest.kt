@@ -15,6 +15,8 @@ import com.example.baselift.helpers.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
@@ -28,6 +30,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -101,6 +104,297 @@ class DashboardViewModelTest {
         val cal = Calendar.getInstance()
         cal.add(Calendar.DAY_OF_YEAR, -daysAgo)
         return cal.timeInMillis
+    }
+
+    private class ObservedHistory<T>(private val values: List<T>) : AbstractList<T>() {
+        var reads = 0
+        override val size get() = values.size
+        override fun get(index: Int): T {
+            reads++
+            return values[index]
+        }
+    }
+
+    private inner class HistorySources(val now: Long) {
+        val nutrition = ObservedHistory((0 until 1_095).map {
+            NutritionLogEntity(id = it + 1, calories = 100, protein = 0, carbs = 0, fats = 0, timestamp = now - it * 86_400_000L)
+        })
+        val sessions = ObservedHistory((0 until 200).map {
+            WorkoutSessionEntity(id = it + 1, workoutId = if (it % 2 == 0) 1 else 2,
+                timestamp = now - it * 86_400_000L, isCompleted = true)
+        })
+        val setValues = (0 until 4_800).map {
+            val day = it / 24
+            SetLogEntity(id = it + 1, sessionId = day + 1,
+                exerciseId = if (day % 2 == 0) it % 2 + 1 else 3, setNumber = it % 4 + 1,
+                weight = 100f, reps = 10, isCompleted = true, timestamp = now - day * 86_400_000L)
+        }
+        val sets = ObservedHistory(setValues)
+        val nutritionFlow = MutableStateFlow<List<NutritionLogEntity>>(nutrition)
+        val sessionFlow = MutableStateFlow<List<WorkoutSessionEntity>>(sessions)
+        val setFlow = MutableSharedFlow<List<SetLogEntity>>(replay = 1).apply { tryEmit(sets) }
+        val workoutFlow = MutableStateFlow(listOf(WorkoutEntity(id = 1, name = "Push"), WorkoutEntity(id = 2, name = "Legs")))
+        val exerciseFlow = MutableStateFlow(listOf(
+            ExerciseEntity(id = 1, workoutId = 1, name = "Bench", equipment = "", muscleGroups = ""),
+            ExerciseEntity(id = 2, workoutId = 1, name = "Press", equipment = "", muscleGroups = ""),
+            ExerciseEntity(id = 3, workoutId = 2, name = "Squat", equipment = "", muscleGroups = "")
+        ))
+        val workouts = object : IWorkoutRepository by workoutRepository {
+            override val allWorkouts = workoutFlow
+            override val allExercises = exerciseFlow
+            override fun getAllCompletedSessions(): Flow<List<WorkoutSessionEntity>> = sessionFlow
+            override fun getAllCompletedSetLogs(): Flow<List<SetLogEntity>> = setFlow
+        }
+        val meals = object : INutritionRepository by nutritionRepository {
+            override fun getAllNutritionLogs(): Flow<List<NutritionLogEntity>> = nutritionFlow
+        }
+
+        fun dashboard(clock: () -> Long = { now }) = DashboardViewModel(
+            workouts, meals, mainDispatcherRule.testDispatcher, clock
+        ).also { viewModelStore.put("observed-dashboard", it) }
+
+        fun resetReads() {
+            nutrition.reads = 0
+            sessions.reads = 0
+            sets.reads = 0
+        }
+    }
+
+    @Test
+    fun `nutrition updates and rest day changes reuse workout history and charts`() = runTest {
+        val sources = HistorySources(System.currentTimeMillis())
+        val dashboard = sources.dashboard()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+        val before = dashboard.uiState.value
+        sources.resetReads()
+
+        sources.nutritionFlow.value = sources.nutritionFlow.value + NutritionLogEntity(
+            id = 2_000, calories = 500, protein = 0, carbs = 0, fats = 0, timestamp = sources.now
+        )
+        runCurrent()
+        assertEquals(0, sources.sessions.reads)
+        assertEquals(0, sources.sets.reads)
+        val afterMeal = dashboard.uiState.value
+        assertEquals(before.nutritionDaysThisWeek.values.sumOf { it.calories } + 500,
+            afterMeal.nutritionDaysThisWeek.values.sumOf { it.calories })
+        assertSame(before.weeklyVolumes, afterMeal.weeklyVolumes)
+        assertSame(before.workoutVolumeTrends, afterMeal.workoutVolumeTrends)
+        assertSame(before.exerciseVolumeTrends, afterMeal.exerciseVolumeTrends)
+        assertSame(before.exerciseMaxWeightTrends, afterMeal.exerciseMaxWeightTrends)
+
+        sources.resetReads()
+        dashboard.setRestDays(7)
+        dashboard.setNutritionRestDays(7)
+        runCurrent()
+        val afterSettings = dashboard.uiState.value
+        assertEquals(200, afterSettings.workoutStreak)
+        assertEquals(1_095, afterSettings.nutritionStreak)
+        assertEquals(0, sources.nutrition.reads)
+        assertEquals(0, sources.sessions.reads)
+        assertEquals(0, sources.sets.reads)
+        assertSame(before.workoutVolumeTrends, afterSettings.workoutVolumeTrends)
+        assertSame(afterMeal.nutritionDaysThisWeek, afterSettings.nutritionDaysThisWeek)
+        assertSame(before.workoutDaysThisWeek, afterSettings.workoutDaysThisWeek)
+    }
+
+    @Test
+    fun `metadata edits reuse set history and membership changes regroup only prepared daily totals`() = runTest {
+        val sources = HistorySources(System.currentTimeMillis())
+        val dashboard = sources.dashboard()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+        val before = dashboard.uiState.value
+        sources.resetReads()
+
+        sources.workoutFlow.value = sources.workoutFlow.value.map { it.copy(name = "Renamed ${it.id}") }
+        sources.exerciseFlow.value = sources.exerciseFlow.value.map { it.copy(name = "Edited ${it.id}", setCount = 5, orderIndex = 3) }
+        runCurrent()
+        val edited = dashboard.uiState.value
+        assertEquals("Edited 1", edited.exercises.getValue(1).first().name)
+        assertTrue(edited.historicalCalendarData.values.filter { it.hasWorkout }.all {
+            it.workoutNames.all { name -> name.startsWith("Renamed") }
+        })
+        assertEquals(0, sources.nutrition.reads)
+        assertEquals(0, sources.sessions.reads)
+        assertEquals(0, sources.sets.reads)
+        assertSame(before.workoutVolumeTrends, edited.workoutVolumeTrends)
+        assertSame(before.exerciseMaxWeightTrends, edited.exerciseMaxWeightTrends)
+
+        sources.exerciseFlow.value = sources.exerciseFlow.value.map {
+            if (it.id == 1) it.copy(workoutId = 2) else it
+        }
+        runCurrent()
+        val moved = dashboard.uiState.value
+        assertEquals(0, sources.sets.reads)
+        assertSame(before.exerciseVolumeTrends, moved.exerciseVolumeTrends)
+        assertSame(before.weeklyVolumes, moved.weeklyVolumes)
+        assertEquals(before.workoutVolumeTrends.getValue(1).sumOf { it.yValue.toDouble() } / 2,
+            moved.workoutVolumeTrends.getValue(1).sumOf { it.yValue.toDouble() }, 0.0)
+        assertEquals(before.workoutVolumeTrends.values.flatten().sumOf { it.yValue.toDouble() },
+            moved.workoutVolumeTrends.values.flatten().sumOf { it.yValue.toDouble() }, 0.0)
+    }
+
+    @Test
+    fun `set changes update charts without reading nutrition or session history and reset clears results`() = runTest {
+        val sources = HistorySources(System.currentTimeMillis())
+        val dashboard = sources.dashboard()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+        val before = dashboard.uiState.value
+        sources.resetReads()
+        sources.setFlow.emit(sources.setValues + sources.setValues.first().copy(id = 5_000, weight = 150f, reps = 6))
+        runCurrent()
+        val changed = dashboard.uiState.value
+        assertEquals(0, sources.nutrition.reads)
+        assertEquals(0, sources.sessions.reads)
+        assertSame(before.nutritionDaysThisWeek, changed.nutritionDaysThisWeek)
+        assertSame(before.workoutDaysThisWeek, changed.workoutDaysThisWeek)
+        assertEquals(before.weeklyVolumes.sumOf { it.totalVolume.toDouble() } + 900,
+            changed.weeklyVolumes.sumOf { it.totalVolume.toDouble() }, 0.0)
+
+        sources.nutritionFlow.value = emptyList()
+        sources.sessionFlow.value = emptyList()
+        sources.setFlow.emit(emptyList())
+        runCurrent()
+        val cleared = dashboard.uiState.value
+        assertTrue(cleared.historicalCalendarData.isEmpty())
+        assertTrue(cleared.weeklyVolumes.isEmpty())
+        assertTrue(cleared.workoutVolumeTrends.isEmpty())
+        assertTrue(cleared.exerciseVolumeTrends.isEmpty())
+        assertTrue(cleared.exerciseMaxWeightTrends.isEmpty())
+        assertEquals(0, cleared.workoutStreak)
+        assertEquals(0, cleared.nutritionStreak)
+    }
+
+    @Test
+    fun `equal set snapshots are compared once without rebuilding chart history`() = runTest {
+        val sources = HistorySources(System.currentTimeMillis())
+        val dashboard = sources.dashboard()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+        val identicalSnapshot = ObservedHistory(sources.setValues)
+        sources.resetReads()
+        sources.setFlow.emit(identicalSnapshot)
+        runCurrent()
+        assertEquals(sources.setValues.size, identicalSnapshot.reads)
+        assertEquals(sources.setValues.size, sources.sets.reads)
+    }
+
+    @Test
+    fun `Monday boundary refreshes weekly summaries without rereading set history`() = runTest {
+        val sunday = Calendar.getInstance().apply {
+            set(2026, Calendar.OCTOBER, 18, 23, 59, 59)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val sources = HistorySources(sunday)
+        val dashboard = sources.dashboard { sunday + testScheduler.currentTime }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+        val before = dashboard.uiState.value
+        assertTrue(before.nutritionDaysThisWeek.containsKey(7))
+        assertTrue(before.workoutSessionsThisWeek > 0)
+        sources.resetReads()
+        advanceTimeBy(1_000)
+        runCurrent()
+        val monday = dashboard.uiState.value
+        assertTrue(monday.nutritionDaysThisWeek.isEmpty())
+        assertEquals(0, monday.workoutSessionsThisWeek)
+        assertEquals(0, sources.sets.reads)
+        assertSame(before.workoutVolumeTrends, monday.workoutVolumeTrends)
+    }
+
+    @Test
+    fun `all rest settings preserve ten workout days and allow nutrition gap in reported October calendar`() = runTest {
+        fun october(day: Int) = Calendar.getInstance().apply {
+            set(2026, Calendar.OCTOBER, day, 12, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val workoutId = workoutRepository.createWorkout("Workout", 0)
+        (1..10).forEach { day ->
+            val session = workoutRepository.startOrGetSession(workoutId)
+            workoutRepository.finalizeSession(session.copy(timestamp = october(day)))
+        }
+        // A second session on the same day must not inflate the day streak.
+        val duplicate = workoutRepository.startOrGetSession(workoutId)
+        workoutRepository.finalizeSession(duplicate.copy(timestamp = october(10)))
+        // An unfinished session today does not count as completed activity.
+        workoutRepository.startOrGetSession(workoutId)
+        ((1..9).toList() + listOf(11, 11)).forEachIndexed { i, day ->
+            nutritionRepository.insertNutritionLog(NutritionLogEntity(
+                id = i + 1, calories = 100, protein = 0, carbs = 0, fats = 0, timestamp = october(day)
+            ))
+        }
+        val dashboard = DashboardViewModel(workoutRepository, nutritionRepository,
+            mainDispatcherRule.testDispatcher, clockMillis = { october(11) })
+        viewModelStore.put("calendar-regression", dashboard)
+        dashboard.setRestDays(0)
+        dashboard.setNutritionRestDays(0)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+
+        val state = dashboard.uiState.value
+        assertEquals(10, state.workoutStreak)
+        assertEquals(1, state.nutritionStreak)
+        assertTrue(state.historicalCalendarData.getValue("2026-10-10").hasWorkout)
+        assertFalse(state.historicalCalendarData.getValue("2026-10-10").hasNutrition)
+        assertFalse(state.historicalCalendarData.getValue("2026-10-11").hasWorkout)
+        assertTrue(state.historicalCalendarData.getValue("2026-10-11").hasNutrition)
+
+        (0..7).forEach { restDays ->
+            val nutritionBefore = dashboard.uiState.value.nutritionStreak
+            dashboard.setRestDays(restDays)
+            runCurrent()
+            assertEquals("Workout allowance $restDays", 10, dashboard.uiState.value.workoutStreak)
+            assertEquals(nutritionBefore, dashboard.uiState.value.nutritionStreak)
+            dashboard.setNutritionRestDays(restDays)
+            runCurrent()
+            assertEquals("Nutrition allowance $restDays", if (restDays == 0) 1 else 10,
+                dashboard.uiState.value.nutritionStreak)
+            assertEquals(10, dashboard.uiState.value.workoutStreak)
+        }
+        // Tightening the allowance must recalculate, rather than retaining a maximum.
+        (7 downTo 0).forEach { restDays ->
+            dashboard.setRestDays(restDays)
+            dashboard.setNutritionRestDays(restDays)
+            runCurrent()
+            assertEquals(10, dashboard.uiState.value.workoutStreak)
+            assertEquals(if (restDays == 0) 1 else 10, dashboard.uiState.value.nutritionStreak)
+        }
+    }
+
+    @Test
+    fun `midnight expires a missed daily streak without rereading history or rebuilding charts`() = runTest {
+        val tuesday = Calendar.getInstance().apply {
+            set(2026, Calendar.OCTOBER, 13, 23, 59, 59)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val sources = HistorySources(tuesday)
+        val dashboard = sources.dashboard { tuesday + testScheduler.currentTime }
+        dashboard.setRestDays(0)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+        val before = dashboard.uiState.value
+        assertEquals(200, before.workoutStreak)
+        assertEquals(1_095, before.nutritionStreak)
+        sources.resetReads()
+
+        // At Wednesday's start, Tuesday can still anchor the streak.
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(200, dashboard.uiState.value.workoutStreak)
+        assertEquals(1_095, dashboard.uiState.value.nutritionStreak)
+        // No Wednesday logs: Thursday must show zero without any repository emission.
+        advanceTimeBy(86_400_000)
+        runCurrent()
+        val expired = dashboard.uiState.value
+        assertEquals(0, expired.workoutStreak)
+        assertEquals(0, expired.nutritionStreak)
+        assertEquals(0, sources.nutrition.reads)
+        assertEquals(0, sources.sessions.reads)
+        assertEquals(0, sources.sets.reads)
+        assertSame(before.workoutVolumeTrends, expired.workoutVolumeTrends)
+        assertSame(before.exerciseVolumeTrends, expired.exerciseVolumeTrends)
     }
 
     @Test
