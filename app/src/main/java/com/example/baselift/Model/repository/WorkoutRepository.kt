@@ -112,7 +112,7 @@ class WorkoutRepository(
 
     /** incrementa o número de séries */
     override suspend fun addSet(exercise: ExerciseEntity) {
-        workoutDao.updateExercise(exercise.copy(setCount = exercise.setCount + 1))
+        workoutDao.incrementSetCount(exercise.id)
     }
 
     // --- SESSIONS ---

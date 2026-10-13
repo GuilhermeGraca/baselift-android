@@ -36,6 +36,10 @@ interface WorkoutDao {
     @Update
     suspend fun updateExercises(exercises: List<ExerciseEntity>)
 
+    // Increment the stored count, independently of a potentially stale UI snapshot.
+    @Query("UPDATE exercises SET setCount = setCount + 1 WHERE id = :exerciseId")
+    suspend fun incrementSetCount(exerciseId: Int): Int
+
     @Delete
     suspend fun deleteExercise(exercise: ExerciseEntity)
 

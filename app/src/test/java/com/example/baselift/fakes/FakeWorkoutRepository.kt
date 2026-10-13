@@ -8,6 +8,7 @@ import com.example.baselift.Model.repository.IWorkoutRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 
 class FakeWorkoutRepository : IWorkoutRepository {
     private val workoutsFlow = MutableStateFlow<List<WorkoutEntity>>(emptyList())
@@ -108,11 +109,10 @@ class FakeWorkoutRepository : IWorkoutRepository {
     }
 
     override suspend fun addSet(exercise: ExerciseEntity) {
-        val index = exercisesFlow.value.indexOfFirst { it.id == exercise.id }
-        if (index != -1) {
-            val newList = exercisesFlow.value.toMutableList()
-            newList[index] = exercise.copy(setCount = exercise.setCount + 1)
-            exercisesFlow.value = newList
+        exercisesFlow.update { exercises ->
+            exercises.map { current ->
+                if (current.id == exercise.id) current.copy(setCount = current.setCount + 1) else current
+            }
         }
     }
 

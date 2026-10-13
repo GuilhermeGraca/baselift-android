@@ -6,6 +6,7 @@ import androidx.work.WorkManager
 import com.example.baselift.Model.local.dao.WorkoutDao
 import com.example.baselift.Model.local.dao.ExercisePrMaxima
 import com.example.baselift.Model.local.entity.SetLogEntity
+import com.example.baselift.Model.local.entity.ExerciseEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.WorkoutRepository
 import io.mockk.coEvery
@@ -42,6 +43,15 @@ class WorkoutRepositoryTest {
     @After
     fun tearDown() {
         unmockkStatic(WorkManager::class)
+    }
+
+    @Test
+    fun `adding a set uses one targeted increment instead of writing a stale exercise copy`() = runTest {
+        val stale = ExerciseEntity(id = 7, workoutId = 1, name = "Old name", setCount = 1)
+        repository.addSet(stale)
+        coVerify(exactly = 1) { workoutDao.incrementSetCount(7) }
+        coVerify(exactly = 0) { workoutDao.updateExercise(any()) }
+        coVerify(exactly = 0) { workoutDao.updateExercises(any()) }
     }
 
     @Test

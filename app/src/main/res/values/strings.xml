@@ -66,6 +66,8 @@
     <string name="workout_set_saving">Saving set…</string>
     <string name="workout_set_save_error_title">Unable to save set</string>
     <string name="workout_set_save_error_message">The set change could not be saved. Your inputs have been kept. Please tap the checkbox again to retry.</string>
+    <string name="workout_set_add_error_title">Unable to add set</string>
+    <string name="workout_set_add_error_message">The set could not be added. Please tap Add set again to retry.</string>
     <string name="workout_new_routine">NEW ROUTINE</string>
     <string name="workout_add_exercise">ADD EXERCISE</string>
     <string name="workout_ex_name">Exercise Name</string>

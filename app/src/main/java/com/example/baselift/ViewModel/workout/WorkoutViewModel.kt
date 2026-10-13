@@ -48,7 +48,8 @@ data class WorkoutUiState(
     val finalizationFailed: Boolean = false,
     val finalizedSessionId: Int? = null,
     val pendingSetWrites: Set<SetWriteKey> = emptySet(),
-    val setSaveFailed: Boolean = false
+    val setSaveFailed: Boolean = false,
+    val setAddFailed: Boolean = false
 )
 
 class WorkoutViewModel(
@@ -246,9 +247,21 @@ class WorkoutViewModel(
 
     fun addSetToExercise(exerciseId: Int) {
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
+        _uiState.update { it.copy(setAddFailed = false) }
         viewModelScope.launch {
-            repository.addSet(exModel.exercise)
+            try {
+                // Each tap is one increment; the repository uses the stored count, not this snapshot.
+                repository.addSet(exModel.exercise)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _uiState.update { it.copy(setAddFailed = true) }
+            }
         }
+    }
+
+    fun dismissSetAddError() {
+        _uiState.update { it.copy(setAddFailed = false) }
     }
 
     fun removeLastSet(exerciseId: Int) {

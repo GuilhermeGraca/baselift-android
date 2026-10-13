@@ -92,6 +92,124 @@ class WorkoutViewModelTest {
         }
     }
 
+    private class ControlledAddRepository(private val source: IWorkoutRepository) : IWorkoutRepository by source {
+        val calls = mutableListOf<ExerciseEntity>()
+        val release = CompletableDeferred<Unit>()
+        var failure: Exception? = null
+
+        override suspend fun addSet(exercise: ExerciseEntity) {
+            calls += exercise
+            release.await()
+            failure?.let { throw it }
+            source.addSet(exercise)
+        }
+    }
+
+    private suspend fun prepareSetAdds(): ControlledAddRepository {
+        val workoutId = repository.createWorkout("Push", 0)
+        repository.createExercise(workoutId, "Bench", "", "", 0)
+        return ControlledAddRepository(repository).also { initViewModel(it) }
+    }
+
+    @Test
+    fun `rapid add taps retain every increment and preserve logged sets and drafts`() = runTest {
+        val source = prepareSetAdds()
+        runCurrent()
+        val exerciseId = viewModel.uiState.value.exercises.single().exercise.id
+        val sessionId = viewModel.uiState.value.activeSession!!.id
+        viewModel.updateDraftWeight(exerciseId, 1, "80")
+        viewModel.updateDraftReps(exerciseId, 1, "10")
+        viewModel.logSet(exerciseId, 1, 80f, 10, true)
+        runCurrent()
+        val logged = repository.getSetsForSession(sessionId).first().single()
+
+        repeat(6) { viewModel.addSetToExercise(exerciseId) }
+        runCurrent()
+        assertEquals(6, source.calls.size)
+        assertTrue(source.calls.all { it.setCount == 1 })
+        assertEquals(1, viewModel.uiState.value.exercises.single().sets.size)
+        source.release.complete(Unit)
+        runCurrent()
+        val exercise = viewModel.uiState.value.exercises.single()
+        assertEquals(7, exercise.exercise.setCount)
+        assertEquals(7, exercise.sets.size)
+        assertEquals(logged, exercise.sets.first().currentLog)
+        assertEquals(listOf(logged), repository.getSetsForSession(sessionId).first())
+        assertEquals("80", viewModel.getDraftWeight(exerciseId, 1))
+        assertEquals("10", viewModel.getDraftReps(exerciseId, 1))
+        assertFalse(viewModel.uiState.value.setAddFailed)
+    }
+
+    @Test
+    fun `failed add preserves the exercise and inputs and allows retry`() = runTest {
+        val source = prepareSetAdds()
+        runCurrent()
+        val exerciseId = viewModel.uiState.value.exercises.single().exercise.id
+        viewModel.updateDraftWeight(exerciseId, 1, "80")
+        viewModel.updateDraftReps(exerciseId, 1, "10")
+        source.failure = IllegalStateException("increment failed")
+        source.release.complete(Unit)
+        viewModel.addSetToExercise(exerciseId)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.setAddFailed)
+        assertEquals(1, viewModel.uiState.value.exercises.single().sets.size)
+        assertEquals("80", viewModel.getDraftWeight(exerciseId, 1))
+        assertEquals("10", viewModel.getDraftReps(exerciseId, 1))
+        viewModel.dismissSetAddError()
+        assertFalse(viewModel.uiState.value.setAddFailed)
+        source.failure = null
+        viewModel.addSetToExercise(exerciseId)
+        runCurrent()
+        assertEquals(2, source.calls.size)
+        assertEquals(2, viewModel.uiState.value.exercises.single().sets.size)
+        assertFalse(viewModel.uiState.value.setAddFailed)
+    }
+
+    @Test
+    fun `pending additions remain scoped to their exercises across routine switches`() = runTest {
+        val source = prepareSetAdds()
+        val otherWorkoutId = repository.createWorkout("Pull", 1)
+        repository.createExercise(otherWorkoutId, "Row", "", "", 0)
+        runCurrent()
+        val firstWorkout = viewModel.uiState.value.selectedWorkout!!
+        val firstExerciseId = viewModel.uiState.value.exercises.single().exercise.id
+        repeat(3) { viewModel.addSetToExercise(firstExerciseId) }
+        runCurrent()
+        viewModel.selectWorkout(repository.allWorkouts.first().single { it.id == otherWorkoutId })
+        runCurrent()
+        val otherExerciseId = viewModel.uiState.value.exercises.single().exercise.id
+        viewModel.updateDraftWeight(otherExerciseId, 1, "50")
+        viewModel.addSetToExercise(otherExerciseId)
+        runCurrent()
+        source.release.complete(Unit)
+        runCurrent()
+        assertEquals(otherWorkoutId, viewModel.uiState.value.selectedWorkout!!.id)
+        assertEquals(2, viewModel.uiState.value.exercises.single().sets.size)
+        assertEquals("50", viewModel.getDraftWeight(otherExerciseId, 1))
+        assertEquals(3, source.calls.count { it.id == firstExerciseId })
+        assertEquals(1, source.calls.count { it.id == otherExerciseId })
+        viewModel.selectWorkout(firstWorkout)
+        runCurrent()
+        assertEquals(4, viewModel.uiState.value.exercises.single().sets.size)
+    }
+
+    @Test
+    fun `cancelled add is not reported as a failure and a later add still succeeds`() = runTest {
+        val source = prepareSetAdds()
+        runCurrent()
+        val exerciseId = viewModel.uiState.value.exercises.single().exercise.id
+        source.failure = CancellationException("cancelled")
+        source.release.complete(Unit)
+        viewModel.addSetToExercise(exerciseId)
+        runCurrent()
+        assertFalse(viewModel.uiState.value.setAddFailed)
+        assertEquals(1, viewModel.uiState.value.exercises.single().sets.size)
+        source.failure = null
+        viewModel.addSetToExercise(exerciseId)
+        runCurrent()
+        assertEquals(2, viewModel.uiState.value.exercises.single().sets.size)
+    }
+
     private class ControlledSetRepository(private val source: IWorkoutRepository) : IWorkoutRepository by source {
         data class Call(val sessionId: Int, val exerciseId: Int, val number: Int, val completed: Boolean, val existingId: Int)
         val calls = mutableListOf<Call>()

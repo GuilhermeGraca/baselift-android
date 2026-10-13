@@ -10,7 +10,12 @@ import com.example.baselift.Model.local.entity.ExerciseEntity
 import com.example.baselift.Model.local.entity.SetLogEntity
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
+import com.example.baselift.Model.repository.WorkoutRepository
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.*
@@ -26,6 +31,67 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class WorkoutDaoTest {
+
+    @Test
+    fun addSet_usesStoredCountAndPreservesMetadataHistoryAndOtherExercises() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout, setCount = 1)
+        val other = insertExercise(workout, "Other", setCount = 3)
+        val session = insertSession(workout)
+        insertCompletedSet(session, exercise, 1, 80f, 10)
+        val history = workoutDao.getSetsForSession(session).first()
+        val stale = workoutDao.getExercisesForWorkout(workout).first().single { it.id == exercise }
+        val latest = stale.copy(name = "Renamed", equipment = "Machine", muscleGroups = "Chest",
+            orderIndex = 7, setCount = 5)
+        workoutDao.updateExercise(latest)
+        val repository = WorkoutRepository(workoutDao, ApplicationProvider.getApplicationContext())
+
+        // All calls deliberately carry the old count and metadata, like delayed UI commands.
+        repeat(6) { repository.addSet(stale) }
+        val after = workoutDao.getExercisesForWorkout(workout).first()
+        assertEquals(latest.copy(setCount = 11), after.single { it.id == exercise })
+        assertEquals(3, after.single { it.id == other }.setCount)
+        assertEquals(history, workoutDao.getSetsForSession(session).first())
+    }
+
+    @Test
+    fun addSet_concurrentCallsPreserveEveryIncrement() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout, setCount = 3)
+        val stale = workoutDao.getExercisesForWorkout(workout).first().single()
+        val repository = WorkoutRepository(workoutDao, ApplicationProvider.getApplicationContext())
+        val start = CompletableDeferred<Unit>()
+        coroutineScope {
+            repeat(24) {
+                launch(Dispatchers.Default) {
+                    start.await()
+                    repository.addSet(stale)
+                }
+            }
+            start.complete(Unit)
+        }
+        val after = workoutDao.getExercisesForWorkout(workout).first().single()
+        assertEquals(exercise, after.id)
+        assertEquals(27, after.setCount)
+    }
+
+    @Test
+    fun addSet_missingOrDeletedExerciseDoesNotRecreateRows() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout)
+        val session = insertSession(workout)
+        insertCompletedSet(session, exercise, 1, 80f, 10)
+        val stale = workoutDao.getExercisesForWorkout(workout).first().single()
+        val other = insertExercise(workout, "Other", setCount = 2)
+        workoutDao.deleteExercise(stale)
+        assertEquals(0, workoutDao.incrementSetCount(exercise))
+        assertEquals(0, workoutDao.incrementSetCount(-1))
+        WorkoutRepository(workoutDao, ApplicationProvider.getApplicationContext()).addSet(stale)
+        val remaining = workoutDao.getExercisesForWorkout(workout).first().single()
+        assertEquals(other, remaining.id)
+        assertEquals(2, remaining.setCount)
+        assertTrue(workoutDao.getSetsForSession(session).first().isEmpty())
+    }
 
     @Test
     fun exerciseChartQuery_scopesCompletedHistoryAndRefreshesAfterDeletion() = runTest {

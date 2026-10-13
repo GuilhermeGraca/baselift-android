@@ -112,6 +112,19 @@ fun WorkoutScreen(
         )
     }
 
+    if (uiState.setAddFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSetAddError,
+            title = { Text(stringResource(com.example.baselift.R.string.workout_set_add_error_title)) },
+            text = { Text(stringResource(com.example.baselift.R.string.workout_set_add_error_message)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissSetAddError) {
+                    Text(stringResource(com.example.baselift.R.string.workout_finalize_error_dismiss))
+                }
+            }
+        )
+    }
+
     if (workoutToDelete != null) {
         ConfirmDeleteDialog(
             title = stringResource(com.example.baselift.R.string.workout_delete_workout),

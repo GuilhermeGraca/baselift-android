@@ -257,6 +257,7 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 - Os rascunhos de peso/reps são mantidos em `mutableStateMapOf` (sobrevivem a recomposições)
 - A conclusão/desmarcação marca imediatamente a série como pendente no `WorkoutViewModel`. O bloqueio por exercício permanece até a escrita terminar e o estado persistido chegar à UI, impedindo toques repetidos e alterações sequenciais prematuras; exercícios diferentes podem guardar em paralelo.
 - A UI mostra um indicador de gravação e bloqueia os controlos envolvidos e a finalização da sessão enquanto há séries pendentes. Falhas libertam o bloqueio, preservam os rascunhos e apresentam uma mensagem para repetir o toque. Os comandos validam a sessão e a série atuais e resolvem o ID persistido no ViewModel.
+- Adicionar uma série executa um único `UPDATE exercises SET setCount = setCount + 1 WHERE id = ...`, usando o valor atual da base de dados. Toques rápidos não reutilizam a contagem antiga da UI nem reescrevem nome, equipamento, grupos musculares ou ordem. Falhas apresentam uma mensagem para repetir a adição; os rascunhos e séries registadas são preservados.
 
 **Personal Records (PRs)**:
 - **PR de Peso**: o peso desta série supera o máximo histórico do exercício
