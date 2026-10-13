@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.*
@@ -31,6 +32,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.example.baselift.ViewModel.workout.SetUiModel
 import com.example.baselift.View.theme.*
 
@@ -43,7 +48,9 @@ fun SetRow(
     onUpdateDraftWeight: (exerciseId: Int, setNumber: Int, value: String) -> Unit,
     onUpdateDraftReps: (exerciseId: Int, setNumber: Int, value: String) -> Unit,
     onRemove: () -> Unit = {},
-    onLogSet: (Int, Float, Int, Boolean, Int) -> Unit
+    onLogSet: (Int, Float, Int, Boolean, Int) -> Unit,
+    isSaving: Boolean = false,
+    writesBlocked: Boolean = false
 ) {
     var showRemoveDialog by remember { mutableStateOf(false) }
 
@@ -106,7 +113,7 @@ fun SetRow(
             .clip(RoundedCornerShape(8.dp))
             .background(rowBgColor)
             .then(
-                if (setModel.canBeRemoved) {
+                if (setModel.canBeRemoved && !writesBlocked) {
                     Modifier
                         .background(
                             Brush.horizontalGradient(
@@ -176,7 +183,7 @@ fun SetRow(
                 if (text.length > 6) text = text.take(6)
                 onUpdateDraftWeight(exerciseId, setModel.setNumber, text)
             },
-            enabled = !setModel.isCompleted,
+            enabled = !setModel.isCompleted && !isSaving && !writesBlocked,
             modifier = Modifier
                 .weight(0.8f)
                 .background(inputBgColor, RoundedCornerShape(6.dp))
@@ -235,7 +242,7 @@ fun SetRow(
                 val text = newValue.filter { it.isDigit() }.take(4)
                 onUpdateDraftReps(exerciseId, setModel.setNumber, text)
             },
-            enabled = !setModel.isCompleted,
+            enabled = !setModel.isCompleted && !isSaving && !writesBlocked,
             modifier = Modifier
                 .weight(0.8f)
                 .background(inputBgColor, RoundedCornerShape(6.dp))
@@ -308,13 +315,19 @@ fun SetRow(
         // caixa de seleção
         val checkboxBg = if (setModel.isCompleted) NeonGreen else Color(0xFF353535)
         val checkTint = if (setModel.isCompleted) PureBlack else MediumGrey.copy(alpha = 0.3f)
+        val checkDescription = stringResource(com.example.baselift.R.string.workout_set_check, setModel.setNumber)
+        val savingDescription = stringResource(com.example.baselift.R.string.workout_set_saving)
         
         Box(
             modifier = Modifier
                 .size(32.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(checkboxBg)
-                .clickable(enabled = setModel.canBeChecked) {
+                .semantics {
+                    contentDescription = checkDescription
+                    if (isSaving) stateDescription = savingDescription
+                }
+                .clickable(enabled = setModel.canBeChecked && !isSaving && !writesBlocked, role = Role.Checkbox) {
                     val w = weightInput.toFloatOrNull() ?: setModel.prevWeight ?: 0f
                     val r = repsInput.toIntOrNull() ?: setModel.prevReps ?: 0
                     if (!setModel.isCompleted) {
@@ -326,12 +339,16 @@ fun SetRow(
                 },
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Default.Check,
-                contentDescription = "Check",
-                tint = checkTint,
-                modifier = Modifier.size(20.dp)
-            )
+            if (isSaving) {
+                CircularProgressIndicator(color = NeonGreen, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+            } else {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = checkTint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

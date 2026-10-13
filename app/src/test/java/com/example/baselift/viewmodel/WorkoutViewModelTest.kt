@@ -14,8 +14,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -86,6 +90,320 @@ class WorkoutViewModelTest {
             failure?.let { throw it }
             source.finalizeSession(session)
         }
+    }
+
+    private class ControlledSetRepository(private val source: IWorkoutRepository) : IWorkoutRepository by source {
+        data class Call(val sessionId: Int, val exerciseId: Int, val number: Int, val completed: Boolean, val existingId: Int)
+        val calls = mutableListOf<Call>()
+        val release = CompletableDeferred<Unit>()
+        val publishSnapshots = MutableStateFlow(true)
+        var failure: Exception? = null
+        var afterWrite: (suspend () -> Unit)? = null
+
+        override fun getSetsForSession(sessionId: Int): Flow<List<SetLogEntity>> =
+            source.getSetsForSession(sessionId).combine(publishSnapshots) { logs, publish -> logs to publish }
+                .filter { it.second }.map { it.first }
+
+        override suspend fun logSet(
+            sessionId: Int, exerciseId: Int, setNumber: Int, weight: Float, reps: Int,
+            isCompleted: Boolean, existingSetId: Int
+        ) {
+            calls += Call(sessionId, exerciseId, setNumber, isCompleted, existingSetId)
+            release.await()
+            failure?.let { throw it }
+            source.logSet(sessionId, exerciseId, setNumber, weight, reps, isCompleted, existingSetId)
+            afterWrite?.invoke()
+        }
+    }
+
+    private suspend fun prepareSetWrites(): ControlledSetRepository {
+        val workoutId = repository.createWorkout("Push", 0)
+        repository.createExercise(workoutId, "Bench", "", "", 0)
+        repository.createExercise(workoutId, "Press", "", "", 1)
+        repository.updateExercises(repository.allExercises.first().map { it.copy(setCount = 2) })
+        return ControlledSetRepository(repository).also { initViewModel(it) }
+    }
+
+    @Test
+    fun `rapid completion taps accept one write synchronously and preserve sequential actions`() = runTest {
+        val source = prepareSetWrites()
+        runCurrent()
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        val sessionId = viewModel.uiState.value.activeSession!!.id
+
+        viewModel.logSet(id, 2, 70f, 10, true)
+        viewModel.logSet(-1, 1, 80f, 10, true)
+        runCurrent()
+        assertTrue(source.calls.isEmpty())
+        repeat(5) { viewModel.logSet(id, 1, 80f, 10, true) }
+        assertEquals(1, viewModel.uiState.value.pendingSetWrites.size)
+        viewModel.logSet(id, 2, 70f, 10, true)
+        viewModel.removeLastSet(id)
+        viewModel.deleteExercise(id)
+        viewModel.finalizeWorkout(sessionId)
+        runCurrent()
+        assertEquals(1, source.calls.size)
+        assertFalse(viewModel.uiState.value.isFinalizing)
+        assertEquals(2, viewModel.uiState.value.exercises.first().sets.size)
+
+        source.release.complete(Unit)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+        assertEquals(1, repository.getSetsForSession(sessionId).first().size)
+        // A stale callback still requesting completion must not insert a second row.
+        viewModel.logSet(id, 1, 80f, 10, true)
+        runCurrent()
+        assertEquals(1, source.calls.size)
+        viewModel.logSet(id, 2, 70f, 10, true)
+        runCurrent()
+        assertEquals(2, source.calls.size)
+        assertEquals(2, repository.getSetsForSession(sessionId).first().size)
+        // Only the latest complete set may be unchecked.
+        viewModel.logSet(id, 1, 80f, 10, false)
+        runCurrent()
+        assertEquals(2, source.calls.size)
+    }
+
+    @Test
+    fun `guard survives a successful write until the UI receives its persisted snapshot`() = runTest {
+        val source = prepareSetWrites()
+        runCurrent()
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        val sessionId = viewModel.uiState.value.activeSession!!.id
+        source.publishSnapshots.value = false
+        source.release.complete(Unit)
+        viewModel.logSet(id, 1, 80f, 10, true)
+        runCurrent()
+        assertEquals(1, repository.getSetsForSession(sessionId).first().size)
+        assertFalse(viewModel.uiState.value.exercises.first().sets.first().isCompleted)
+        assertEquals(1, viewModel.uiState.value.pendingSetWrites.size)
+        viewModel.logSet(id, 1, 80f, 10, true)
+        viewModel.finalizeWorkout(sessionId)
+        runCurrent()
+        assertEquals(1, source.calls.size)
+        assertFalse(viewModel.uiState.value.isFinalizing)
+
+        source.publishSnapshots.value = true
+        runCurrent()
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+        assertTrue(viewModel.uiState.value.exercises.first().sets.first().isCompleted)
+        // The ViewModel resolves the latest ID itself, even if the old UI sent zero.
+        viewModel.logSet(id, 1, 80f, 10, false)
+        runCurrent()
+        assertTrue(source.calls.last().existingId > 0)
+        assertTrue(repository.getSetsForSession(sessionId).first().isEmpty())
+        viewModel.logSet(id, 1, 90f, 8, true)
+        runCurrent()
+        assertEquals(0, source.calls.last().existingId)
+        assertEquals(1, repository.getSetsForSession(sessionId).first().size)
+    }
+
+    @Test
+    fun `snapshot arriving before repository return cannot release the write guard early`() = runTest {
+        val source = prepareSetWrites()
+        runCurrent()
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        val afterWrite = CompletableDeferred<Unit>()
+        source.afterWrite = { afterWrite.await() }
+        source.release.complete(Unit)
+        viewModel.logSet(id, 1, 80f, 10, true)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.exercises.first().sets.first().isCompleted)
+        assertEquals(1, viewModel.uiState.value.pendingSetWrites.size)
+        viewModel.logSet(id, 1, 80f, 10, false)
+        viewModel.logSet(id, 2, 70f, 10, true)
+        runCurrent()
+        assertEquals(1, source.calls.size)
+        afterWrite.complete(Unit)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+    }
+
+    @Test
+    fun `different exercises save independently and finalization waits for both`() = runTest {
+        val source = prepareSetWrites()
+        runCurrent()
+        val ids = viewModel.uiState.value.exercises.map { it.exercise.id }
+        ids.forEach { viewModel.logSet(it, 1, 80f, 10, true) }
+        runCurrent()
+        assertEquals(2, source.calls.size)
+        assertEquals(2, viewModel.uiState.value.pendingSetWrites.size)
+        viewModel.finalizeWorkout()
+        runCurrent()
+        assertFalse(viewModel.uiState.value.isFinalizing)
+        source.release.complete(Unit)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+        val sessionId = viewModel.uiState.value.activeSession!!.id
+        viewModel.finalizeWorkout(sessionId)
+        runCurrent()
+        assertEquals(sessionId, viewModel.uiState.value.finalizedSessionId)
+    }
+
+    @Test
+    fun `failed set save preserves inputs and allows a single retry`() = runTest {
+        val source = prepareSetWrites()
+        runCurrent()
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        viewModel.updateDraftWeight(id, 1, "80")
+        viewModel.updateDraftReps(id, 1, "10")
+        source.failure = IllegalStateException("write failed")
+        source.release.complete(Unit)
+        viewModel.logSet(id, 1, 80f, 10, true)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.setSaveFailed)
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+        assertNull(viewModel.uiState.value.exercises.first().sets.first().currentLog)
+        assertEquals("80", viewModel.getDraftWeight(id, 1))
+        assertEquals("10", viewModel.getDraftReps(id, 1))
+        viewModel.dismissSetSaveError()
+        assertFalse(viewModel.uiState.value.setSaveFailed)
+        source.failure = null
+        repeat(3) { viewModel.logSet(id, 1, 80f, 10, true) }
+        runCurrent()
+        assertEquals(2, source.calls.size)
+        assertTrue(viewModel.uiState.value.exercises.first().sets.first().isCompleted)
+        assertFalse(viewModel.uiState.value.setSaveFailed)
+    }
+
+    @Test
+    fun `failed uncheck preserves the completed row and retries using its persisted ID`() = runTest {
+        val source = prepareSetWrites()
+        runCurrent()
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        source.release.complete(Unit)
+        viewModel.logSet(id, 1, 80f, 10, true)
+        runCurrent()
+        val savedId = viewModel.uiState.value.exercises.first().sets.first().currentLog!!.id
+        source.failure = IllegalStateException("delete failed")
+        viewModel.logSet(id, 1, 80f, 10, false)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.setSaveFailed)
+        assertEquals(savedId, viewModel.uiState.value.exercises.first().sets.first().currentLog!!.id)
+        source.failure = null
+        viewModel.logSet(id, 1, 80f, 10, false)
+        runCurrent()
+        assertEquals(savedId, source.calls.last().existingId)
+        assertNull(viewModel.uiState.value.exercises.first().sets.first().currentLog)
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+    }
+
+    @Test
+    fun `switching routines does not cancel saves or apply stale callbacks to the new session`() = runTest {
+        val source = prepareSetWrites()
+        val otherId = repository.createWorkout("Pull", 1)
+        repository.createExercise(otherId, "Row", "", "", 0)
+        runCurrent()
+        val firstWorkout = viewModel.uiState.value.selectedWorkout!!
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        val sessionId = viewModel.uiState.value.activeSession!!.id
+        viewModel.logSet(id, 1, 80f, 10, true, sessionId)
+        runCurrent()
+        viewModel.selectWorkout(repository.allWorkouts.first().single { it.id == otherId })
+        runCurrent()
+        val otherSession = viewModel.uiState.value.activeSession!!
+        viewModel.updateDraftWeight(viewModel.uiState.value.exercises.single().exercise.id, 1, "50")
+        viewModel.logSet(id, 1, 80f, 10, true, sessionId)
+        source.release.complete(Unit)
+        runCurrent()
+        assertEquals(1, source.calls.size)
+        assertEquals(otherSession, viewModel.uiState.value.activeSession)
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+        assertTrue(repository.getSetsForSession(otherSession.id).first().isEmpty())
+        assertEquals(1, repository.getSetsForSession(sessionId).first().size)
+        viewModel.selectWorkout(firstWorkout)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.exercises.first().sets.first().isCompleted)
+    }
+
+    @Test
+    fun `cancelled set save releases the guard without presenting a failure`() = runTest {
+        val source = prepareSetWrites()
+        runCurrent()
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        source.failure = CancellationException("cancelled")
+        source.release.complete(Unit)
+        viewModel.logSet(id, 1, 80f, 10, true)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+        assertFalse(viewModel.uiState.value.setSaveFailed)
+        assertFalse(viewModel.uiState.value.exercises.first().sets.first().isCompleted)
+    }
+
+    @Test
+    fun `returning to a routine before its save finishes still acknowledges the right session`() = runTest {
+        val source = prepareSetWrites()
+        val otherId = repository.createWorkout("Pull", 1)
+        runCurrent()
+        val workout = viewModel.uiState.value.selectedWorkout!!
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        viewModel.logSet(id, 1, 80f, 10, true)
+        runCurrent()
+        viewModel.selectWorkout(repository.allWorkouts.first().single { it.id == otherId })
+        runCurrent()
+        viewModel.selectWorkout(workout)
+        runCurrent()
+        viewModel.logSet(id, 1, 80f, 10, true)
+        source.release.complete(Unit)
+        runCurrent()
+        assertEquals(1, source.calls.size)
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+        assertTrue(viewModel.uiState.value.exercises.first().sets.first().isCompleted)
+    }
+
+    @Test
+    fun `switching after persistence before acknowledgement releases the offscreen guard`() = runTest {
+        val source = prepareSetWrites()
+        val otherId = repository.createWorkout("Pull", 1)
+        runCurrent()
+        val workout = viewModel.uiState.value.selectedWorkout!!
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        source.publishSnapshots.value = false
+        source.release.complete(Unit)
+        viewModel.logSet(id, 1, 80f, 10, true)
+        runCurrent()
+        assertEquals(1, viewModel.uiState.value.pendingSetWrites.size)
+        viewModel.selectWorkout(repository.allWorkouts.first().single { it.id == otherId })
+        runCurrent()
+        assertTrue(viewModel.uiState.value.pendingSetWrites.isEmpty())
+        source.publishSnapshots.value = true
+        viewModel.selectWorkout(workout)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.exercises.first().sets.first().isCompleted)
+        viewModel.logSet(id, 1, 80f, 10, true)
+        runCurrent()
+        assertEquals(1, source.calls.size)
+    }
+
+    @Test
+    fun `finalizing blocks set commands and a previous session callback cannot log to the new one`() = runTest {
+        val saves = prepareSetWrites()
+        val finalizations = ControlledFinalizationRepository(saves)
+        initViewModel(finalizations)
+        runCurrent()
+        val id = viewModel.uiState.value.exercises.first().exercise.id
+        val sessionId = viewModel.uiState.value.activeSession!!.id
+        saves.release.complete(Unit)
+        viewModel.logSet(id, 1, 80f, 10, true, sessionId)
+        runCurrent()
+        viewModel.finalizeWorkout(sessionId)
+        viewModel.logSet(id, 1, 80f, 10, false, sessionId)
+        viewModel.logSet(id, 2, 70f, 10, true, sessionId)
+        runCurrent()
+        assertEquals(1, saves.calls.size)
+        assertTrue(viewModel.uiState.value.isFinalizing)
+        finalizations.release.complete(Unit)
+        runCurrent()
+        val newSessionId = viewModel.uiState.value.activeSession!!.id
+        assertNotEquals(sessionId, newSessionId)
+        viewModel.logSet(id, 1, 90f, 8, true, sessionId)
+        runCurrent()
+        assertEquals(1, saves.calls.size)
+        assertTrue(repository.getSetsForSession(newSessionId).first().isEmpty())
+        viewModel.logSet(id, 1, 90f, 8, true, newSessionId)
+        runCurrent()
+        assertEquals(2, saves.calls.size)
+        assertEquals(newSessionId, saves.calls.last().sessionId)
     }
 
     @Test

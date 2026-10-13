@@ -46,7 +46,9 @@ fun ExerciseCard(
     onEditExercise: (String, String, String) -> Unit,
     isDragging: Boolean = false,
     isAnyDragging: Boolean = false,
-    dragModifier: Modifier = Modifier
+    dragModifier: Modifier = Modifier,
+    savingSetNumbers: Set<Int> = emptySet(),
+    writesBlocked: Boolean = false
 ) {
     val exercise = exerciseModel.exercise
     var showMenu by remember { mutableStateOf(false) }
@@ -126,6 +128,7 @@ fun ExerciseCard(
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(com.example.baselift.R.string.workout_delete_exercise), color = Color(0xFFFF4444), fontSize = 14.sp) },
+                            enabled = !writesBlocked && savingSetNumbers.isEmpty(),
                             leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF4444), modifier = Modifier.size(18.dp)) },
                             onClick = { showMenu = false; showDeleteDialog = true }
                         )
@@ -191,7 +194,9 @@ fun ExerciseCard(
                             onUpdateDraftWeight = onUpdateDraftWeight,
                             onUpdateDraftReps = onUpdateDraftReps,
                             onRemove = onRemoveLastSet,
-                            onLogSet = onLogSet
+                            onLogSet = onLogSet,
+                            isSaving = setModel.setNumber in savingSetNumbers,
+                            writesBlocked = writesBlocked || savingSetNumbers.isNotEmpty()
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }

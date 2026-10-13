@@ -62,6 +62,10 @@
     <string name="workout_finalize_error_title">Unable to finish workout</string>
     <string name="workout_finalize_error_message">Your workout could not be saved. Please try finalizing it again.</string>
     <string name="workout_finalize_error_dismiss">OK</string>
+    <string name="workout_set_check">Set %1$d completion</string>
+    <string name="workout_set_saving">Saving set…</string>
+    <string name="workout_set_save_error_title">Unable to save set</string>
+    <string name="workout_set_save_error_message">The set change could not be saved. Your inputs have been kept. Please tap the checkbox again to retry.</string>
     <string name="workout_new_routine">NEW ROUTINE</string>
     <string name="workout_add_exercise">ADD EXERCISE</string>
     <string name="workout_ex_name">Exercise Name</string>
