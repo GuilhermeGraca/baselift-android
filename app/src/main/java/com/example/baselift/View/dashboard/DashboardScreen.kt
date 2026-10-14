@@ -13,8 +13,6 @@ import com.example.baselift.View.theme.PureBlack
 import com.example.baselift.ViewModel.dashboard.DashboardUiState
 import com.example.baselift.ViewModel.dashboard.ExerciseCharts
 import kotlinx.coroutines.flow.Flow
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 
 // ecrã principal do dashboard
 @Composable
@@ -24,12 +22,6 @@ fun DashboardScreen(
     onSetNutritionRestDays: (Int) -> Unit = {},
     exerciseCharts: (Int) -> Flow<ExerciseCharts>
 ) {
-    var isContentReady by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(50)
-        isContentReady = true
-    }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -59,13 +51,11 @@ fun DashboardScreen(
         }
 
         // secção de rotinas (carregada lazy)
-        if (isContentReady) {
-            RoutinesSection(
-                workouts = uiState.workouts,
-                exercisesMap = uiState.exercises,
-                workoutVolumeTrends = uiState.workoutVolumeTrends,
-                exerciseCharts = exerciseCharts
-            )
-        }
+        RoutinesSection(
+            workouts = uiState.workouts,
+            exercisesMap = uiState.exercises,
+            workoutVolumeTrends = uiState.workoutVolumeTrends,
+            exerciseCharts = exerciseCharts
+        )
     }
 }

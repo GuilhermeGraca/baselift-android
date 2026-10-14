@@ -424,14 +424,14 @@ Fase 6 → Dashboard + streaks + gráficos históricos
 
 Isto permitiu usar a app a sério durante o desenvolvimento, o que revelou problemas reais de UX. Por exemplo, depois da Fase 5 detetou-se que os logs não faziam reset correto ao mudar de dia, o que levou à criação do `refreshTrigger` no `NutritionViewModel`.
 
-**Refinamentos finais**: após todas as fases, houve uma fase de polimento focada em performance e UX, motivada por lentidão na navegação entre tabs. O crossfade da `NavHost` foi removido, foi adicionado Deferred Rendering no Dashboard e Workout (50ms de delay nas listas), e o gráfico de peso foi substituído do Vico por Canvas personalizado para controlo total sobre o aspeto visual.
+**Refinamentos finais**: após todas as fases, houve uma fase de polimento focada em performance e UX, motivada por lentidão na navegação entre tabs. O crossfade da `NavHost` foi removido e o gráfico de peso foi substituído do Vico por Canvas personalizado para controlo total sobre o aspeto visual. A revisão de performance posterior removeu os atrasos artificiais de 50ms no Dashboard e Workout: o conteúdo disponível entra na composição sem esperar por um temporizador, mantendo as listas lazy e o carregamento real dos dados.
 
 ---
 
 ## 12. Otimizações de Performance
 
 - **Remoção do crossfade** na `NavHost` entre tabs para evitar sobreposição de ecrãs
-- **Deferred Rendering** no Dashboard e Workout: os cabeçalhos são renderizados de imediato, as listas pesadas são desenhadas com 50ms de delay para eliminar sensação de bloqueio
+- **Conteúdo disponível sem atraso artificial** no Dashboard e Workout: as listas lazy compõem os itens necessários à vista sem um temporizador de 50ms; os dados e gráficos continuam a respeitar os seus fluxos de carregamento
 - **Índices na base de dados** (migração v9→v10): em `timestamp`, `isCompleted`, etc., para acelerar queries históricas
 - **Cache de queries** no `WorkoutViewModel` (`previousSetsCache`) para evitar N+1 queries ao reconstruir o estado dos exercícios
 - **`flowOn(Dispatchers.IO / Default)`** em todos os flows pesados para não bloquear a Main Thread

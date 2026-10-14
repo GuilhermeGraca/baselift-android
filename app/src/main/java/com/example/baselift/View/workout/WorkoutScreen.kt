@@ -79,13 +79,6 @@ fun WorkoutScreen(
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     
-    // Defer rendering of heavy lists by a few frames to make tab transition perfectly smooth
-    var isContentReady by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(50)
-        isContentReady = true
-    }
-
     if (uiState.finalizationFailed) {
         AlertDialog(
             onDismissRequest = viewModel::dismissFinalizationError,
@@ -223,7 +216,7 @@ fun WorkoutScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             // lista de exercícios
-            if (uiState.selectedWorkout != null && isContentReady) {
+            if (uiState.selectedWorkout != null) {
                 var draggedIndex by remember { mutableStateOf<Int?>(null) }
                 var hoverIndex by remember { mutableStateOf<Int?>(null) }
                 var draggedOffset by remember { mutableStateOf(0f) }
