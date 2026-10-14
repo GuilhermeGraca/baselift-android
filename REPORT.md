@@ -272,6 +272,8 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 
 **Sessões**: quando o utilizador inicia um treino, é criada uma `WorkoutSessionEntity` com `isCompleted = false`. Ao terminar o treino, a sessão fica marcada como completa e os rascunhos são limpos.
 
+`startOrGetSession()` usa `WorkoutDao.getOrCreateActiveSession()` para consultar/criar a sessão numa única transação. Pedidos concorrentes para o mesmo treino reutilizam o mesmo registo; recuperar uma sessão conserva o timestamp e as séries já registadas. A notificação continua a ser agendada fora da transação, para cinco horas após cada chamada, com `ExistingWorkPolicy.REPLACE`.
+
 **Cache de queries**: o `WorkoutViewModel` mantém um cache local `previousSetsCache` para evitar N+1 queries à base de dados ao reconstruir o estado da UI.
 
 ---

@@ -89,6 +89,15 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: WorkoutSessionEntity): Long
 
+    // Serialize lookup and creation in SQLite, including callers using separate Room instances.
+    @Transaction
+    suspend fun getOrCreateActiveSession(workoutId: Int): WorkoutSessionEntity {
+        getActiveSession(workoutId)?.let { return it }
+        val session = WorkoutSessionEntity(workoutId = workoutId, timestamp = System.currentTimeMillis())
+        val id = insertSession(session)
+        return session.copy(id = id.toInt())
+    }
+
     @Update
     suspend fun updateSession(session: WorkoutSessionEntity)
 

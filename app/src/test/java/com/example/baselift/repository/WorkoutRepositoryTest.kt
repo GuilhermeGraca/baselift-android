@@ -16,12 +16,17 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import io.mockk.slot
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkoutRepositoryTest {
@@ -217,30 +222,69 @@ class WorkoutRepositoryTest {
 
     @Test
     fun `startOrGetSession creates new session if none exists`() = runTest {
-        coEvery { workoutDao.getActiveSession(1) } returns null
-        coEvery { workoutDao.insertSession(any()) } returns 5L
+        val created = WorkoutSessionEntity(id = 5, workoutId = 1, timestamp = 1234L)
+        coEvery { workoutDao.getOrCreateActiveSession(1) } returns created
         
         val session = repository.startOrGetSession(workoutId = 1)
         
         assertEquals(5, session.id)
         assertEquals(1, session.workoutId)
-        coVerify(exactly = 1) { workoutDao.insertSession(any()) }
+        assertSame(created, session)
+        coVerify(exactly = 1) { workoutDao.getOrCreateActiveSession(1) }
+        coVerify(exactly = 0) { workoutDao.getActiveSession(any()) }
+        coVerify(exactly = 0) { workoutDao.insertSession(any()) }
+        val reminder = slot<OneTimeWorkRequest>()
         verify(exactly = 1) {
-            workManager.enqueueUniqueWork("REMINDER_5", ExistingWorkPolicy.REPLACE, any<OneTimeWorkRequest>())
+            workManager.enqueueUniqueWork("REMINDER_5", ExistingWorkPolicy.REPLACE, capture(reminder))
         }
+        assertEquals(TimeUnit.HOURS.toMillis(5), reminder.captured.workSpec.initialDelay)
+        assertEquals(5, reminder.captured.workSpec.input.getInt("SESSION_ID", -1))
     }
 
     @Test
     fun `startOrGetSession returns active session if it exists`() = runTest {
         val existingSession = WorkoutSessionEntity(id = 2, workoutId = 1, timestamp = 1234L)
-        coEvery { workoutDao.getActiveSession(1) } returns existingSession
+        coEvery { workoutDao.getOrCreateActiveSession(1) } returns existingSession
         
         val session = repository.startOrGetSession(workoutId = 1)
         
         assertEquals(2, session.id)
+        assertSame(existingSession, session)
+        assertEquals(1234L, session.timestamp)
+        coVerify(exactly = 1) { workoutDao.getOrCreateActiveSession(1) }
+        coVerify(exactly = 0) { workoutDao.getActiveSession(any()) }
         coVerify(exactly = 0) { workoutDao.insertSession(any()) }
+        val reminder = slot<OneTimeWorkRequest>()
         verify(exactly = 1) {
-            workManager.enqueueUniqueWork("REMINDER_2", ExistingWorkPolicy.REPLACE, any<OneTimeWorkRequest>())
+            workManager.enqueueUniqueWork("REMINDER_2", ExistingWorkPolicy.REPLACE, capture(reminder))
         }
+        assertEquals(TimeUnit.HOURS.toMillis(5), reminder.captured.workSpec.initialDelay)
+        assertEquals(2, reminder.captured.workSpec.input.getInt("SESSION_ID", -1))
+    }
+
+    @Test
+    fun `failed session transaction propagates without scheduling a reminder`() = runTest {
+        val failure = IllegalStateException("transaction failed")
+        coEvery { workoutDao.getOrCreateActiveSession(1) } throws failure
+        try {
+            repository.startOrGetSession(1)
+            fail("Expected failure")
+        } catch (actual: IllegalStateException) {
+            assertSame(failure, actual)
+        }
+        verify(exactly = 0) { workManager.enqueueUniqueWork(any(), any(), any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `cancelled session transaction propagates without scheduling a reminder`() = runTest {
+        val cancelled = CancellationException("cancelled")
+        coEvery { workoutDao.getOrCreateActiveSession(1) } throws cancelled
+        try {
+            repository.startOrGetSession(1)
+            fail("Expected cancellation")
+        } catch (actual: CancellationException) {
+            assertSame(cancelled, actual)
+        }
+        verify(exactly = 0) { workManager.enqueueUniqueWork(any(), any(), any<OneTimeWorkRequest>()) }
     }
 }

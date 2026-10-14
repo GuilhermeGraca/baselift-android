@@ -122,15 +122,7 @@ class WorkoutRepository(
     }
 
     override suspend fun startOrGetSession(workoutId: Int): WorkoutSessionEntity {
-        var session = workoutDao.getActiveSession(workoutId)
-        if (session == null) {
-            val newSession = WorkoutSessionEntity(
-                workoutId = workoutId,
-                timestamp = System.currentTimeMillis()
-            )
-            val id = workoutDao.insertSession(newSession)
-            session = newSession.copy(id = id.toInt())
-        }
+        val session = workoutDao.getOrCreateActiveSession(workoutId)
         
         // Agendar notificação para daqui a 5 horas
         val data = workDataOf("SESSION_ID" to session.id)
