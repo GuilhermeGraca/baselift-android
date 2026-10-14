@@ -71,18 +71,25 @@ class FakeWorkoutRepository : IWorkoutRepository {
     }
 
     override suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String) {
-        val updated = exercise.copy(name = name, equipment = equipment, muscleGroups = muscleGroups)
-        val index = exercisesFlow.value.indexOfFirst { it.id == exercise.id }
-        if (index != -1) {
-            val newList = exercisesFlow.value.toMutableList()
-            newList[index] = updated
-            exercisesFlow.value = newList
+        exercisesFlow.update { exercises ->
+            exercises.map { current ->
+                if (current.id == exercise.id) current.copy(name = name, equipment = equipment, muscleGroups = muscleGroups)
+                else current
+            }
         }
     }
 
-    override suspend fun updateExercises(exercises: List<ExerciseEntity>) {
+    // Fixture helper; production commands use targeted updates.
+    suspend fun updateExercises(exercises: List<ExerciseEntity>) {
         val updatesById = exercises.associateBy { it.id }
         exercisesFlow.value = exercisesFlow.value.map { updatesById[it.id] ?: it }
+    }
+
+    override suspend fun reorderExercises(exercises: List<ExerciseEntity>) {
+        val orderById = exercises.associate { it.id to it.orderIndex }
+        exercisesFlow.update { current ->
+            current.map { exercise -> orderById[exercise.id]?.let { exercise.copy(orderIndex = it) } ?: exercise }
+        }
     }
 
     override suspend fun deleteExercise(exercise: ExerciseEntity) {
@@ -90,8 +97,12 @@ class FakeWorkoutRepository : IWorkoutRepository {
         setLogsFlow.value = setLogsFlow.value.filter { it.exerciseId != exercise.id }
     }
 
-    override suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int) {
-        val newCount = maxOf(1, exercise.setCount - 1)
+    override suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int): Boolean {
+        val current = exercisesFlow.value.find { it.id == exercise.id } ?: return false
+        val session = sessionsFlow.value.find { it.id == sessionId } ?: return false
+        if (current.setCount <= 1 || current.setCount != exercise.setCount ||
+            session.isCompleted || session.workoutId != current.workoutId) return false
+        val newCount = current.setCount - 1
         val setNumberToRemove = exercise.setCount
         
         // Remove from set logs
@@ -103,9 +114,10 @@ class FakeWorkoutRepository : IWorkoutRepository {
         val index = exercisesFlow.value.indexOfFirst { it.id == exercise.id }
         if (index != -1) {
             val newList = exercisesFlow.value.toMutableList()
-            newList[index] = exercise.copy(setCount = newCount)
+            newList[index] = current.copy(setCount = newCount)
             exercisesFlow.value = newList
         }
+        return true
     }
 
     override suspend fun addSet(exercise: ExerciseEntity) {

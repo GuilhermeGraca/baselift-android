@@ -251,7 +251,8 @@ fun ConfirmDeleteDialog(
     title: String,
     message: String,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    confirmEnabled: Boolean = true
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Box(
@@ -272,7 +273,7 @@ fun ConfirmDeleteDialog(
                         Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4444))) {
+                    Button(onClick = onConfirm, enabled = confirmEnabled, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4444))) {
                         Text(stringResource(com.example.baselift.R.string.workout_delete), color = CrystalWhite)
                     }
                 }

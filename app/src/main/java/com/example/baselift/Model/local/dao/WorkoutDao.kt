@@ -40,6 +40,36 @@ interface WorkoutDao {
     @Query("UPDATE exercises SET setCount = setCount + 1 WHERE id = :exerciseId")
     suspend fun incrementSetCount(exerciseId: Int): Int
 
+    @Query("UPDATE exercises SET name = :name, equipment = :equipment, muscleGroups = :muscleGroups WHERE id = :exerciseId")
+    suspend fun updateExerciseMetadata(exerciseId: Int, name: String, equipment: String, muscleGroups: String)
+
+    @Query("UPDATE exercises SET orderIndex = :orderIndex WHERE id = :exerciseId")
+    suspend fun updateExerciseOrder(exerciseId: Int, orderIndex: Int)
+
+    @Transaction
+    suspend fun reorderExercises(exercises: List<ExerciseEntity>) {
+        exercises.forEach { updateExerciseOrder(it.id, it.orderIndex) }
+    }
+
+    @Query("""
+        UPDATE exercises SET setCount = setCount - 1
+        WHERE id = :exerciseId AND setCount = :expectedSetNumber AND setCount > 1
+          AND EXISTS (
+              SELECT 1 FROM workout_sessions session
+              WHERE session.id = :sessionId AND session.workoutId = exercises.workoutId
+                AND session.isCompleted = 0
+          )
+    """)
+    suspend fun decrementLastSetCount(exerciseId: Int, sessionId: Int, expectedSetNumber: Int): Int
+
+    // A stale confirmation must never remove a different set or touch completed history.
+    @Transaction
+    suspend fun removeLastSet(exerciseId: Int, sessionId: Int, expectedSetNumber: Int): Boolean {
+        if (decrementLastSetCount(exerciseId, sessionId, expectedSetNumber) == 0) return false
+        deleteSetByNumber(exerciseId, sessionId, expectedSetNumber)
+        return true
+    }
+
     @Delete
     suspend fun deleteExercise(exercise: ExerciseEntity)
 

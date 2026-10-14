@@ -27,9 +27,9 @@ interface IWorkoutRepository {
     fun getExercisesForWorkout(workoutId: Int): Flow<List<ExerciseEntity>>
     suspend fun createExercise(workoutId: Int, name: String, equipment: String, muscleGroups: String, orderIndex: Int = 0)
     suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String)
-    suspend fun updateExercises(exercises: List<ExerciseEntity>)
+    suspend fun reorderExercises(exercises: List<ExerciseEntity>)
     suspend fun deleteExercise(exercise: ExerciseEntity)
-    suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int)
+    suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int): Boolean
     suspend fun addSet(exercise: ExerciseEntity)
     fun getActiveSessionFlow(workoutId: Int): Flow<WorkoutSessionEntity?>
     suspend fun startOrGetSession(workoutId: Int): WorkoutSessionEntity
@@ -91,11 +91,11 @@ class WorkoutRepository(
     }
 
     override suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String) {
-        workoutDao.updateExercise(exercise.copy(name = name, equipment = equipment, muscleGroups = muscleGroups))
+        workoutDao.updateExerciseMetadata(exercise.id, name, equipment, muscleGroups)
     }
 
-    override suspend fun updateExercises(exercises: List<ExerciseEntity>) {
-        workoutDao.updateExercises(exercises)
+    override suspend fun reorderExercises(exercises: List<ExerciseEntity>) {
+        workoutDao.reorderExercises(exercises)
     }
 
     override suspend fun deleteExercise(exercise: ExerciseEntity) {
@@ -103,11 +103,8 @@ class WorkoutRepository(
     }
 
     /** decrementa o número de séries e apaga o registo na sessão atual */
-    override suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int) {
-        val newCount = maxOf(1, exercise.setCount - 1)
-        val setNumberToRemove = exercise.setCount
-        workoutDao.deleteSetByNumber(exercise.id, sessionId, setNumberToRemove)
-        workoutDao.updateExercise(exercise.copy(setCount = newCount))
+    override suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int): Boolean {
+        return workoutDao.removeLastSet(exercise.id, sessionId, exercise.setCount)
     }
 
     /** incrementa o número de séries */

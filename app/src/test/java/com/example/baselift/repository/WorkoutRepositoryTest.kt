@@ -55,6 +55,35 @@ class WorkoutRepositoryTest {
     }
 
     @Test
+    fun `removal delegates its identity to one transaction and propagates conflicts`() = runTest {
+        val exercise = ExerciseEntity(id = 7, workoutId = 1, name = "Bench", setCount = 3)
+        coEvery { workoutDao.removeLastSet(7, 2, 3) } returnsMany listOf(true, false)
+        assertEquals(true, repository.removeLastSet(exercise, 2))
+        assertEquals(false, repository.removeLastSet(exercise, 2))
+        coVerify(exactly = 2) { workoutDao.removeLastSet(7, 2, 3) }
+        coVerify(exactly = 0) { workoutDao.deleteSetByNumber(any(), any(), any()) }
+        coVerify(exactly = 0) { workoutDao.updateExercise(any()) }
+    }
+
+    @Test
+    fun `metadata edits target only metadata columns`() = runTest {
+        val exercise = ExerciseEntity(id = 7, workoutId = 1, name = "Old", setCount = 1)
+        repository.updateExercise(exercise, "New", "Machine", "Chest")
+        coVerify(exactly = 1) { workoutDao.updateExerciseMetadata(7, "New", "Machine", "Chest") }
+        coVerify(exactly = 0) { workoutDao.updateExercise(any()) }
+    }
+
+    @Test
+    fun `reorder delegates one batch of order updates instead of whole exercise writes`() = runTest {
+        val exercises = listOf(ExerciseEntity(id = 7, workoutId = 1, name = "Bench", orderIndex = 1),
+            ExerciseEntity(id = 8, workoutId = 1, name = "Press", orderIndex = 0))
+        repository.reorderExercises(exercises)
+        coVerify(exactly = 1) { workoutDao.reorderExercises(exercises) }
+        coVerify(exactly = 0) { workoutDao.updateExercises(any()) }
+        coVerify(exactly = 0) { workoutDao.updateExercise(any()) }
+    }
+
+    @Test
     fun `checkPR returns WEIGHT when new weight is greater than max weight`() = runTest {
         coEvery { workoutDao.getExercisePrMaxima(1) } returns ExercisePrMaxima(100f, 120f)
         

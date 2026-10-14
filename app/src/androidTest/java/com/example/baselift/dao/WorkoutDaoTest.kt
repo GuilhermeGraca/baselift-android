@@ -14,6 +14,8 @@ import com.example.baselift.Model.repository.WorkoutRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -31,6 +33,181 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class WorkoutDaoTest {
+
+    @Test
+    fun removeLastSet_scopesCurrentSessionAndPreservesMetadataAndOtherHistory() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout, setCount = 3)
+        val other = insertExercise(workout, "Other", setCount = 3)
+        val active = insertSession(workout)
+        val history = insertSession(workout, isCompleted = true)
+        val keepFirst = insertCompletedSet(active, exercise, 1, 80f, 10)
+        insertCompletedSet(active, exercise, 3, 70f, 10)
+        insertCompletedSet(active, exercise, 3, 75f, 8) // Existing logical duplicates share removal scope.
+        val keepOther = insertCompletedSet(active, other, 3, 50f, 10)
+        val keepHistory = insertCompletedSet(history, exercise, 3, 60f, 10)
+        val stale = workoutDao.getExercisesForWorkout(workout).first().single { it.id == exercise }
+        workoutDao.updateExerciseMetadata(exercise, "Renamed", "Machine", "Chest")
+        workoutDao.updateExerciseOrder(exercise, 7)
+        val repository = WorkoutRepository(workoutDao, ApplicationProvider.getApplicationContext())
+        assertTrue(repository.removeLastSet(stale, active))
+        val after = workoutDao.getExercisesForWorkout(workout).first().single { it.id == exercise }
+        assertEquals(stale.copy(name = "Renamed", equipment = "Machine", muscleGroups = "Chest",
+            orderIndex = 7, setCount = 2), after)
+        assertEquals(listOf(keepFirst, keepOther), workoutDao.getSetsForSession(active).first().map { it.id })
+        assertEquals(keepHistory, workoutDao.getSetsForSession(history).first().single().id)
+    }
+
+    @Test
+    fun removeLastSet_rejectsMinimumStaleMissingAndWrongOrCompletedSessions() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout, setCount = 3)
+        val active = insertSession(workout)
+        val completed = insertSession(workout, isCompleted = true)
+        val wrongSession = insertSession(insertWorkout("Other"))
+        insertCompletedSet(active, exercise, 3, 80f, 10)
+        val before = workoutDao.getSetsForSession(active).first()
+        assertFalse(workoutDao.removeLastSet(exercise, active, 2))
+        assertFalse(workoutDao.removeLastSet(exercise, active, 1))
+        assertFalse(workoutDao.removeLastSet(exercise, completed, 3))
+        assertFalse(workoutDao.removeLastSet(exercise, wrongSession, 3))
+        assertFalse(workoutDao.removeLastSet(exercise, -1, 3))
+        assertFalse(workoutDao.removeLastSet(-1, active, 3))
+        assertEquals(3, workoutDao.getExercisesForWorkout(workout).first().single().setCount)
+        workoutDao.incrementSetCount(exercise)
+        assertFalse(workoutDao.removeLastSet(exercise, active, 3))
+        assertEquals(4, workoutDao.getExercisesForWorkout(workout).first().single().setCount)
+        assertEquals(before, workoutDao.getSetsForSession(active).first())
+        val minimum = insertExercise(workout, "Minimum", setCount = 1)
+        insertCompletedSet(active, minimum, 1, 50f, 10)
+        assertFalse(workoutDao.removeLastSet(minimum, active, 1))
+        assertEquals(1, workoutDao.getExercisesForWorkout(workout).first().single { it.id == minimum }.setCount)
+        assertTrue(workoutDao.getSetsForSession(active).first().any { it.exerciseId == minimum })
+    }
+
+    @Test
+    fun removeLastSet_deleteFailureRollsBackCountAndLogsAndAllowsRetry() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout, setCount = 3)
+        val session = insertSession(workout)
+        insertCompletedSet(session, exercise, 3, 80f, 10)
+        val before = workoutDao.getSetsForSession(session).first()
+        database.openHelper.writableDatabase.execSQL("""
+            CREATE TRIGGER reject_last_set_delete BEFORE DELETE ON set_logs
+            WHEN OLD.exerciseId = $exercise AND OLD.sessionId = $session
+            BEGIN SELECT RAISE(ABORT, 'injected deletion failure'); END
+        """.trimIndent())
+        try {
+            workoutDao.removeLastSet(exercise, session, 3)
+            fail("Expected transaction failure")
+        } catch (_: android.database.sqlite.SQLiteException) {
+            assertEquals(3, workoutDao.getExercisesForWorkout(workout).first().single().setCount)
+            assertEquals(before, workoutDao.getSetsForSession(session).first())
+        }
+        database.openHelper.writableDatabase.execSQL("DROP TRIGGER reject_last_set_delete")
+        assertTrue(workoutDao.removeLastSet(exercise, session, 3))
+        assertEquals(2, workoutDao.getExercisesForWorkout(workout).first().single().setCount)
+        assertTrue(workoutDao.getSetsForSession(session).first().isEmpty())
+    }
+
+    @Test
+    fun removeLastSet_concurrentDuplicateConfirmationsRemoveExactlyOnce() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout, setCount = 3)
+        val session = insertSession(workout)
+        insertCompletedSet(session, exercise, 3, 80f, 10)
+        val start = CompletableDeferred<Unit>()
+        val results = coroutineScope {
+            val jobs = (1..12).map {
+                async(Dispatchers.Default) { start.await(); workoutDao.removeLastSet(exercise, session, 3) }
+            }
+            start.complete(Unit)
+            jobs.awaitAll()
+        }
+        assertEquals(1, results.count { it })
+        assertEquals(2, workoutDao.getExercisesForWorkout(workout).first().single().setCount)
+        assertTrue(workoutDao.getSetsForSession(session).first().isEmpty())
+    }
+
+    @Test
+    fun concurrentAddRemoveMetadataAndReorderPreserveEachOthersFields() = runTest {
+        val workout = insertWorkout()
+        val exercise = insertExercise(workout, setCount = 3)
+        val other = insertExercise(workout, "Other", setCount = 2)
+        workoutDao.updateExerciseOrder(other, 1)
+        val session = insertSession(workout)
+        insertCompletedSet(session, exercise, 3, 80f, 10)
+        val stale = workoutDao.getExercisesForWorkout(workout).first()
+        val target = stale.single { it.id == exercise }
+        val repository = WorkoutRepository(workoutDao, ApplicationProvider.getApplicationContext())
+        val start = CompletableDeferred<Unit>()
+        val removed = coroutineScope {
+            val addition = async(Dispatchers.Default) { start.await(); repository.addSet(target) }
+            val removal = async(Dispatchers.Default) { start.await(); repository.removeLastSet(target, session) }
+            val edit = async(Dispatchers.Default) { start.await(); repository.updateExercise(target, "New", "Machine", "Chest") }
+            val reorder = async(Dispatchers.Default) {
+                start.await()
+                repository.reorderExercises(stale.reversed().mapIndexed { index, entity -> entity.copy(orderIndex = index) })
+            }
+            start.complete(Unit)
+            addition.await(); edit.await(); reorder.await()
+            removal.await()
+        }
+        val after = workoutDao.getExercisesForWorkout(workout).first()
+        assertEquals(listOf(other, exercise), after.map { it.id })
+        assertEquals(if (removed) 3 else 4, after.last().setCount)
+        assertEquals("New", after.last().name)
+        assertEquals("Machine", after.last().equipment)
+        assertEquals("Chest", after.last().muscleGroups)
+        assertEquals(2, after.first().setCount)
+        assertEquals(if (removed) 0 else 1, workoutDao.getSetsForSession(session).first().size)
+    }
+
+    @Test
+    fun metadataAndReorderIgnoreStaleCountsAndPreserveEachOthersUpdates() = runTest {
+        val workout = insertWorkout()
+        val first = insertExercise(workout, setCount = 3)
+        val second = insertExercise(workout, "Other", setCount = 2)
+        workoutDao.updateExerciseOrder(second, 1)
+        val stale = workoutDao.getExercisesForWorkout(workout).first()
+        repeat(3) { workoutDao.incrementSetCount(first) }
+        val repository = WorkoutRepository(workoutDao, ApplicationProvider.getApplicationContext())
+        repository.updateExercise(stale.single { it.id == first }, "New", "Machine", "Chest")
+        repository.reorderExercises(stale.reversed().mapIndexed { index, entity -> entity.copy(orderIndex = index) })
+        val after = workoutDao.getExercisesForWorkout(workout).first()
+        assertEquals(listOf(second, first), after.map { it.id })
+        assertEquals(6, after.last().setCount)
+        assertEquals("New", after.last().name)
+        assertEquals("Machine", after.last().equipment)
+        assertEquals("Chest", after.last().muscleGroups)
+    }
+
+    @Test
+    fun reorderFailureRollsBackTheWholeBatchAndPreservesMetadataAndCounts() = runTest {
+        val workout = insertWorkout()
+        val first = insertExercise(workout, setCount = 3)
+        val second = insertExercise(workout, "Other", setCount = 2)
+        workoutDao.updateExerciseOrder(second, 1)
+        val before = workoutDao.getExercisesForWorkout(workout).first()
+        val reorder = before.map { it.copy(orderIndex = 1 - it.orderIndex) }
+        database.openHelper.writableDatabase.execSQL("""
+            CREATE TRIGGER reject_second_order BEFORE UPDATE OF orderIndex ON exercises
+            WHEN OLD.id = $second
+            BEGIN SELECT RAISE(ABORT, 'injected reorder failure'); END
+        """.trimIndent())
+        try {
+            workoutDao.reorderExercises(reorder)
+            fail("Expected batch failure")
+        } catch (_: android.database.sqlite.SQLiteException) {
+            assertEquals(before, workoutDao.getExercisesForWorkout(workout).first())
+        }
+        database.openHelper.writableDatabase.execSQL("DROP TRIGGER reject_second_order")
+        workoutDao.reorderExercises(reorder)
+        val after = workoutDao.getExercisesForWorkout(workout).first()
+        assertEquals(listOf(second, first), after.map { it.id })
+        assertEquals(3, after.last().setCount)
+        assertEquals(2, after.first().setCount)
+    }
 
     @Test
     fun addSet_usesStoredCountAndPreservesMetadataHistoryAndOtherExercises() = runTest {

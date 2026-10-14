@@ -49,7 +49,10 @@ data class WorkoutUiState(
     val finalizedSessionId: Int? = null,
     val pendingSetWrites: Set<SetWriteKey> = emptySet(),
     val setSaveFailed: Boolean = false,
-    val setAddFailed: Boolean = false
+    val setAddFailed: Boolean = false,
+    val pendingSetRemovals: Set<SetWriteKey> = emptySet(),
+    val addingSetExerciseIds: Set<Int> = emptySet(),
+    val setRemovalFailed: Boolean = false
 )
 
 class WorkoutViewModel(
@@ -66,6 +69,30 @@ class WorkoutViewModel(
 
     // Owned by Main, like commands and UI state. Keep the guard through Room's UI emission.
     private val pendingSetWrites = mutableMapOf<SetWriteKey, PendingSetWrite>()
+    private class PendingSetRemoval { var saved = false }
+    private val pendingSetRemovals = mutableMapOf<SetWriteKey, PendingSetRemoval>()
+    private val pendingSetAdds = mutableMapOf<Int, Int>()
+
+    private fun hasPendingSetRemoval(exerciseId: Int): Boolean =
+        pendingSetRemovals.keys.any { it.exerciseId == exerciseId }
+
+    private fun removePendingSetRemoval(key: SetWriteKey) {
+        pendingSetRemovals.remove(key)
+        _uiState.update { it.copy(pendingSetRemovals = pendingSetRemovals.keys.toSet()) }
+    }
+
+    private fun reconcileSetRemovals(sessionId: Int, exercises: List<ExerciseUiModel>) {
+        val acknowledged = pendingSetRemovals.filter { (key, removal) ->
+            if (key.sessionId != sessionId || !removal.saved) return@filter false
+            val exercise = exercises.find { it.exercise.id == key.exerciseId }
+            exercise == null || (exercise.exercise.setCount == key.setNumber - 1 &&
+                exercise.sets.none { it.setNumber == key.setNumber })
+        }.keys
+        if (acknowledged.isNotEmpty()) {
+            acknowledged.forEach { pendingSetRemovals.remove(it) }
+            _uiState.update { it.copy(pendingSetRemovals = pendingSetRemovals.keys.toSet()) }
+        }
+    }
 
     private fun hasPendingSetWrite(exerciseId: Int): Boolean =
         pendingSetWrites.keys.any { it.exerciseId == exerciseId }
@@ -100,10 +127,12 @@ class WorkoutViewModel(
     private fun draftKey(exerciseId: Int, setNumber: Int) = "${exerciseId}_${setNumber}"
 
     fun updateDraftWeight(exerciseId: Int, setNumber: Int, value: String) {
+        if (pendingSetRemovals.keys.any { it.exerciseId == exerciseId && it.setNumber == setNumber }) return
         draftWeights[draftKey(exerciseId, setNumber)] = value
     }
 
     fun updateDraftReps(exerciseId: Int, setNumber: Int, value: String) {
+        if (pendingSetRemovals.keys.any { it.exerciseId == exerciseId && it.setNumber == setNumber }) return
         draftReps[draftKey(exerciseId, setNumber)] = value
     }
 
@@ -144,9 +173,11 @@ class WorkoutViewModel(
         // Saved rows no longer need a UI acknowledgement when this selection discards them.
         // In-flight commands keep their guards and remain owned by the ViewModel.
         pendingSetWrites.entries.removeAll { it.value.saved }
+        pendingSetRemovals.entries.removeAll { it.value.saved }
         _uiState.update {
             it.copy(selectedWorkout = workout, activeSession = null, exercises = emptyList(),
-                pendingSetWrites = pendingSetWrites.keys.toSet())
+                pendingSetWrites = pendingSetWrites.keys.toSet(),
+                pendingSetRemovals = pendingSetRemovals.keys.toSet())
         }
 
         selectWorkoutJob = viewModelScope.launch {
@@ -167,6 +198,7 @@ class WorkoutViewModel(
                 .collect { exerciseModels ->
                     _uiState.update { it.copy(exercises = exerciseModels) }
                     reconcileSetWrites(session.id, exerciseModels)
+                    reconcileSetRemovals(session.id, exerciseModels)
                 }
         }
     }
@@ -246,8 +278,10 @@ class WorkoutViewModel(
     }
 
     fun addSetToExercise(exerciseId: Int) {
+        if (hasPendingSetRemoval(exerciseId)) return
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
-        _uiState.update { it.copy(setAddFailed = false) }
+        pendingSetAdds[exerciseId] = pendingSetAdds.getOrDefault(exerciseId, 0) + 1
+        _uiState.update { it.copy(setAddFailed = false, addingSetExerciseIds = pendingSetAdds.keys.toSet()) }
         viewModelScope.launch {
             try {
                 // Each tap is one increment; the repository uses the stored count, not this snapshot.
@@ -256,6 +290,10 @@ class WorkoutViewModel(
                 throw cancelled
             } catch (_: Exception) {
                 _uiState.update { it.copy(setAddFailed = true) }
+            } finally {
+                val remaining = pendingSetAdds.getValue(exerciseId) - 1
+                if (remaining == 0) pendingSetAdds.remove(exerciseId) else pendingSetAdds[exerciseId] = remaining
+                _uiState.update { it.copy(addingSetExerciseIds = pendingSetAdds.keys.toSet()) }
             }
         }
     }
@@ -264,22 +302,59 @@ class WorkoutViewModel(
         _uiState.update { it.copy(setAddFailed = false) }
     }
 
-    fun removeLastSet(exerciseId: Int) {
-        if (hasPendingSetWrite(exerciseId) || _uiState.value.isFinalizing) return
-        val session = _uiState.value.activeSession ?: return
-        val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
-        if (exModel.exercise.setCount <= 1) return // não baixar de uma série
-        val setNumberToRemove = exModel.exercise.setCount
-        // limpar rascunho da série removida
-        draftWeights.remove("${exerciseId}_${setNumberToRemove}")
-        draftReps.remove("${exerciseId}_${setNumberToRemove}")
+    fun removeLastSet(
+        exerciseId: Int,
+        expectedSetNumber: Int? = null,
+        expectedSessionId: Int? = _uiState.value.activeSession?.id
+    ) {
+        val state = _uiState.value
+        if (hasPendingSetWrite(exerciseId) || hasPendingSetRemoval(exerciseId) ||
+            exerciseId in pendingSetAdds || state.isFinalizing) return
+        val session = state.activeSession ?: return
+        if (session.id != expectedSessionId) return
+        val exModel = state.exercises.find { it.exercise.id == exerciseId } ?: return
+        if (exModel.exercise.setCount <= 1) return
+        val number = expectedSetNumber ?: exModel.exercise.setCount
+        if (number != exModel.exercise.setCount || exModel.sets.find { it.setNumber == number }?.canBeRemoved != true) {
+            _uiState.update { it.copy(setRemovalFailed = true) }
+            return
+        }
+        val key = SetWriteKey(session.id, exerciseId, number)
+        val removal = PendingSetRemoval()
+        pendingSetRemovals[key] = removal
+        _uiState.update { it.copy(pendingSetRemovals = pendingSetRemovals.keys.toSet(), setRemovalFailed = false) }
         viewModelScope.launch {
-            repository.removeLastSet(exModel.exercise, session.id)
+            try {
+                if (repository.removeLastSet(exModel.exercise, session.id)) {
+                    removal.saved = true
+                    // Keep drafts through failure; clear only the set the transaction actually removed.
+                    draftWeights.remove(draftKey(exerciseId, number))
+                    draftReps.remove(draftKey(exerciseId, number))
+                    if (_uiState.value.activeSession?.id == session.id) {
+                        reconcileSetRemovals(session.id, _uiState.value.exercises)
+                    } else {
+                        removePendingSetRemoval(key)
+                    }
+                } else {
+                    _uiState.update { it.copy(setRemovalFailed = true) }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _uiState.update { it.copy(setRemovalFailed = true) }
+            } finally {
+                if (!removal.saved) removePendingSetRemoval(key)
+            }
         }
     }
 
+    fun dismissSetRemovalError() {
+        _uiState.update { it.copy(setRemovalFailed = false) }
+    }
+
     fun deleteExercise(exerciseId: Int) {
-        if (hasPendingSetWrite(exerciseId) || _uiState.value.isFinalizing) return
+        if (hasPendingSetWrite(exerciseId) || hasPendingSetRemoval(exerciseId) ||
+            exerciseId in pendingSetAdds || _uiState.value.isFinalizing) return
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
         // limpar todos os rascunhos para este exercício
         exModel.sets.forEach { set ->
@@ -308,7 +383,8 @@ class WorkoutViewModel(
     ) {
         val state = _uiState.value
         val session = state.activeSession ?: return
-        if (state.isFinalizing || session.id != expectedSessionId || hasPendingSetWrite(exerciseId)) return
+        if (state.isFinalizing || session.id != expectedSessionId || hasPendingSetWrite(exerciseId) ||
+            hasPendingSetRemoval(exerciseId)) return
         val set = state.exercises.find { it.exercise.id == exerciseId }
             ?.sets?.find { it.setNumber == setNumber } ?: return
         // Validate the latest displayed state, not the row captured by a previous composition.
@@ -364,7 +440,7 @@ class WorkoutViewModel(
                 val updatedEntities = currentExercises.mapIndexed { index, uiModel ->
                     uiModel.exercise.copy(orderIndex = index)
                 }
-                repository.updateExercises(updatedEntities)
+                repository.reorderExercises(updatedEntities)
             }
         }
     }
@@ -374,7 +450,8 @@ class WorkoutViewModel(
         val session = state.activeSession ?: return
         // Reject duplicate taps, including callbacks from the previous session's UI.
         if (state.isFinalizing || session.id != expectedSessionId ||
-            state.pendingSetWrites.any { it.sessionId == session.id }) return
+            state.pendingSetWrites.any { it.sessionId == session.id } ||
+            state.pendingSetRemovals.any { it.sessionId == session.id }) return
         val exerciseIds = state.exercises.map { it.exercise.id }.toSet()
         _uiState.update { it.copy(isFinalizing = true, finalizationFailed = false) }
 

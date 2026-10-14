@@ -39,7 +39,7 @@ fun ExerciseCard(
     draftReps: Map<String, String>,
     onUpdateDraftWeight: (Int, Int, String) -> Unit,
     onUpdateDraftReps: (Int, Int, String) -> Unit,
-    onRemoveLastSet: () -> Unit,
+    onRemoveLastSet: (Int) -> Unit,
     onAddSet: () -> Unit,
     onLogSet: (Int, Float, Int, Boolean, Int) -> Unit,
     onDeleteExercise: () -> Unit,
@@ -48,7 +48,9 @@ fun ExerciseCard(
     isAnyDragging: Boolean = false,
     dragModifier: Modifier = Modifier,
     savingSetNumbers: Set<Int> = emptySet(),
-    writesBlocked: Boolean = false
+    writesBlocked: Boolean = false,
+    removingSetNumbers: Set<Int> = emptySet(),
+    isAddingSets: Boolean = false
 ) {
     val exercise = exerciseModel.exercise
     var showMenu by remember { mutableStateOf(false) }
@@ -76,7 +78,8 @@ fun ExerciseCard(
                 onDeleteExercise()
                 showDeleteDialog = false
             },
-            onDismiss = { showDeleteDialog = false }
+            onDismiss = { showDeleteDialog = false },
+            confirmEnabled = !writesBlocked && savingSetNumbers.isEmpty() && removingSetNumbers.isEmpty() && !isAddingSets
         )
     }
     Column(
@@ -128,7 +131,7 @@ fun ExerciseCard(
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(com.example.baselift.R.string.workout_delete_exercise), color = Color(0xFFFF4444), fontSize = 14.sp) },
-                            enabled = !writesBlocked && savingSetNumbers.isEmpty(),
+                            enabled = !writesBlocked && savingSetNumbers.isEmpty() && removingSetNumbers.isEmpty() && !isAddingSets,
                             leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF4444), modifier = Modifier.size(18.dp)) },
                             onClick = { showMenu = false; showDeleteDialog = true }
                         )
@@ -196,7 +199,9 @@ fun ExerciseCard(
                             onRemove = onRemoveLastSet,
                             onLogSet = onLogSet,
                             isSaving = setModel.setNumber in savingSetNumbers,
-                            writesBlocked = writesBlocked || savingSetNumbers.isNotEmpty()
+                            writesBlocked = writesBlocked || savingSetNumbers.isNotEmpty() || removingSetNumbers.isNotEmpty(),
+                            isRemoving = setModel.setNumber in removingSetNumbers,
+                            removalBlocked = isAddingSets
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
@@ -207,7 +212,7 @@ fun ExerciseCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xFF222222))
-                        .clickable { onAddSet() }
+                        .clickable(enabled = !writesBlocked && removingSetNumbers.isEmpty()) { onAddSet() }
                         .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {

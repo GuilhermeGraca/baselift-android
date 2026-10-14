@@ -11,8 +11,10 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.ViewModelStore
@@ -26,6 +28,7 @@ import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
 import com.example.baselift.Model.repository.WorkoutRepository
+import com.example.baselift.R
 import com.example.baselift.View.workout.components.ExerciseCard
 import com.example.baselift.View.workout.components.SetRow
 import com.example.baselift.ViewModel.workout.ExerciseUiModel
@@ -56,6 +59,57 @@ class SetWriteInteractionTest {
 
     private val row = SetUiModel(1, null, 70f, 8, canBeChecked = true)
     private val editable = SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText)
+
+    @Test
+    fun removingBlocksChecksAndAddWhileShowingTheTargetRow() {
+        val model = ExerciseUiModel(ExerciseEntity(id = 1, workoutId = 1, name = "Bench", setCount = 2),
+            listOf(row, row.copy(setNumber = 2, canBeRemoved = true)))
+        var adds = 0
+        var logs = 0
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            MaterialTheme {
+                ExerciseCard(model, emptyMap(), emptyMap(), { _, _, _ -> }, { _, _, _ -> }, {},
+                    onAddSet = { adds++ }, onLogSet = { _, _, _, _, _ -> logs++ },
+                    onDeleteExercise = {}, onEditExercise = { _, _, _ -> }, removingSetNumbers = setOf(2))
+            }
+        }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithContentDescription("Set 1 completion").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Set 2 completion").assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Removing set…"))
+        val label = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.workout_add_set)
+        compose.onNodeWithText(label).assertIsNotEnabled().performTouchInput { click() }
+        compose.runOnIdle { assertEquals(0, adds); assertEquals(0, logs) }
+    }
+
+    @Test
+    fun confirmationRetainsTheRequestedSetNumberWhenAnotherSetArrives() {
+        val exercise = ExerciseEntity(id = 1, workoutId = 1, name = "Bench", setCount = 2)
+        val second = row.copy(setNumber = 2, canBeRemoved = true)
+        val model = mutableStateOf(ExerciseUiModel(exercise, listOf(row, second)))
+        val adding = mutableStateOf(false)
+        val requested = mutableListOf<Int>()
+        compose.setContent {
+            MaterialTheme {
+                ExerciseCard(model.value, emptyMap(), emptyMap(), { _, _, _ -> }, { _, _, _ -> },
+                    onRemoveLastSet = { requested += it }, onAddSet = {}, onLogSet = { _, _, _, _, _ -> },
+                    onDeleteExercise = {}, onEditExercise = { _, _, _ -> }, isAddingSets = adding.value)
+            }
+        }
+        compose.onNodeWithText("2").performTouchInput { longClick() }
+        val label = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.workout_delete)
+        compose.onNodeWithText(label).assertIsEnabled()
+        compose.runOnIdle { adding.value = true }
+        compose.onNodeWithText(label).assertIsNotEnabled()
+        compose.runOnIdle {
+            adding.value = false
+            model.value = ExerciseUiModel(exercise.copy(setCount = 3), listOf(row,
+                second.copy(canBeRemoved = false), row.copy(setNumber = 3, canBeRemoved = true)))
+        }
+        compose.onNodeWithText(label).assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals(listOf(2), requested) }
+    }
 
     @Test
     fun savingDisablesCheckboxAndInputsThenAllowsRetryWithPreservedValues() {

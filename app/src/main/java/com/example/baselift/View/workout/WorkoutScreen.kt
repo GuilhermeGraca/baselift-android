@@ -125,6 +125,19 @@ fun WorkoutScreen(
         )
     }
 
+    if (uiState.setRemovalFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSetRemovalError,
+            title = { Text(stringResource(com.example.baselift.R.string.workout_set_remove_error_title)) },
+            text = { Text(stringResource(com.example.baselift.R.string.workout_set_remove_error_message)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissSetRemovalError) {
+                    Text(stringResource(com.example.baselift.R.string.workout_finalize_error_dismiss))
+                }
+            }
+        )
+    }
+
     if (workoutToDelete != null) {
         ConfirmDeleteDialog(
             title = stringResource(com.example.baselift.R.string.workout_delete_workout),
@@ -379,7 +392,9 @@ fun WorkoutScreen(
                                 onUpdateDraftWeight = { exId, setNum, v -> viewModel.updateDraftWeight(exId, setNum, v) },
                                 onUpdateDraftReps = { exId, setNum, v -> viewModel.updateDraftReps(exId, setNum, v) },
                                 onAddSet = { viewModel.addSetToExercise(exerciseModel.exercise.id) },
-                                onRemoveLastSet = { viewModel.removeLastSet(exerciseModel.exercise.id) },
+                                onRemoveLastSet = { number ->
+                                    viewModel.removeLastSet(exerciseModel.exercise.id, number, displayedSessionId)
+                                },
                                 onDeleteExercise = { viewModel.deleteExercise(exerciseModel.exercise.id) },
                                 onEditExercise = { name, eq, mg -> viewModel.updateExercise(exerciseModel.exercise.id, name, eq, mg) },
                                 onLogSet = { setNumber, weight, reps, isCompleted, _ ->
@@ -398,7 +413,11 @@ fun WorkoutScreen(
                                 savingSetNumbers = uiState.pendingSetWrites.filter {
                                     it.sessionId == displayedSessionId && it.exerciseId == exerciseModel.exercise.id
                                 }.map { it.setNumber }.toSet(),
-                                writesBlocked = uiState.isFinalizing
+                                writesBlocked = uiState.isFinalizing,
+                                removingSetNumbers = uiState.pendingSetRemovals.filter {
+                                    it.sessionId == displayedSessionId && it.exerciseId == exerciseModel.exercise.id
+                                }.map { it.setNumber }.toSet(),
+                                isAddingSets = exerciseModel.exercise.id in uiState.addingSetExerciseIds
                             )
                         }
                     }
@@ -454,7 +473,8 @@ fun WorkoutScreen(
                                     Button(
                                         onClick = { viewModel.finalizeWorkout(activeSessionId) },
                                         enabled = hasCompletedSets && !uiState.isFinalizing &&
-                                            uiState.pendingSetWrites.none { it.sessionId == activeSessionId },
+                                            uiState.pendingSetWrites.none { it.sessionId == activeSessionId } &&
+                                            uiState.pendingSetRemovals.none { it.sessionId == activeSessionId },
                                         modifier = Modifier.fillMaxWidth().height(56.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = NeonGreen,

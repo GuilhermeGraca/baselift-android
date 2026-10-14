@@ -47,19 +47,23 @@ fun SetRow(
     draftReps: Map<String, String>,
     onUpdateDraftWeight: (exerciseId: Int, setNumber: Int, value: String) -> Unit,
     onUpdateDraftReps: (exerciseId: Int, setNumber: Int, value: String) -> Unit,
-    onRemove: () -> Unit = {},
+    onRemove: (Int) -> Unit = {},
     onLogSet: (Int, Float, Int, Boolean, Int) -> Unit,
     isSaving: Boolean = false,
-    writesBlocked: Boolean = false
+    writesBlocked: Boolean = false,
+    isRemoving: Boolean = false,
+    removalBlocked: Boolean = false
 ) {
     var showRemoveDialog by remember { mutableStateOf(false) }
+    val isBusy = isSaving || isRemoving
 
     if (showRemoveDialog) {
         ConfirmDeleteDialog(
             title = stringResource(com.example.baselift.R.string.workout_remove_set),
             message = stringResource(com.example.baselift.R.string.workout_remove_set_msg, setModel.setNumber),
-            onConfirm = { onRemove(); showRemoveDialog = false },
-            onDismiss = { showRemoveDialog = false }
+            onConfirm = { onRemove(setModel.setNumber); showRemoveDialog = false },
+            onDismiss = { showRemoveDialog = false },
+            confirmEnabled = !isBusy && !writesBlocked && !removalBlocked
         )
     }
     
@@ -113,7 +117,7 @@ fun SetRow(
             .clip(RoundedCornerShape(8.dp))
             .background(rowBgColor)
             .then(
-                if (setModel.canBeRemoved && !writesBlocked) {
+                if (setModel.canBeRemoved && !writesBlocked && !isBusy && !removalBlocked) {
                     Modifier
                         .background(
                             Brush.horizontalGradient(
@@ -183,7 +187,7 @@ fun SetRow(
                 if (text.length > 6) text = text.take(6)
                 onUpdateDraftWeight(exerciseId, setModel.setNumber, text)
             },
-            enabled = !setModel.isCompleted && !isSaving && !writesBlocked,
+            enabled = !setModel.isCompleted && !isBusy && !writesBlocked,
             modifier = Modifier
                 .weight(0.8f)
                 .background(inputBgColor, RoundedCornerShape(6.dp))
@@ -242,7 +246,7 @@ fun SetRow(
                 val text = newValue.filter { it.isDigit() }.take(4)
                 onUpdateDraftReps(exerciseId, setModel.setNumber, text)
             },
-            enabled = !setModel.isCompleted && !isSaving && !writesBlocked,
+            enabled = !setModel.isCompleted && !isBusy && !writesBlocked,
             modifier = Modifier
                 .weight(0.8f)
                 .background(inputBgColor, RoundedCornerShape(6.dp))
@@ -317,6 +321,7 @@ fun SetRow(
         val checkTint = if (setModel.isCompleted) PureBlack else MediumGrey.copy(alpha = 0.3f)
         val checkDescription = stringResource(com.example.baselift.R.string.workout_set_check, setModel.setNumber)
         val savingDescription = stringResource(com.example.baselift.R.string.workout_set_saving)
+        val removingDescription = stringResource(com.example.baselift.R.string.workout_set_removing)
         
         Box(
             modifier = Modifier
@@ -325,9 +330,9 @@ fun SetRow(
                 .background(checkboxBg)
                 .semantics {
                     contentDescription = checkDescription
-                    if (isSaving) stateDescription = savingDescription
+                    if (isBusy) stateDescription = if (isRemoving) removingDescription else savingDescription
                 }
-                .clickable(enabled = setModel.canBeChecked && !isSaving && !writesBlocked, role = Role.Checkbox) {
+                .clickable(enabled = setModel.canBeChecked && !isBusy && !writesBlocked, role = Role.Checkbox) {
                     val w = weightInput.toFloatOrNull() ?: setModel.prevWeight ?: 0f
                     val r = repsInput.toIntOrNull() ?: setModel.prevReps ?: 0
                     if (!setModel.isCompleted) {
@@ -339,8 +344,9 @@ fun SetRow(
                 },
             contentAlignment = Alignment.Center
         ) {
-            if (isSaving) {
-                CircularProgressIndicator(color = NeonGreen, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+            if (isBusy) {
+                CircularProgressIndicator(color = if (setModel.isCompleted) PureBlack else NeonGreen,
+                    strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
             } else {
                 Icon(
                     Icons.Default.Check,
