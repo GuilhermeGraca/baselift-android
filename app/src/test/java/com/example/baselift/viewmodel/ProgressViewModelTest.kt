@@ -41,13 +41,14 @@ class ProgressViewModelTest {
     fun setup() {
         progressRepository = FakeProgressRepository()
         userRepository = FakeUserRepository()
-        viewModel = ProgressViewModel(progressRepository, userRepository)
+        viewModel = ProgressViewModel(progressRepository, userRepository, mainDispatcherRule.testDispatcher)
 
         mockContext = mockk()
         mockContentResolver = mockk(relaxed = true)
         mockUri = mockk(relaxed = true)
         
         every { mockContext.contentResolver } returns mockContentResolver
+        every { mockContext.applicationContext } returns mockContext
         every { mockUri.toString() } returns "content://test/uri"
     }
 

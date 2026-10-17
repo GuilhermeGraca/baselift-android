@@ -16,11 +16,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 
 class ProgressViewModel(
     private val progressRepository: IProgressRepository,
-    private val userRepository: IUserRepository
+    private val userRepository: IUserRepository,
+    private val photoIoDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
+
+    private var profilePhotoRequest: Any = Any()
+
+    private suspend fun retainPhotoReadPermission(context: Context, uri: Uri) {
+        withContext(photoIoDispatcher) {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
 
     val user: StateFlow<UserEntity?> = userRepository.getUser()
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
@@ -62,14 +77,13 @@ class ProgressViewModel(
     }
 
     fun addPhotoLog(context: Context, uri: Uri) {
+        val applicationContext = context.applicationContext
         viewModelScope.launch {
             try {
-                // pedir permissão persistente para ler a imagem depois do reinício
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
+                retainPhotoReadPermission(applicationContext, uri)
                 progressRepository.insertPhotoLog(uri.toString(), System.currentTimeMillis())
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -77,14 +91,16 @@ class ProgressViewModel(
     }
 
     fun addPhotoLogs(context: Context, uris: List<Uri>, timestamp: Long) {
+        val applicationContext = context.applicationContext
+        val selectedUris = uris.toList()
         viewModelScope.launch {
-            uris.forEach { uri ->
+            selectedUris.forEach { uri ->
+                currentCoroutineContext().ensureActive()
                 try {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
+                    retainPhotoReadPermission(applicationContext, uri)
                     progressRepository.insertPhotoLog(uri.toString(), timestamp)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -123,23 +139,27 @@ class ProgressViewModel(
     }
 
     fun updateProfilePhoto(context: Context, uri: Uri?) {
+        val applicationContext = context.applicationContext
+        val request = Any()
+        profilePhotoRequest = request
         viewModelScope.launch {
-            val currentUser = userRepository.getUser().firstOrNull()
-            if (currentUser != null) {
-                if (uri != null) {
-                    try {
-                        context.contentResolver.takePersistableUriPermission(
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                    userRepository.saveUser(currentUser.copy(profilePhotoUri = uri.toString()))
-                } else {
-                    userRepository.saveUser(currentUser.copy(profilePhotoUri = null))
+            if (profilePhotoRequest !== request) return@launch
+            if (uri != null) {
+                try {
+                    retainPhotoReadPermission(applicationContext, uri)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    // Preserve the existing best-effort profile permission policy.
+                    e.printStackTrace()
                 }
             }
+            currentCoroutineContext().ensureActive()
+            if (profilePhotoRequest !== request) return@launch
+            // Provider work may be slow. Read current profile fields after it completes.
+            val currentUser = userRepository.getUser().firstOrNull() ?: return@launch
+            if (profilePhotoRequest !== request) return@launch
+            userRepository.saveUser(currentUser.copy(profilePhotoUri = uri?.toString()))
         }
     }
 
