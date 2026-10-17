@@ -43,6 +43,9 @@ class WorkoutSubscriptionsTest {
     @Test fun hiddenWorkoutStopsRowQueriesAndAcceptedSaveReturnsWithFreshModelsAndDrafts() {
         val exerciseQueries = AtomicInteger()
         val setQueries = AtomicInteger()
+        val routineQueries = AtomicInteger()
+        val activeRoutines = AtomicInteger()
+        val recoveryReads = AtomicInteger()
         val activeExercises = AtomicInteger()
         val activeSets = AtomicInteger()
         val sessionReads = AtomicInteger()
@@ -55,6 +58,7 @@ class WorkoutSubscriptionsTest {
             .setQueryCallback({ sql, _ ->
                 if (sql.startsWith("SELECT * FROM exercises WHERE workoutId", ignoreCase = true)) exerciseQueries.incrementAndGet()
                 if (sql.startsWith("SELECT * FROM set_logs WHERE sessionId", ignoreCase = true)) setQueries.incrementAndGet()
+                if (sql.startsWith("SELECT * FROM workouts ORDER BY", ignoreCase = true)) routineQueries.incrementAndGet()
             }, Executor { it.run() }).build()
         database = db
         val dao = db.workoutDao()
@@ -69,6 +73,8 @@ class WorkoutSubscriptionsTest {
             try { emitAll(rows) } finally { active.decrementAndGet() }
         }
         val source = object : IWorkoutRepository by real {
+            override val allWorkouts = tracked(real.allWorkouts, activeRoutines)
+            override suspend fun getAnyActiveSession() = real.getAnyActiveSession().also { recoveryReads.incrementAndGet() }
             override suspend fun startOrGetSession(workoutId: Int) = dao.getOrCreateActiveSession(workoutId).also { sessionReads.incrementAndGet() }
             override suspend fun getPreviousSetsForWorkout(workoutId: Int) = real.getPreviousSetsForWorkout(workoutId).also { historyReads.incrementAndGet() }
             override fun getExercisesForWorkout(workoutId: Int) = tracked(real.getExercisesForWorkout(workoutId), activeExercises)
@@ -88,23 +94,28 @@ class WorkoutSubscriptionsTest {
             vm.updateDraftReps(1, 2, "8")
         }
         val visible = mutableStateOf(true)
+        assertEquals(0, recoveryReads.get()); assertEquals(0, sessionReads.get())
+        assertEquals(0, historyReads.get()); assertEquals(0, routineQueries.get())
         compose.setContent { MaterialTheme { if (visible.value) WorkoutScreen(vm) } }
         compose.waitUntil(5_000) { vm.uiState.value.exercises.isNotEmpty() }
         compose.onNodeWithText("Bench").assertIsDisplayed()
         compose.runOnIdle { vm.logSet(1, 1, 80f, 10, true) }
         compose.waitUntil(5_000) { writeStarted.isCompleted }
         compose.runOnIdle { visible.value = false }
-        compose.waitUntil(5_000) { activeExercises.get() == 0 && activeSets.get() == 0 }
+        compose.waitUntil(5_000) { activeExercises.get() == 0 && activeSets.get() == 0 && activeRoutines.get() == 0 }
         val exercisesBefore = exerciseQueries.get()
         val setsBefore = setQueries.get()
+        val routinesBefore = routineQueries.get()
         assertTrue(exercisesBefore > 0); assertTrue(setsBefore > 0)
         writeRelease.complete(Unit)
         compose.waitUntil(5_000) { writeFinished.isCompleted && vm.uiState.value.pendingSetWrites.isEmpty() }
         runBlocking {
             dao.updateExerciseMetadata(1, "Incline", "Machine", "Upper chest")
             dao.incrementSetCount(1)
+            dao.updateWorkout(WorkoutEntity(id = 1, name = "Upper", defaultRestTimer = 60))
         }
         assertEquals(exercisesBefore, exerciseQueries.get()); assertEquals(setsBefore, setQueries.get())
+        assertEquals(routinesBefore, routineQueries.get())
         assertEquals("Bench", vm.uiState.value.exercises.single().exercise.name)
         assertTrue(vm.uiState.value.isSelectionLoading)
         compose.runOnIdle { visible.value = true }
@@ -114,10 +125,14 @@ class WorkoutSubscriptionsTest {
                 row.sets.size == 3 && row.sets.first().isCompleted
         }
         compose.onNodeWithText("Incline").assertIsDisplayed()
+        compose.onNodeWithText("UPPER").assertIsDisplayed()
+        assertEquals(60, vm.uiState.value.selectedWorkout?.defaultRestTimer)
         assertEquals("75", vm.getDraftWeight(1, 2)); assertEquals("8", vm.getDraftReps(1, 2))
         assertTrue(vm.uiState.value.pendingSetWrites.isEmpty())
         assertEquals(1, activeExercises.get()); assertEquals(1, activeSets.get())
+        assertEquals(1, activeRoutines.get()); assertEquals(1, recoveryReads.get())
         assertTrue(exerciseQueries.get() > exercisesBefore); assertTrue(setQueries.get() > setsBefore)
+        assertTrue(routineQueries.get() > routinesBefore)
         assertEquals(1, sessionReads.get()); assertEquals(1, historyReads.get())
         assertEquals(1, vm.uiState.value.activeSession?.id)
     }

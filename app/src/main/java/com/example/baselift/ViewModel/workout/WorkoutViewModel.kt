@@ -60,6 +60,7 @@ data class WorkoutUiState(
     val activeSession: WorkoutSessionEntity? = null,
     val exercises: List<ExerciseUiModel> = emptyList(),
     val isLoading: Boolean = true,
+    val workoutsLoadFailed: Boolean = false,
     val isSelectionLoading: Boolean = false,
     val selectionLoadFailed: Boolean = false,
     val exerciseEdits: Map<Int, ExerciseEditState> = emptyMap(),
@@ -166,7 +167,7 @@ class WorkoutViewModel(
     private var observedExerciseModels: List<ExerciseUiModel>? = null
     private var observingSelection = false
 
-    private fun hasCurrentExerciseModels() = observingSelection && observedExerciseModels != null
+    private fun hasCurrentExerciseModels() = routinesReady.value && observingSelection && observedExerciseModels != null
 
     private fun releaseSavedAcknowledgements() {
         pendingSetWrites.entries.removeAll { it.value.saved }
@@ -311,33 +312,71 @@ class WorkoutViewModel(
     // guarda o trabalho ativo de seleção de treino para poder cancelar antes de começar outro
     private var selectWorkoutJob: kotlinx.coroutines.Job? = null
     private var selectionToken: Any = Any()
+    // True only after the routine list has emitted for the current presentation demand.
+    private val routinesReady = MutableStateFlow(false)
+    private val routinesRetry = MutableStateFlow(0)
+    private var recoveredInitialSelection = false
+    private var recoveredWorkoutId: Int? = null
 
     init {
-        // obter todos os treinos
         viewModelScope.launch {
-            val anyActive = repository.getAnyActiveSession()
-            repository.allWorkouts.collect { workouts ->
-                val selectedId = _uiState.value.selectedWorkout?.id
-                val selected = workouts.find { it.id == selectedId }
-                    ?: workouts.find { it.id == anyActive?.workoutId }
-                    ?: workouts.firstOrNull()
-                _uiState.update {
-                    it.copy(workouts = workouts, isLoading = false,
-                        selectedWorkout = if (selected?.id == selectedId) selected else it.selectedWorkout)
+            SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000)
+                .command(_uiState.subscriptionCount).collectLatest { command ->
+                    if (command != SharingCommand.START) return@collectLatest
+                    routinesRetry.collectLatest {
+                        _uiState.update { it.copy(isLoading = true, workoutsLoadFailed = false) }
+                        try {
+                            // Recover the initial routine once, only when Workout is first requested.
+                            if (!recoveredInitialSelection) {
+                                val active = repository.getAnyActiveSession()
+                                currentCoroutineContext().ensureActive()
+                                recoveredWorkoutId = active?.workoutId
+                                recoveredInitialSelection = true
+                            }
+                            repository.allWorkouts.collect { workouts ->
+                                currentCoroutineContext().ensureActive()
+                                val selectedId = _uiState.value.selectedWorkout?.id
+                                val selected = workouts.find { it.id == selectedId }
+                                    ?: workouts.find { it.id == recoveredWorkoutId }
+                                    ?: workouts.firstOrNull()
+                                _uiState.update {
+                                    it.copy(workouts = workouts, isLoading = false,
+                                        selectedWorkout = if (selected?.id == selectedId) selected else it.selectedWorkout)
+                                }
+                                // Validate the selected ID before allowing current-row observation.
+                                if (selected?.id != selectedId) loadWorkout(selected)
+                                routinesReady.value = true
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            currentCoroutineContext().ensureActive()
+                            _uiState.update { it.copy(isLoading = false, workoutsLoadFailed = true) }
+                        } finally {
+                            routinesReady.value = false
+                            _uiState.update { it.copy(isLoading = !it.workoutsLoadFailed) }
+                        }
+                    }
                 }
-                // Selection has side effects; never run it inside a StateFlow.update retry lambda.
-                if (selected?.id != selectedId) loadWorkout(selected)
-            }
         }
     }
 
+    fun retryWorkouts() {
+        val state = _uiState.value
+        if (!state.workoutsLoadFailed || state.isLoading || _uiState.subscriptionCount.value == 0) return
+        _uiState.update { it.copy(isLoading = true, workoutsLoadFailed = false) }
+        routinesRetry.value += 1
+    }
+
     fun selectWorkout(workout: WorkoutEntity?) {
+        if (!routinesReady.value) return
+        if (workout != null && _uiState.value.workouts.none { it.id == workout.id }) return
         loadWorkout(workout)
     }
 
     fun retryWorkoutSelection(expectedWorkoutId: Int) {
         val state = _uiState.value
-        if (state.selectedWorkout?.id == expectedWorkoutId && state.selectionLoadFailed) {
+        if (routinesReady.value && state.selectedWorkout?.id == expectedWorkoutId && state.selectionLoadFailed) {
             loadWorkout(state.selectedWorkout, force = true)
         }
     }
@@ -369,6 +408,8 @@ class WorkoutViewModel(
 
         val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
+                // A post-finalization renewal may be requested after presentation has stopped.
+                routinesReady.first { it }
                 // iniciar ou obter a sessão
                 val session = repository.startOrGetSession(workout.id)
                 currentCoroutineContext().ensureActive()
@@ -383,36 +424,35 @@ class WorkoutViewModel(
 
                 // Presentation demand owns Room observation, not accepted durable commands.
                 // Keep this selection's session/history across tab changes; resume only its rows.
-                SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000)
-                    .command(_uiState.subscriptionCount).collectLatest { command ->
-                        if (command != SharingCommand.START) return@collectLatest
-                        observingSelection = true
-                        _uiState.update { it.copy(isSelectionLoading = true) }
-                        try {
-                            repository.getExercisesForWorkout(workout.id).distinctUntilChanged()
-                                .combine(repository.getSetsForSession(session.id).distinctUntilChanged()) { exercises, setLogs ->
-                                    buildExerciseModels(exercises, setLogs, previousSetsByKey)
-                                }
-                                .flowOn(modelDispatcher)
-                                .collect { exerciseModels ->
-                                    if (selectionToken !== token || _uiState.value.selectedWorkout?.id != workout.id ||
-                                        _uiState.value.activeSession?.id != session.id) return@collect
-                                    observedExerciseModels = exerciseModels
-                                    val displayed = displayedExerciseOrder(workout.id, exerciseModels)
-                                    _uiState.update { it.copy(exercises = displayed, isSelectionLoading = false) }
-                                    reconcileSetWrites(session.id, exerciseModels)
-                                    reconcileSetRemovals(session.id, exerciseModels)
-                                    reconcileExerciseEdits(exerciseModels)
-                                }
-                        } finally {
-                            if (selectionToken === token) {
-                                observingSelection = false
-                                observedExerciseModels = null
-                                releaseSavedAcknowledgements()
-                                _uiState.update { it.copy(isSelectionLoading = true) }
+                routinesReady.collectLatest { ready ->
+                    if (!ready) return@collectLatest
+                    observingSelection = true
+                    _uiState.update { it.copy(isSelectionLoading = true) }
+                    try {
+                        repository.getExercisesForWorkout(workout.id).distinctUntilChanged()
+                            .combine(repository.getSetsForSession(session.id).distinctUntilChanged()) { exercises, setLogs ->
+                                buildExerciseModels(exercises, setLogs, previousSetsByKey)
                             }
+                            .flowOn(modelDispatcher)
+                            .collect { exerciseModels ->
+                                if (selectionToken !== token || _uiState.value.selectedWorkout?.id != workout.id ||
+                                    _uiState.value.activeSession?.id != session.id) return@collect
+                                observedExerciseModels = exerciseModels
+                                val displayed = displayedExerciseOrder(workout.id, exerciseModels)
+                                _uiState.update { it.copy(exercises = displayed, isSelectionLoading = false) }
+                                reconcileSetWrites(session.id, exerciseModels)
+                                reconcileSetRemovals(session.id, exerciseModels)
+                                reconcileExerciseEdits(exerciseModels)
+                            }
+                    } finally {
+                        if (selectionToken === token) {
+                            observingSelection = false
+                            observedExerciseModels = null
+                            releaseSavedAcknowledgements()
+                            _uiState.update { it.copy(isSelectionLoading = true) }
                         }
                     }
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -473,20 +513,18 @@ class WorkoutViewModel(
     }
 
     fun createWorkout(name: String) {
+        if (!routinesReady.value) return
+        val count = _uiState.value.workouts.size
         viewModelScope.launch {
-            val count = _uiState.value.workouts.size
             repository.createWorkout(name, count)
         }
     }
 
     fun deleteWorkout(workout: WorkoutEntity) {
+        if (!routinesReady.value) return
         viewModelScope.launch {
             repository.deleteWorkout(workout)
-            if (_uiState.value.selectedWorkout == workout) {
-                // selecionar outro treino ou nenhum
-                val remaining = _uiState.value.workouts.filter { it.id != workout.id }
-                selectWorkout(remaining.firstOrNull())
-            }
+            // The next current routine-list emission owns replacement selection, including offscreen saves.
         }
     }
 
@@ -500,6 +538,7 @@ class WorkoutViewModel(
     }
 
     fun updateWorkoutRestTimer(seconds: Int) {
+        if (!routinesReady.value) return
         val currentWorkout = _uiState.value.selectedWorkout ?: return
         viewModelScope.launch {
             val updatedWorkout = currentWorkout.copy(defaultRestTimer = seconds)

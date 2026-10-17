@@ -179,7 +179,7 @@ fun WorkoutScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // barra superior para abas de treino
-            if (uiState.workouts.isNotEmpty()) {
+            if (!uiState.isLoading && !uiState.workoutsLoadFailed && uiState.workouts.isNotEmpty()) {
                 androidx.compose.foundation.lazy.LazyRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -233,7 +233,7 @@ fun WorkoutScreen(
                         }
                     }
                 }
-            } else {
+            } else if (!uiState.isLoading && !uiState.workoutsLoadFailed) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     contentAlignment = Alignment.Center
@@ -246,7 +246,22 @@ fun WorkoutScreen(
 
             // lista de exercícios
             val selectedWorkout = uiState.selectedWorkout
-            if (selectedWorkout != null && uiState.isSelectionLoading) {
+            if (uiState.isLoading) {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
+                }
+            } else if (uiState.workoutsLoadFailed) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(stringResource(com.example.baselift.R.string.workout_list_error), color = MediumGrey)
+                    TextButton(onClick = viewModel::retryWorkouts) {
+                        Text(stringResource(com.example.baselift.R.string.workout_selection_retry), color = NeonGreen)
+                    }
+                }
+            } else if (selectedWorkout != null && uiState.isSelectionLoading) {
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = NeonGreen)
                 }
@@ -543,7 +558,7 @@ fun WorkoutScreen(
                 .padding(16.dp)
         ) {
             // botão flutuante principal
-            FloatingActionButton(
+            if (!uiState.isLoading && !uiState.workoutsLoadFailed) FloatingActionButton(
                 onClick = { showAddWorkoutDialog = true },
                 modifier = Modifier.align(Alignment.BottomEnd).size(56.dp),
                 containerColor = NeonGreen,
@@ -591,6 +606,7 @@ fun WorkoutScreen(
         Dialog(onDismissRequest = { showAddWorkoutDialog = false }) {
             GenericInputDialog(
                 title = stringResource(com.example.baselift.R.string.workout_new_routine),
+                confirmEnabled = !uiState.isLoading && !uiState.workoutsLoadFailed,
                 content = {
                     BasicTextField(
                         value = newWorkoutName,
@@ -600,7 +616,7 @@ fun WorkoutScreen(
                     )
                 },
                 onConfirm = {
-                    if (newWorkoutName.isNotBlank()) {
+                    if (newWorkoutName.isNotBlank() && !uiState.isLoading && !uiState.workoutsLoadFailed) {
                         viewModel.createWorkout(newWorkoutName)
                         showAddWorkoutDialog = false
                     }
@@ -618,6 +634,8 @@ fun WorkoutScreen(
         Dialog(onDismissRequest = { showAddExerciseDialog = false }) {
             GenericInputDialog(
                 title = stringResource(com.example.baselift.R.string.workout_add_exercise),
+                confirmEnabled = !uiState.isLoading && !uiState.workoutsLoadFailed &&
+                    !uiState.isSelectionLoading && !uiState.selectionLoadFailed,
                 content = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(com.example.baselift.R.string.workout_ex_name), color = MediumGrey, fontSize = 12.sp)
@@ -644,7 +662,8 @@ fun WorkoutScreen(
                     }
                 },
                 onConfirm = {
-                    if (exName.isNotBlank()) {
+                    if (exName.isNotBlank() && !uiState.isLoading && !uiState.workoutsLoadFailed &&
+                        !uiState.isSelectionLoading && !uiState.selectionLoadFailed) {
                         viewModel.createExercise(exName, exEquipment, exMuscles)
                         showAddExerciseDialog = false
                     }

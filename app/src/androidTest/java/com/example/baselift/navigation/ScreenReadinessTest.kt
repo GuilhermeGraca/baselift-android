@@ -80,9 +80,9 @@ class ScreenReadinessTest {
     fun workoutWaitsForRealHistoryAndPublishesRowsWhenItArrives() {
         val historyReady = CompletableDeferred<Unit>()
         val vm = workoutViewModel(historyReady)
-        compose.waitUntil(5_000) { vm.uiState.value.activeSession != null }
         compose.mainClock.autoAdvance = false
         compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
+        compose.waitUntil(5_000) { vm.uiState.value.activeSession != null }
         val enteredAt = compose.mainClock.currentTime
         compose.onNodeWithText("Bench").assertDoesNotExist()
         historyReady.complete(Unit)
@@ -133,8 +133,8 @@ class ScreenReadinessTest {
             attempts.incrementAndGet()
             if (fail.getAndSet(false)) error("injected history failure")
         })
-        compose.waitUntil(5_000) { vm.uiState.value.selectionLoadFailed }
         compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
+        compose.waitUntil(5_000) { vm.uiState.value.selectionLoadFailed }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         compose.onNodeWithText(context.getString(R.string.workout_selection_error)).assertIsDisplayed()
         compose.onNodeWithText("Bench").assertDoesNotExist()

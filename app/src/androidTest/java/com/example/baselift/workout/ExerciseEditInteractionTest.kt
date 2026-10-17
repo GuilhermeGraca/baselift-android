@@ -77,6 +77,7 @@ class ExerciseEditInteractionTest {
         }
         compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
         compose.waitUntil(5_000) { vm.uiState.value.exercises.isNotEmpty() }
+        compose.onNodeWithContentDescription("Options").assertIsDisplayed()
         compose.mainClock.autoAdvance = false
         return vm
     }

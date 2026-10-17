@@ -105,9 +105,9 @@ class WorkoutSubscriptionsTest {
     }
     private fun ids() = vm.uiState.value.exercises.map { it.exercise.id }
 
-    @Test fun `startup recovers selection but does not observe rows without presentation demand`() = runTest {
+    @Test fun `startup defers selection and row observation until presentation demand`() = runTest {
         prepare(); runCurrent()
-        assertEquals(1, source.sessions); assertEquals(1, source.histories)
+        assertEquals(0, source.sessions); assertEquals(0, source.histories)
         assertEquals(0, source.exerciseStarts); assertEquals(0, source.setStarts)
         assertTrue(vm.uiState.value.exercises.isEmpty())
         watch(); runCurrent()
@@ -275,7 +275,7 @@ class WorkoutSubscriptionsTest {
         assertEquals("Incline", vm.uiState.value.exercises.first().exercise.name)
     }
 
-    @Test fun `accepted finalization while paused renews the session without starting row queries`() = runTest {
+    @Test fun `accepted finalization while paused saves then defers session renewal until return`() = runTest {
         prepare(); val observer = watch(); runCurrent()
         vm.logSet(1, 1, 80f, 10, true); runCurrent()
         val oldSession = vm.uiState.value.activeSession!!
@@ -283,7 +283,9 @@ class WorkoutSubscriptionsTest {
         vm.finalizeWorkout(); runCurrent(); stop(observer)
         gate.complete(Unit); runCurrent()
         assertFalse(vm.uiState.value.isFinalizing); assertFalse(vm.uiState.value.finalizationFailed)
-        assertNotEquals(oldSession.id, vm.uiState.value.activeSession?.id)
+        assertNull(vm.uiState.value.activeSession)
+        assertEquals(oldSession.id, vm.uiState.value.finalizedSessionId)
+        assertEquals(1, source.sessions); assertEquals(1, source.histories)
         assertEquals(0, source.activeExercises); assertEquals(1, source.exerciseStarts)
         watch(); runCurrent()
         assertEquals(80f, vm.uiState.value.exercises.first().sets.first().prevWeight!!, 0f)
@@ -291,12 +293,15 @@ class WorkoutSubscriptionsTest {
         assertEquals(2, source.sessions); assertEquals(2, source.histories)
     }
 
-    @Test fun `routine changes while paused observe only the current selection on return`() = runTest {
+    @Test fun `stale routine callbacks while paused are ignored until current routines return`() = runTest {
         prepare(); val observer = watch(); runCurrent(); stop(observer)
         val legs = repository.allWorkouts.first().single { it.id == 2 }
         vm.selectWorkout(legs); runCurrent()
         assertEquals(0, source.activeExercises); assertEquals(1, source.exerciseStarts)
         watch(); runCurrent()
+        assertEquals(listOf(1, 2, 3), ids())
+        assertEquals(1, source.sessions)
+        vm.selectWorkout(legs); runCurrent()
         assertEquals(listOf(4), ids()); assertEquals(2, vm.uiState.value.activeSession?.workoutId)
         assertEquals(2, source.sessions); assertEquals(2, source.histories)
     }
