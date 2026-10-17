@@ -439,7 +439,7 @@ Isto permitiu usar a app a sério durante o desenvolvimento, o que revelou probl
 - **Índices na base de dados** (migração v9→v10): em `timestamp`, `isCompleted`, etc., para acelerar queries históricas
 - **Cache de queries** no `WorkoutViewModel` (`previousSetsCache`) para evitar N+1 queries ao reconstruir o estado dos exercícios
 - **`flowOn(Dispatchers.IO / Default)`** em todos os flows pesados para não bloquear a Main Thread
-- **Subscrições ligadas à apresentação**: Dashboard e históricos de peso/fotos do Insights usam `WhileSubscribed(1_000)` para parar o trabalho a montante após um segundo sem observadores, mantendo o último estado. O perfil partilhado continua disponível para o cabeçalho e navegação. `Lazily`, ainda usado noutros fluxos, adia o primeiro arranque mas não cancela a coleção quando os observadores saem; Nutrition e os coletores de apresentação do Workout ainda precisam dessa revisão.
+- **Subscrições ligadas à apresentação**: Dashboard, históricos de peso/fotos do Insights e estado de apresentação da Nutrition usam `WhileSubscribed(1_000)` para parar o trabalho a montante após um segundo sem observadores, mantendo o último estado. O perfil partilhado continua disponível para o cabeçalho e navegação. Na Nutrition, registos, templates e metas voltam a ser observados ao regressar; a consulta diária é reconstruída e os comandos de registo/eliminação mantêm o seu próprio scope. `Lazily`, ainda usado noutros fluxos, adia o primeiro arranque mas não cancela a coleção quando os observadores saem; os coletores de apresentação do Workout ainda precisam dessa revisão.
 - **Limpeza de `systemBarsPadding()`** globais para eliminar espaços em branco desnecessários no Dashboard e Insights
 
 ---

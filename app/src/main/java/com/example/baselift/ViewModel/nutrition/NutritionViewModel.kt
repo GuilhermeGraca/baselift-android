@@ -81,7 +81,7 @@ class NutritionViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Lazily,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000),
         initialValue = NutritionUiState()
     )
 
