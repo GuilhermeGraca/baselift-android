@@ -78,6 +78,20 @@ fun WorkoutScreen(
     }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+
+    val reorderErrorWorkoutId = uiState.selectedWorkout?.id?.takeIf { it in uiState.reorderFailedWorkoutIds }
+    if (reorderErrorWorkoutId != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissReorderError(reorderErrorWorkoutId) },
+            title = { Text(stringResource(com.example.baselift.R.string.workout_reorder_error_title)) },
+            text = { Text(stringResource(com.example.baselift.R.string.workout_reorder_error_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissReorderError(reorderErrorWorkoutId) }) {
+                    Text(stringResource(com.example.baselift.R.string.workout_finalize_error_dismiss))
+                }
+            }
+        )
+    }
     
     if (uiState.finalizationFailed) {
         AlertDialog(
@@ -322,7 +336,10 @@ fun WorkoutScreen(
                                                     val targetViewportY = (initialDraggedItemOffset + draggedOffset).toInt()
 
                                                     if (draggedIndex != dropIdx) {
-                                                        viewModel.moveExercise(draggedIndex!!, dropIdx)
+                                                        viewModel.moveExercise(
+                                                            draggedIndex!!, dropIdx, selectedWorkout.id,
+                                                            exerciseModel.exercise.id
+                                                        )
                                                     }
 
                                                     settlementJob?.cancel()

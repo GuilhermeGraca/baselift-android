@@ -14,6 +14,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import androidx.compose.runtime.Stable
 
 @Stable
@@ -52,7 +54,8 @@ data class WorkoutUiState(
     val setAddFailed: Boolean = false,
     val pendingSetRemovals: Set<SetWriteKey> = emptySet(),
     val addingSetExerciseIds: Set<Int> = emptySet(),
-    val setRemovalFailed: Boolean = false
+    val setRemovalFailed: Boolean = false,
+    val reorderFailedWorkoutIds: Set<Int> = emptySet()
 )
 
 class WorkoutViewModel(
@@ -72,6 +75,78 @@ class WorkoutViewModel(
     private class PendingSetRemoval { var saved = false }
     private val pendingSetRemovals = mutableMapOf<SetWriteKey, PendingSetRemoval>()
     private val pendingSetAdds = mutableMapOf<Int, Int>()
+
+    private class PendingReorder(val exercises: List<ExerciseEntity>) {
+        val rankById = exercises.associate { it.id to it.orderIndex }
+        var saved = false
+    }
+
+    // One durable worker per routine; only its newest unsaved order is queued.
+    private val pendingReorders = mutableMapOf<Int, PendingReorder>()
+    private val reorderJobs = mutableMapOf<Int, Job>()
+    private var observedExerciseModels: List<ExerciseUiModel>? = null
+
+    private fun displayedExerciseOrder(workoutId: Int, models: List<ExerciseUiModel>): List<ExerciseUiModel> {
+        val pending = pendingReorders[workoutId] ?: return models
+        if (pending.saved && models.all { model ->
+                pending.rankById[model.exercise.id]?.let { it == model.exercise.orderIndex } ?: true
+            }) {
+            pendingReorders.remove(workoutId)
+            return models
+        }
+        // Sort fresh models, retaining incoming set/metadata changes and newly added rows.
+        return models.sortedBy { pending.rankById[it.exercise.id] ?: Int.MAX_VALUE }
+    }
+
+    private fun refreshDisplayedExerciseOrder(workoutId: Int) {
+        if (_uiState.value.selectedWorkout?.id != workoutId) return
+        val models = observedExerciseModels ?: return
+        val displayed = displayedExerciseOrder(workoutId, models)
+        _uiState.update { it.copy(exercises = displayed) }
+    }
+
+    private fun startReorderWorker(workoutId: Int) {
+        if (workoutId in reorderJobs) return
+        // Register before starting: an immediate repository can finish without suspending.
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                while (true) {
+                    val request = pendingReorders[workoutId]?.takeUnless { it.saved } ?: break
+                    try {
+                        repository.reorderExercises(request.exercises)
+                        request.saved = true
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // A superseded failure must not discard or interrupt the newer intent.
+                        if (pendingReorders[workoutId] === request) {
+                            pendingReorders.remove(workoutId)
+                            _uiState.update {
+                                it.copy(reorderFailedWorkoutIds = it.reorderFailedWorkoutIds + workoutId)
+                            }
+                            refreshDisplayedExerciseOrder(workoutId)
+                        }
+                    }
+                    if (pendingReorders[workoutId] === request && request.saved) {
+                        if (_uiState.value.selectedWorkout?.id == workoutId) {
+                            refreshDisplayedExerciseOrder(workoutId)
+                        } else {
+                            // Returning to this routine will query its saved order afresh.
+                            pendingReorders.remove(workoutId)
+                        }
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                pendingReorders.remove(workoutId)
+                refreshDisplayedExerciseOrder(workoutId)
+                throw cancelled
+            } finally {
+                reorderJobs.remove(workoutId)
+            }
+        }
+        reorderJobs[workoutId] = job
+        job.start()
+    }
 
     private fun hasPendingSetRemoval(exerciseId: Int): Boolean =
         pendingSetRemovals.keys.any { it.exerciseId == exerciseId }
@@ -174,6 +249,8 @@ class WorkoutViewModel(
         // In-flight commands keep their guards and remain owned by the ViewModel.
         pendingSetWrites.entries.removeAll { it.value.saved }
         pendingSetRemovals.entries.removeAll { it.value.saved }
+        pendingReorders.entries.removeAll { it.value.saved }
+        observedExerciseModels = null
         _uiState.update {
             it.copy(selectedWorkout = workout, activeSession = null, exercises = emptyList(),
                 pendingSetWrites = pendingSetWrites.keys.toSet(),
@@ -196,7 +273,11 @@ class WorkoutViewModel(
                 }
                 .flowOn(modelDispatcher)
                 .collect { exerciseModels ->
-                    _uiState.update { it.copy(exercises = exerciseModels) }
+                    if (_uiState.value.selectedWorkout?.id != workout.id ||
+                        _uiState.value.activeSession?.id != session.id) return@collect
+                    observedExerciseModels = exerciseModels
+                    val displayed = displayedExerciseOrder(workout.id, exerciseModels)
+                    _uiState.update { it.copy(exercises = displayed) }
                     reconcileSetWrites(session.id, exerciseModels)
                     reconcileSetRemovals(session.id, exerciseModels)
                 }
@@ -426,23 +507,31 @@ class WorkoutViewModel(
     fun dismissSetSaveError() {
         _uiState.update { it.copy(setSaveFailed = false) }
     }
-    fun moveExercise(from: Int, to: Int) {
-        val currentExercises = _uiState.value.exercises.toMutableList()
-        if (from in currentExercises.indices && to in currentExercises.indices) {
-            val item = currentExercises.removeAt(from)
-            currentExercises.add(to, item)
-            
-            // Atualizar UI imediatamente
-            _uiState.update { it.copy(exercises = currentExercises) }
-            
-            // Guardar ordem na base de dados garantindo que usamos a lista certa
-            viewModelScope.launch {
-                val updatedEntities = currentExercises.mapIndexed { index, uiModel ->
-                    uiModel.exercise.copy(orderIndex = index)
-                }
-                repository.reorderExercises(updatedEntities)
-            }
+    fun moveExercise(
+        from: Int,
+        to: Int,
+        expectedWorkoutId: Int? = _uiState.value.selectedWorkout?.id,
+        expectedExerciseId: Int? = null
+    ) {
+        val state = _uiState.value
+        val workoutId = state.selectedWorkout?.id ?: return
+        val currentExercises = state.exercises.toMutableList()
+        if (workoutId != expectedWorkoutId || from !in currentExercises.indices ||
+            to !in currentExercises.indices || from == to ||
+            (expectedExerciseId != null && currentExercises[from].exercise.id != expectedExerciseId)) return
+        val item = currentExercises.removeAt(from)
+        currentExercises.add(to, item)
+        pendingReorders[workoutId] = PendingReorder(currentExercises.mapIndexed { index, model ->
+            model.exercise.copy(orderIndex = index)
+        })
+        _uiState.update {
+            it.copy(exercises = currentExercises, reorderFailedWorkoutIds = it.reorderFailedWorkoutIds - workoutId)
         }
+        startReorderWorker(workoutId)
+    }
+
+    fun dismissReorderError(workoutId: Int) {
+        _uiState.update { it.copy(reorderFailedWorkoutIds = it.reorderFailedWorkoutIds - workoutId) }
     }
 
     fun finalizeWorkout(expectedSessionId: Int? = _uiState.value.activeSession?.id) {
