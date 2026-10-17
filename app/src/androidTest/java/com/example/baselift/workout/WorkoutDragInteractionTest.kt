@@ -83,8 +83,8 @@ class WorkoutDragInteractionTest {
     fun dragPersistsOrderAndSwitchingRoutinesKeepsEachListsIdentity() {
         val vm = prepare()
         val dao = database!!.workoutDao()
-        compose.waitUntil(5_000) { vm.uiState.value.exercises.size == 3 }
         compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
+        compose.waitUntil(5_000) { vm.uiState.value.exercises.size == 3 }
         dragBench()
         compose.waitUntil(5_000) { vm.uiState.value.exercises.first().exercise.id != 1 }
         val reordered = vm.uiState.value.exercises.map { it.exercise.id }
@@ -106,8 +106,8 @@ class WorkoutDragInteractionTest {
         val vm = prepare()
         val dao = database!!.workoutDao()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        compose.waitUntil(5_000) { vm.uiState.value.exercises.size == 3 }
         compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
+        compose.waitUntil(5_000) { vm.uiState.value.exercises.size == 3 }
         compose.runOnIdle {
             vm.updateDraftWeight(1, 1, "80")
             vm.updateDraftReps(1, 1, "10")

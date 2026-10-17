@@ -75,9 +75,9 @@ class ExerciseEditInteractionTest {
             store.put("workout", vm)
             vm.updateDraftWeight(1, 2, "75")
         }
+        compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
         compose.waitUntil(5_000) { vm.uiState.value.exercises.isNotEmpty() }
         compose.mainClock.autoAdvance = false
-        compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
         return vm
     }
 

@@ -8,6 +8,7 @@ import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
 import com.example.baselift.fakes.FakeWorkoutRepository
+import com.example.baselift.helpers.observeForTest
 import com.example.baselift.helpers.MainDispatcherRule
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
@@ -55,7 +56,7 @@ class WorkoutViewModelTest {
 
     private fun initViewModel(source: IWorkoutRepository = repository) {
         viewModel = WorkoutViewModel(source, modelDispatcher = mainDispatcherRule.testDispatcher)
-        viewModelStore.put("workout", viewModel)
+        viewModelStore.put("workout", viewModel); viewModel.observeForTest()
     }
 
     private class HistoryCountingRepository(

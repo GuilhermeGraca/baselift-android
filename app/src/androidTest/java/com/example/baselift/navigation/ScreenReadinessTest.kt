@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -25,6 +26,8 @@ import com.example.baselift.ViewModel.dashboard.ExerciseCharts
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -50,10 +53,15 @@ class ScreenReadinessTest {
     @Test
     fun readyWorkoutAppearsWithoutAClockAdvanceAndAfterReturning() {
         val vm = workoutViewModel()
+        lateinit var warmObserver: kotlinx.coroutines.Job
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            warmObserver = vm.viewModelScope.launch { vm.uiState.collect {} }
+        }
         compose.waitUntil(5_000) { vm.uiState.value.exercises.isNotEmpty() }
         val visible = mutableStateOf(true)
         compose.mainClock.autoAdvance = false
         compose.setContent { MaterialTheme { if (visible.value) WorkoutScreen(vm) } }
+        compose.runOnIdle { warmObserver.cancel() }
         val enteredAt = compose.mainClock.currentTime
         compose.onNodeWithText("Bench").assertIsDisplayed()
         assertEquals(enteredAt, compose.mainClock.currentTime)

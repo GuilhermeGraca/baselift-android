@@ -5,6 +5,7 @@ import com.example.baselift.Model.local.entity.ExerciseEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
 import com.example.baselift.fakes.FakeWorkoutRepository
+import com.example.baselift.helpers.observeForTest
 import com.example.baselift.helpers.MainDispatcherRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -58,7 +59,7 @@ class WorkoutExerciseEditTest {
         repository.createExercise(legs, "Squat", "Barbell", "Legs", 0)
         source = ControlledEdit(repository)
         vm = WorkoutViewModel(source, main.testDispatcher)
-        store.put("workout", vm)
+        store.put("workout", vm); vm.observeForTest()
     }
 
     private fun edit(id: Int = 1) = vm.uiState.value.exerciseEdits.getValue(id)

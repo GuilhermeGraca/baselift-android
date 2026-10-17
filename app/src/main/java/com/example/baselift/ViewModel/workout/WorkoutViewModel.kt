@@ -118,6 +118,7 @@ class WorkoutViewModel(
     }
 
     fun beginExerciseEdit(exerciseId: Int) {
+        if (!hasCurrentExerciseModels()) return
         val row = _uiState.value.exercises.find { it.exercise.id == exerciseId }?.exercise ?: return
         _uiState.update { state ->
             val draft = state.exerciseEdits[exerciseId] ?: ExerciseEditState(
@@ -163,6 +164,18 @@ class WorkoutViewModel(
     private val pendingReorders = mutableMapOf<Int, PendingReorder>()
     private val reorderJobs = mutableMapOf<Int, Job>()
     private var observedExerciseModels: List<ExerciseUiModel>? = null
+    private var observingSelection = false
+
+    private fun hasCurrentExerciseModels() = observingSelection && observedExerciseModels != null
+
+    private fun releaseSavedAcknowledgements() {
+        pendingSetWrites.entries.removeAll { it.value.saved }
+        pendingSetRemovals.entries.removeAll { it.value.saved }
+        pendingReorders.entries.removeAll { it.value.saved }
+        pendingExerciseEdits.filterValues { it.saved }.keys.toList().forEach(::finishExerciseEdit)
+        _uiState.update { it.copy(pendingSetWrites = pendingSetWrites.keys.toSet(),
+            pendingSetRemovals = pendingSetRemovals.keys.toSet()) }
+    }
 
     private fun displayedExerciseOrder(workoutId: Int, models: List<ExerciseUiModel>): List<ExerciseUiModel> {
         val pending = pendingReorders[workoutId] ?: return models
@@ -206,7 +219,7 @@ class WorkoutViewModel(
                         }
                     }
                     if (pendingReorders[workoutId] === request && request.saved) {
-                        if (_uiState.value.selectedWorkout?.id == workoutId) {
+                        if (_uiState.value.selectedWorkout?.id == workoutId && observingSelection) {
                             refreshDisplayedExerciseOrder(workoutId)
                         } else {
                             // Returning to this routine will query its saved order afresh.
@@ -340,10 +353,8 @@ class WorkoutViewModel(
         selectWorkoutJob?.cancel()
         // Saved rows no longer need a UI acknowledgement when this selection discards them.
         // In-flight commands keep their guards and remain owned by the ViewModel.
-        pendingSetWrites.entries.removeAll { it.value.saved }
-        pendingSetRemovals.entries.removeAll { it.value.saved }
-        pendingReorders.entries.removeAll { it.value.saved }
-        pendingExerciseEdits.filterValues { it.saved }.keys.toList().forEach(::finishExerciseEdit)
+        observingSelection = false
+        releaseSavedAcknowledgements()
         observedExerciseModels = null
         _uiState.update {
             it.copy(selectedWorkout = workout, activeSession = null, exercises = emptyList(),
@@ -370,21 +381,37 @@ class WorkoutViewModel(
                 if (selectionToken !== token) return@launch
                 val previousSetsByKey = previousSets.associateBy { it.exerciseId to it.setNumber }
 
-                // observar exercícios para este treino
-                repository.getExercisesForWorkout(workout.id).distinctUntilChanged()
-                    .combine(repository.getSetsForSession(session.id).distinctUntilChanged()) { exercises, setLogs ->
-                        buildExerciseModels(exercises, setLogs, previousSetsByKey)
-                    }
-                    .flowOn(modelDispatcher)
-                    .collect { exerciseModels ->
-                        if (selectionToken !== token || _uiState.value.selectedWorkout?.id != workout.id ||
-                            _uiState.value.activeSession?.id != session.id) return@collect
-                        observedExerciseModels = exerciseModels
-                        val displayed = displayedExerciseOrder(workout.id, exerciseModels)
-                        _uiState.update { it.copy(exercises = displayed, isSelectionLoading = false) }
-                        reconcileSetWrites(session.id, exerciseModels)
-                        reconcileSetRemovals(session.id, exerciseModels)
-                        reconcileExerciseEdits(exerciseModels)
+                // Presentation demand owns Room observation, not accepted durable commands.
+                // Keep this selection's session/history across tab changes; resume only its rows.
+                SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000)
+                    .command(_uiState.subscriptionCount).collectLatest { command ->
+                        if (command != SharingCommand.START) return@collectLatest
+                        observingSelection = true
+                        _uiState.update { it.copy(isSelectionLoading = true) }
+                        try {
+                            repository.getExercisesForWorkout(workout.id).distinctUntilChanged()
+                                .combine(repository.getSetsForSession(session.id).distinctUntilChanged()) { exercises, setLogs ->
+                                    buildExerciseModels(exercises, setLogs, previousSetsByKey)
+                                }
+                                .flowOn(modelDispatcher)
+                                .collect { exerciseModels ->
+                                    if (selectionToken !== token || _uiState.value.selectedWorkout?.id != workout.id ||
+                                        _uiState.value.activeSession?.id != session.id) return@collect
+                                    observedExerciseModels = exerciseModels
+                                    val displayed = displayedExerciseOrder(workout.id, exerciseModels)
+                                    _uiState.update { it.copy(exercises = displayed, isSelectionLoading = false) }
+                                    reconcileSetWrites(session.id, exerciseModels)
+                                    reconcileSetRemovals(session.id, exerciseModels)
+                                    reconcileExerciseEdits(exerciseModels)
+                                }
+                        } finally {
+                            if (selectionToken === token) {
+                                observingSelection = false
+                                observedExerciseModels = null
+                                releaseSavedAcknowledgements()
+                                _uiState.update { it.copy(isSelectionLoading = true) }
+                            }
+                        }
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -464,6 +491,7 @@ class WorkoutViewModel(
     }
 
     fun createExercise(name: String, equipment: String, muscleGroups: String) {
+        if (!hasCurrentExerciseModels()) return
         val currentWorkoutId = _uiState.value.selectedWorkout?.id ?: return
         viewModelScope.launch {
             val count = _uiState.value.exercises.size
@@ -484,6 +512,7 @@ class WorkoutViewModel(
     }
 
     fun addSetToExercise(exerciseId: Int) {
+        if (!hasCurrentExerciseModels()) return
         if (hasPendingSetRemoval(exerciseId)) return
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
         pendingSetAdds[exerciseId] = pendingSetAdds.getOrDefault(exerciseId, 0) + 1
@@ -514,6 +543,7 @@ class WorkoutViewModel(
         expectedSessionId: Int? = _uiState.value.activeSession?.id
     ) {
         val state = _uiState.value
+        if (!hasCurrentExerciseModels()) return
         if (hasPendingSetWrite(exerciseId) || hasPendingSetRemoval(exerciseId) ||
             exerciseId in pendingSetAdds || state.isFinalizing) return
         val session = state.activeSession ?: return
@@ -536,8 +566,8 @@ class WorkoutViewModel(
                     // Keep drafts through failure; clear only the set the transaction actually removed.
                     draftWeights.remove(draftKey(exerciseId, number))
                     draftReps.remove(draftKey(exerciseId, number))
-                    if (_uiState.value.activeSession?.id == session.id) {
-                        reconcileSetRemovals(session.id, _uiState.value.exercises)
+                    if (_uiState.value.activeSession?.id == session.id && observingSelection) {
+                        observedExerciseModels?.let { reconcileSetRemovals(session.id, it) }
                     } else {
                         removePendingSetRemoval(key)
                     }
@@ -559,6 +589,7 @@ class WorkoutViewModel(
     }
 
     fun deleteExercise(exerciseId: Int) {
+        if (!hasCurrentExerciseModels()) return
         if (hasPendingSetWrite(exerciseId) || hasPendingSetRemoval(exerciseId) ||
             exerciseId in pendingSetAdds || exerciseId in pendingExerciseEdits || _uiState.value.isFinalizing) return
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
@@ -573,6 +604,7 @@ class WorkoutViewModel(
     }
 
     fun updateExercise(exerciseId: Int, name: String, equipment: String, muscleGroups: String) {
+        if (!hasCurrentExerciseModels()) return
         if (name.isBlank() || exerciseId in pendingExerciseEdits) return
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
         val draft = ExerciseEditState(exerciseId, exModel.exercise.workoutId, name, equipment, muscleGroups,
@@ -585,7 +617,7 @@ class WorkoutViewModel(
                 repository.updateExercise(exModel.exercise, name, equipment, muscleGroups)
                 request.saved = true
                 if (_uiState.value.selectedWorkout?.id != draft.workoutId ||
-                    _uiState.value.selectionLoadFailed) {
+                    _uiState.value.selectionLoadFailed || !observingSelection) {
                     finishExerciseEdit(exerciseId)
                 } else {
                     observedExerciseModels?.let(::reconcileExerciseEdits)
@@ -618,6 +650,7 @@ class WorkoutViewModel(
         expectedSessionId: Int? = _uiState.value.activeSession?.id
     ) {
         val state = _uiState.value
+        if (!hasCurrentExerciseModels()) return
         val session = state.activeSession ?: return
         if (state.isFinalizing || session.id != expectedSessionId || hasPendingSetWrite(exerciseId) ||
             hasPendingSetRemoval(exerciseId)) return
@@ -643,8 +676,8 @@ class WorkoutViewModel(
                     existingSetId = set.currentLog?.id ?: 0
                 )
                 write.saved = true
-                if (_uiState.value.activeSession?.id == session.id) {
-                    reconcileSetWrites(session.id, _uiState.value.exercises)
+                if (_uiState.value.activeSession?.id == session.id && observingSelection) {
+                    observedExerciseModels?.let { reconcileSetWrites(session.id, it) }
                 } else {
                     // This session has no visible rows; its next selection reloads Room.
                     removePendingSetWrite(key)
@@ -669,6 +702,7 @@ class WorkoutViewModel(
         expectedExerciseId: Int? = null
     ) {
         val state = _uiState.value
+        if (!hasCurrentExerciseModels()) return
         val workoutId = state.selectedWorkout?.id ?: return
         val currentExercises = state.exercises.toMutableList()
         if (workoutId != expectedWorkoutId || from !in currentExercises.indices ||
@@ -690,6 +724,7 @@ class WorkoutViewModel(
     }
 
     fun finalizeWorkout(expectedSessionId: Int? = _uiState.value.activeSession?.id) {
+        if (!hasCurrentExerciseModels()) return
         val state = _uiState.value
         val session = state.activeSession ?: return
         // Reject duplicate taps, including callbacks from the previous session's UI.

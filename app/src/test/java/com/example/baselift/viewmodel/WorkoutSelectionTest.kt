@@ -7,6 +7,7 @@ import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
 import com.example.baselift.fakes.FakeWorkoutRepository
+import com.example.baselift.helpers.observeForTest
 import com.example.baselift.helpers.MainDispatcherRule
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -69,7 +70,7 @@ class WorkoutSelectionTest {
 
     private fun start() {
         vm = WorkoutViewModel(source, main.testDispatcher)
-        store.put("workout", vm)
+        store.put("workout", vm); vm.observeForTest()
     }
 
     private suspend fun select(id: Int) = vm.selectWorkout(repository.allWorkouts.first().single { it.id == id })
@@ -283,7 +284,7 @@ class WorkoutSelectionTest {
             }
         }
         vm = WorkoutViewModel(delayed, main.testDispatcher)
-        store.put("workout", vm); runCurrent()
+        store.put("workout", vm); vm.observeForTest(); runCurrent()
         vm.updateWorkoutRestTimer(60); runCurrent()
         select(2); runCurrent()
         val session = vm.uiState.value.activeSession

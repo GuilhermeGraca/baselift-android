@@ -6,6 +6,7 @@ import com.example.baselift.Model.local.entity.SetLogEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
 import com.example.baselift.fakes.FakeWorkoutRepository
+import com.example.baselift.helpers.observeForTest
 import com.example.baselift.helpers.MainDispatcherRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -79,7 +80,7 @@ class WorkoutSetRemovalTest {
 
     private fun initialize(source: IWorkoutRepository) {
         vm = WorkoutViewModel(source, main.testDispatcher)
-        store.put("workout", vm)
+        store.put("workout", vm); vm.observeForTest()
     }
 
     @Test fun `duplicate removal is guarded through persistence and clears only successful drafts`() = runTest {
