@@ -17,6 +17,7 @@ import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
 import com.example.baselift.Model.repository.WorkoutRepository
+import com.example.baselift.R
 import com.example.baselift.View.dashboard.DashboardScreen
 import com.example.baselift.View.workout.WorkoutScreen
 import com.example.baselift.ViewModel.dashboard.DashboardUiState
@@ -31,6 +32,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(AndroidJUnit4::class)
 class ScreenReadinessTest {
@@ -114,7 +117,43 @@ class ScreenReadinessTest {
         assertEquals(0, chartRequests)
     }
 
-    private fun workoutViewModel(historyReady: CompletableDeferred<Unit>? = null): WorkoutViewModel {
+    @Test
+    fun selectionFailureCanRetryWithRetainedInputsAndRepeatedRoutineTapsDoNotReload() {
+        val fail = AtomicBoolean(true)
+        val attempts = AtomicInteger()
+        val vm = workoutViewModel(historyAction = {
+            attempts.incrementAndGet()
+            if (fail.getAndSet(false)) error("injected history failure")
+        })
+        compose.waitUntil(5_000) { vm.uiState.value.selectionLoadFailed }
+        compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        compose.onNodeWithText(context.getString(R.string.workout_selection_error)).assertIsDisplayed()
+        compose.onNodeWithText("Bench").assertDoesNotExist()
+        compose.runOnIdle {
+            vm.updateDraftWeight(1, 1, "80")
+            vm.updateDraftReps(1, 1, "10")
+        }
+        compose.onNodeWithText(context.getString(R.string.workout_selection_retry)).performClick()
+        compose.waitUntil(5_000) { vm.uiState.value.exercises.isNotEmpty() }
+        compose.onNodeWithText("Bench").assertIsDisplayed()
+        compose.onNodeWithText("80").assertIsDisplayed()
+        compose.onNodeWithText("10").assertIsDisplayed()
+        val session = vm.uiState.value.activeSession
+        repeat(4) { compose.onNodeWithText("PUSH").performTouchInput { click() } }
+        compose.runOnIdle {
+            assertEquals(2, attempts.get())
+            assertEquals(session, vm.uiState.value.activeSession)
+            assertEquals("80", vm.getDraftWeight(1, 1))
+            assertEquals("10", vm.getDraftReps(1, 1))
+        }
+        compose.onNodeWithText(context.getString(R.string.workout_selection_error)).assertDoesNotExist()
+    }
+
+    private fun workoutViewModel(
+        historyReady: CompletableDeferred<Unit>? = null,
+        historyAction: () -> Unit = {}
+    ): WorkoutViewModel {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         database = db
@@ -130,6 +169,7 @@ class ScreenReadinessTest {
             override suspend fun startOrGetSession(workoutId: Int) = dao.getActiveSession(workoutId)!!
             override suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity> {
                 historyReady?.await()
+                historyAction()
                 return real.getPreviousSetsForWorkout(workoutId)
             }
         }

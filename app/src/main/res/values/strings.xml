@@ -73,6 +73,8 @@
     <string name="workout_set_remove_error_message">The set could not be removed. Your inputs have been kept. If the set list changed, select the current last set and try again.</string>
     <string name="workout_reorder_error_title">Unable to save exercise order</string>
     <string name="workout_reorder_error_message">The exercise order could not be saved. Your sets and inputs have been kept. Please drag the exercises again to retry.</string>
+    <string name="workout_selection_error">Unable to load this routine. Your saved sets and inputs have been kept.</string>
+    <string name="workout_selection_retry">Retry loading</string>
     <string name="workout_new_routine">NEW ROUTINE</string>
     <string name="workout_add_exercise">ADD EXERCISE</string>
     <string name="workout_ex_name">Exercise Name</string>

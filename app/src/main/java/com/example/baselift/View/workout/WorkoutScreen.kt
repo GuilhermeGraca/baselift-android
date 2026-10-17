@@ -231,7 +231,22 @@ fun WorkoutScreen(
 
             // lista de exercícios
             val selectedWorkout = uiState.selectedWorkout
-            if (selectedWorkout != null) {
+            if (selectedWorkout != null && uiState.isSelectionLoading) {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonGreen)
+                }
+            } else if (selectedWorkout != null && uiState.selectionLoadFailed) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(stringResource(com.example.baselift.R.string.workout_selection_error), color = MediumGrey)
+                    TextButton(onClick = { viewModel.retryWorkoutSelection(selectedWorkout.id) }) {
+                        Text(stringResource(com.example.baselift.R.string.workout_selection_retry), color = NeonGreen)
+                    }
+                }
+            } else if (selectedWorkout != null) {
                 key(selectedWorkout.id) {
                     var draggedIndex by remember { mutableStateOf<Int?>(null) }
                     var hoverIndex by remember { mutableStateOf<Int?>(null) }
