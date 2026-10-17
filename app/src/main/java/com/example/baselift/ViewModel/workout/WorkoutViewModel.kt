@@ -42,6 +42,18 @@ data class ExerciseUiModel(
 data class SetWriteKey(val sessionId: Int, val exerciseId: Int, val setNumber: Int)
 
 @Stable
+data class ExerciseEditState(
+    val exerciseId: Int,
+    val workoutId: Int,
+    val name: String,
+    val equipment: String,
+    val muscleGroups: String,
+    val isOpen: Boolean = true,
+    val isSaving: Boolean = false,
+    val saveFailed: Boolean = false
+)
+
+@Stable
 data class WorkoutUiState(
     val workouts: List<WorkoutEntity> = emptyList(),
     val selectedWorkout: WorkoutEntity? = null,
@@ -50,6 +62,7 @@ data class WorkoutUiState(
     val isLoading: Boolean = true,
     val isSelectionLoading: Boolean = false,
     val selectionLoadFailed: Boolean = false,
+    val exerciseEdits: Map<Int, ExerciseEditState> = emptyMap(),
     val isFinalizing: Boolean = false,
     val finalizationFailed: Boolean = false,
     val finalizedSessionId: Int? = null,
@@ -79,6 +92,67 @@ class WorkoutViewModel(
     private class PendingSetRemoval { var saved = false }
     private val pendingSetRemovals = mutableMapOf<SetWriteKey, PendingSetRemoval>()
     private val pendingSetAdds = mutableMapOf<Int, Int>()
+    private class PendingExerciseEdit(val draft: ExerciseEditState) { var saved = false }
+    private val pendingExerciseEdits = mutableMapOf<Int, PendingExerciseEdit>()
+
+    private fun finishExerciseEdit(exerciseId: Int) {
+        pendingExerciseEdits.remove(exerciseId)
+        _uiState.update { it.copy(exerciseEdits = it.exerciseEdits - exerciseId) }
+    }
+
+    private fun reconcileExerciseEdits(models: List<ExerciseUiModel>) {
+        if (_uiState.value.exerciseEdits.isEmpty()) return
+        val byId = models.associateBy { it.exercise.id }
+        val removed = _uiState.value.exerciseEdits.values.filter {
+            it.workoutId == _uiState.value.selectedWorkout?.id && it.exerciseId !in byId &&
+                it.exerciseId !in pendingExerciseEdits
+        }.map { it.exerciseId }
+        removed.forEach(::finishExerciseEdit)
+        val finished = pendingExerciseEdits.filter { (_, request) ->
+            if (!request.saved || request.draft.workoutId != _uiState.value.selectedWorkout?.id) return@filter false
+            val row = byId[request.draft.exerciseId]?.exercise
+            row == null || (row.name == request.draft.name && row.equipment == request.draft.equipment &&
+                row.muscleGroups == request.draft.muscleGroups)
+        }.keys.toList()
+        finished.forEach(::finishExerciseEdit)
+    }
+
+    fun beginExerciseEdit(exerciseId: Int) {
+        val row = _uiState.value.exercises.find { it.exercise.id == exerciseId }?.exercise ?: return
+        _uiState.update { state ->
+            val draft = state.exerciseEdits[exerciseId] ?: ExerciseEditState(
+                row.id, row.workoutId, row.name, row.equipment, row.muscleGroups)
+            state.copy(exerciseEdits = state.exerciseEdits.mapValues { (_, edit) -> edit.copy(isOpen = false) } +
+                (exerciseId to draft.copy(isOpen = true)))
+        }
+    }
+
+    fun updateExerciseEditDraft(
+        exerciseId: Int, name: String? = null, equipment: String? = null, muscleGroups: String? = null
+    ) {
+        _uiState.update { state ->
+            val draft = state.exerciseEdits[exerciseId] ?: return@update state
+            if (draft.isSaving) return@update state
+            state.copy(exerciseEdits = state.exerciseEdits + (exerciseId to draft.copy(
+                name = name ?: draft.name, equipment = equipment ?: draft.equipment,
+                muscleGroups = muscleGroups ?: draft.muscleGroups, saveFailed = false)))
+        }
+    }
+
+    fun dismissExerciseEdit(exerciseId: Int) {
+        _uiState.update { state ->
+            val draft = state.exerciseEdits[exerciseId] ?: return@update state
+            state.copy(exerciseEdits = if (draft.isSaving) {
+                state.exerciseEdits + (exerciseId to draft.copy(isOpen = false))
+            } else state.exerciseEdits - exerciseId)
+        }
+    }
+
+    fun saveExerciseEdit(exerciseId: Int) {
+        val draft = _uiState.value.exerciseEdits[exerciseId] ?: return
+        if (!draft.isOpen || draft.workoutId != _uiState.value.selectedWorkout?.id) return
+        updateExercise(exerciseId, draft.name, draft.equipment, draft.muscleGroups)
+    }
 
     private class PendingReorder(val exercises: List<ExerciseEntity>) {
         val rankById = exercises.associate { it.id to it.orderIndex }
@@ -269,6 +343,7 @@ class WorkoutViewModel(
         pendingSetWrites.entries.removeAll { it.value.saved }
         pendingSetRemovals.entries.removeAll { it.value.saved }
         pendingReorders.entries.removeAll { it.value.saved }
+        pendingExerciseEdits.filterValues { it.saved }.keys.toList().forEach(::finishExerciseEdit)
         observedExerciseModels = null
         _uiState.update {
             it.copy(selectedWorkout = workout, activeSession = null, exercises = emptyList(),
@@ -309,12 +384,14 @@ class WorkoutViewModel(
                         _uiState.update { it.copy(exercises = displayed, isSelectionLoading = false) }
                         reconcileSetWrites(session.id, exerciseModels)
                         reconcileSetRemovals(session.id, exerciseModels)
+                        reconcileExerciseEdits(exerciseModels)
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 currentCoroutineContext().ensureActive()
                 if (selectionToken === token) {
+                    pendingExerciseEdits.filterValues { it.saved }.keys.toList().forEach(::finishExerciseEdit)
                     observedExerciseModels = null
                     _uiState.update {
                         it.copy(activeSession = null, exercises = emptyList(), selectionLoadFailed = true)
@@ -483,7 +560,7 @@ class WorkoutViewModel(
 
     fun deleteExercise(exerciseId: Int) {
         if (hasPendingSetWrite(exerciseId) || hasPendingSetRemoval(exerciseId) ||
-            exerciseId in pendingSetAdds || _uiState.value.isFinalizing) return
+            exerciseId in pendingSetAdds || exerciseId in pendingExerciseEdits || _uiState.value.isFinalizing) return
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
         // limpar todos os rascunhos para este exercício
         exModel.sets.forEach { set ->
@@ -496,9 +573,39 @@ class WorkoutViewModel(
     }
 
     fun updateExercise(exerciseId: Int, name: String, equipment: String, muscleGroups: String) {
+        if (name.isBlank() || exerciseId in pendingExerciseEdits) return
         val exModel = _uiState.value.exercises.find { it.exercise.id == exerciseId } ?: return
+        val draft = ExerciseEditState(exerciseId, exModel.exercise.workoutId, name, equipment, muscleGroups,
+            isOpen = _uiState.value.exerciseEdits[exerciseId]?.isOpen == true, isSaving = true)
+        val request = PendingExerciseEdit(draft)
+        pendingExerciseEdits[exerciseId] = request
+        _uiState.update { it.copy(exerciseEdits = it.exerciseEdits + (exerciseId to draft)) }
         viewModelScope.launch {
-            repository.updateExercise(exModel.exercise, name, equipment, muscleGroups)
+            try {
+                repository.updateExercise(exModel.exercise, name, equipment, muscleGroups)
+                request.saved = true
+                if (_uiState.value.selectedWorkout?.id != draft.workoutId ||
+                    _uiState.value.selectionLoadFailed) {
+                    finishExerciseEdit(exerciseId)
+                } else {
+                    observedExerciseModels?.let(::reconcileExerciseEdits)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _uiState.update { state ->
+                    val current = state.exerciseEdits[exerciseId] ?: draft
+                    state.copy(exerciseEdits = state.exerciseEdits + (exerciseId to current.copy(saveFailed = true)))
+                }
+            } finally {
+                if (!request.saved) {
+                    pendingExerciseEdits.remove(exerciseId)
+                    _uiState.update { state ->
+                        val current = state.exerciseEdits[exerciseId] ?: return@update state
+                        state.copy(exerciseEdits = state.exerciseEdits + (exerciseId to current.copy(isSaving = false)))
+                    }
+                }
+            }
         }
     }
 

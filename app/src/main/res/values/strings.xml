@@ -75,6 +75,9 @@
     <string name="workout_reorder_error_message">The exercise order could not be saved. Your sets and inputs have been kept. Please drag the exercises again to retry.</string>
     <string name="workout_selection_error">Unable to load this routine. Your saved sets and inputs have been kept.</string>
     <string name="workout_selection_retry">Retry loading</string>
+    <string name="workout_edit_saving">SAVING…</string>
+    <string name="workout_edit_close">Close</string>
+    <string name="workout_edit_error">Unable to save these changes. Your entries have been kept. Please try saving again.</string>
     <string name="workout_new_routine">NEW ROUTINE</string>
     <string name="workout_add_exercise">ADD EXERCISE</string>
     <string name="workout_ex_name">Exercise Name</string>

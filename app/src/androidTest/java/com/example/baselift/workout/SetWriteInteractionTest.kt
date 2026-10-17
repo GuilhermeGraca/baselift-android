@@ -71,7 +71,7 @@ class SetWriteInteractionTest {
             MaterialTheme {
                 ExerciseCard(model, emptyMap(), emptyMap(), { _, _, _ -> }, { _, _, _ -> }, {},
                     onAddSet = { adds++ }, onLogSet = { _, _, _, _, _ -> logs++ },
-                    onDeleteExercise = {}, onEditExercise = { _, _, _ -> }, removingSetNumbers = setOf(2))
+                    onDeleteExercise = {}, onEditExercise = {}, removingSetNumbers = setOf(2))
             }
         }
         compose.mainClock.advanceTimeBy(500)
@@ -94,7 +94,7 @@ class SetWriteInteractionTest {
             MaterialTheme {
                 ExerciseCard(model.value, emptyMap(), emptyMap(), { _, _, _ -> }, { _, _, _ -> },
                     onRemoveLastSet = { requested += it }, onAddSet = {}, onLogSet = { _, _, _, _, _ -> },
-                    onDeleteExercise = {}, onEditExercise = { _, _, _ -> }, isAddingSets = adding.value)
+                    onDeleteExercise = {}, onEditExercise = {}, isAddingSets = adding.value)
             }
         }
         compose.onNodeWithText("2").performTouchInput { longClick() }
@@ -162,7 +162,7 @@ class SetWriteInteractionTest {
                 Column {
                     ExerciseCard(model, emptyMap(), emptyMap(), { _, _, _ -> }, { _, _, _ -> }, {}, {},
                         onLogSet = { _, _, _, _, _ -> calls++ }, onDeleteExercise = {},
-                        onEditExercise = { _, _, _ -> }, savingSetNumbers = pending.value)
+                        onEditExercise = {}, savingSetNumbers = pending.value)
                 }
             }
         }

@@ -32,6 +32,7 @@ import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.View.theme.*
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
 import com.example.baselift.View.workout.components.ExerciseCard
+import com.example.baselift.View.workout.components.EditExerciseDialog
 import com.example.baselift.View.workout.components.GenericInputDialog
 import com.example.baselift.View.workout.components.RestTimerWidget
 import com.example.baselift.View.workout.components.ConfirmDeleteDialog
@@ -78,6 +79,20 @@ fun WorkoutScreen(
     }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+
+    uiState.exerciseEdits.values.firstOrNull {
+        it.isOpen && it.workoutId == uiState.selectedWorkout?.id &&
+            !uiState.isSelectionLoading && !uiState.selectionLoadFailed
+    }?.let { edit ->
+        EditExerciseDialog(
+            state = edit,
+            onNameChange = { viewModel.updateExerciseEditDraft(edit.exerciseId, name = it) },
+            onEquipmentChange = { viewModel.updateExerciseEditDraft(edit.exerciseId, equipment = it) },
+            onMuscleGroupsChange = { viewModel.updateExerciseEditDraft(edit.exerciseId, muscleGroups = it) },
+            onConfirm = { viewModel.saveExerciseEdit(edit.exerciseId) },
+            onDismiss = { viewModel.dismissExerciseEdit(edit.exerciseId) }
+        )
+    }
 
     val reorderErrorWorkoutId = uiState.selectedWorkout?.id?.takeIf { it in uiState.reorderFailedWorkoutIds }
     if (reorderErrorWorkoutId != null) {
@@ -418,7 +433,7 @@ fun WorkoutScreen(
                                         viewModel.removeLastSet(exerciseModel.exercise.id, number, displayedSessionId)
                                     },
                                     onDeleteExercise = { viewModel.deleteExercise(exerciseModel.exercise.id) },
-                                    onEditExercise = { name, eq, mg -> viewModel.updateExercise(exerciseModel.exercise.id, name, eq, mg) },
+                                    onEditExercise = { viewModel.beginExerciseEdit(exerciseModel.exercise.id) },
                                     onLogSet = { setNumber, weight, reps, isCompleted, _ ->
                                         viewModel.logSet(
                                             exerciseId = exerciseModel.exercise.id,
@@ -439,7 +454,8 @@ fun WorkoutScreen(
                                     removingSetNumbers = uiState.pendingSetRemovals.filter {
                                         it.sessionId == displayedSessionId && it.exerciseId == exerciseModel.exercise.id
                                     }.map { it.setNumber }.toSet(),
-                                    isAddingSets = exerciseModel.exercise.id in uiState.addingSetExerciseIds
+                                    isAddingSets = exerciseModel.exercise.id in uiState.addingSetExerciseIds,
+                                    isSavingMetadata = uiState.exerciseEdits[exerciseModel.exercise.id]?.isSaving == true
                                 )
                             }
                         }
