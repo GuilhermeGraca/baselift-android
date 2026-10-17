@@ -16,6 +16,7 @@ import com.example.baselift.Model.local.AppDatabase
 import com.example.baselift.Model.local.entity.MealTemplateEntity
 import com.example.baselift.Model.local.entity.NutritionLogEntity
 import com.example.baselift.Model.local.entity.UserEntity
+import com.example.baselift.Model.repository.NutritionDay
 import com.example.baselift.Model.repository.INutritionRepository
 import com.example.baselift.Model.repository.IUserRepository
 import com.example.baselift.Model.repository.NutritionRepository
@@ -73,7 +74,7 @@ class NutritionSubscriptionsTest {
             try { emitAll(rows) } finally { active.decrementAndGet() }
         }
         val source = object : INutritionRepository by real {
-            override fun getTodayLogs() = tracked(real.getTodayLogs(), dailyActive)
+            override fun getLogsForDay(day: NutritionDay) = tracked(real.getLogsForDay(day), dailyActive)
             override fun getAllMealTemplates() = tracked(real.getAllMealTemplates(), templatesActive)
         }
         val userSource = object : IUserRepository by users {

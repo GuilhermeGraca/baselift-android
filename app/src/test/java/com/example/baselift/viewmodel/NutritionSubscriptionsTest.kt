@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModelStore
 import com.example.baselift.Model.local.entity.MealTemplateEntity
 import com.example.baselift.Model.local.entity.NutritionLogEntity
 import com.example.baselift.Model.local.entity.UserEntity
+import com.example.baselift.Model.repository.NutritionDay
 import com.example.baselift.Model.repository.INutritionRepository
 import com.example.baselift.Model.repository.IUserRepository
 import com.example.baselift.ViewModel.nutrition.NutritionViewModel
@@ -42,9 +43,9 @@ class NutritionSubscriptionsTest {
     }
 
     private val source = object : INutritionRepository by repository {
-        override fun getTodayLogs(): Flow<List<NutritionLogEntity>> {
+        override fun getLogsForDay(day: NutritionDay): Flow<List<NutritionLogEntity>> {
             dayRequests++
-            return tracked(repository.getTodayLogs(), logs)
+            return tracked(repository.getLogsForDay(day), logs)
         }
         override fun getAllMealTemplates() = tracked(repository.getAllMealTemplates(), templates)
         override suspend fun deleteMealTemplate(template: MealTemplateEntity) {
