@@ -25,11 +25,12 @@ class ProgressViewModel(
     val user: StateFlow<UserEntity?> = userRepository.getUser()
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
+    // Keep the last snapshots for return navigation; inactive Insights stops history queries.
     val weightLogs: StateFlow<List<WeightLogEntity>> = progressRepository.allWeightLogs
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000), emptyList())
 
     val photoLogs: StateFlow<List<PhotoLogEntity>> = progressRepository.allPhotoLogs
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000), emptyList())
 
     fun addWeightLog(weight: Float, timestamp: Long) {
         viewModelScope.launch {
