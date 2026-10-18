@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="profile_load_error_title">Unable to load your profile</string>
+    <string name="profile_load_error_message">Your saved data has not been changed. Please try loading your profile again.</string>
     <string name="app_name">BaseLift</string>
     <!-- General -->
     <string name="save">Guardar</string>

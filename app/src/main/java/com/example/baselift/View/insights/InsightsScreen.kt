@@ -93,7 +93,8 @@ fun InsightsScreen(
     val uiState by onboardingViewModel.uiState.collectAsStateWithLifecycle()
     val weightLogs by progressViewModel.weightLogs.collectAsStateWithLifecycle()
     val photoLogs by progressViewModel.photoLogs.collectAsStateWithLifecycle()
-    val user by progressViewModel.user.collectAsStateWithLifecycle()
+    val profileLoadState by onboardingViewModel.profileLoadState.collectAsStateWithLifecycle()
+    val user = profileLoadState.profile?.user
     val photoImport by progressViewModel.photoImport.collectAsStateWithLifecycle()
 
     val context = LocalContext.current

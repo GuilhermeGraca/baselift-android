@@ -11,7 +11,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlin.math.roundToInt
+
+// A missing snapshot means no database emission yet; a snapshot with null means confirmed absence.
+data class LoadedProfile(val user: UserEntity?)
+
+data class ProfileLoadState(
+    val profile: LoadedProfile? = null,
+    val isLoading: Boolean = true,
+    val hasError: Boolean = false
+)
 
 class OnboardingViewModel(
     private val userRepository: IUserRepository,
@@ -24,30 +35,40 @@ class OnboardingViewModel(
     private val _isRecalibrating = MutableStateFlow(false)
     val isRecalibrating: StateFlow<Boolean> = _isRecalibrating.asStateFlow()
 
-    private val _hasUser = MutableStateFlow(false)
-    val hasUser: StateFlow<Boolean> = _hasUser.asStateFlow()
-
-    private val _isLoaded = MutableStateFlow(false)
-    val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
+    private val _profileLoadState = MutableStateFlow(ProfileLoadState())
+    val profileLoadState: StateFlow<ProfileLoadState> = _profileLoadState.asStateFlow()
+    private var profileObservation: Job? = null
 
     private var oldWeight: Float? = null
 
     init {
-        viewModelScope.launch {
-            userRepository.getUser().collect { user ->
-                if (user != null) {
-                    _uiState.value = user
-                    _hasUser.value = true
-                    if (oldWeight == null) {
-                        oldWeight = user.weight
+        retryProfileLoad()
+    }
+
+    fun retryProfileLoad() {
+        if (profileObservation?.isActive == true) return
+        // Retain the last confirmed snapshot and any open navigation/drafts during recovery.
+        _profileLoadState.update { it.copy(isLoading = true) }
+        profileObservation = viewModelScope.launch {
+            try {
+                userRepository.getUser().collect { user ->
+                    if (user != null) {
+                        // Re-reading the same profile after failure must not overwrite an unsaved draft.
+                        if (_profileLoadState.value.profile?.user != user) _uiState.value = user
+                        if (oldWeight == null) {
+                            oldWeight = user.weight
+                        }
+                    } else {
+                        _uiState.value = UserEntity()
+                        _isRecalibrating.value = false
+                        oldWeight = null
                     }
-                } else {
-                    _uiState.value = UserEntity()
-                    _hasUser.value = false
-                    _isRecalibrating.value = false
-                    oldWeight = null
+                    _profileLoadState.value = ProfileLoadState(LoadedProfile(user), isLoading = false)
                 }
-                _isLoaded.value = true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _profileLoadState.update { it.copy(isLoading = false, hasError = true) }
             }
         }
     }

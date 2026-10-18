@@ -434,6 +434,8 @@ Isto permitiu usar a app a sério durante o desenvolvimento, o que revelou probl
 
 ## 12. Otimizações de Performance
 
+- **Arranque e perfil coerentes**: a navegação e o cabeçalho usam uma única emissão confirmada do perfil, distinguindo uma leitura pendente de ausência real do utilizador. Falhas de leitura têm retry explícito e preservam o último perfil e o grafo já composto; reler o mesmo perfil não substitui o draft de recalibração. O destino inicial é guardado, sem reconstruir o grafo ao editar/criar o perfil, e as tabs usam Insights como âncora após concluir onboarding. A recuperação de leituras não altera os contratos de gravação do perfil.
+
 - **Remoção do crossfade** na `NavHost` entre tabs para evitar sobreposição de ecrãs
 - **Conteúdo disponível sem atraso artificial** no Dashboard e Workout: as listas lazy compõem os itens necessários à vista sem um temporizador de 50ms; os dados e gráficos continuam a respeitar os seus fluxos de carregamento
 - **Índices na base de dados** (migração v9→v10): em `timestamp`, `isCompleted`, etc., para acelerar queries históricas
