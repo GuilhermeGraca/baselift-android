@@ -94,8 +94,12 @@ fun InsightsScreen(
     val weightLogs by progressViewModel.weightLogs.collectAsStateWithLifecycle()
     val photoLogs by progressViewModel.photoLogs.collectAsStateWithLifecycle()
     val user by progressViewModel.user.collectAsStateWithLifecycle()
+    val photoImport by progressViewModel.photoImport.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
+    PhotoImportFeedback(photoImport.result,
+        onRetry = { progressViewModel.retryPhotoImport(context, it) },
+        onDismiss = progressViewModel::dismissPhotoImportResult)
     var selectedUrisForLogging by remember { mutableStateOf<List<Uri>?>(null) }
     var clickedPhoto by remember { mutableStateOf<PhotoLogEntity?>(null) }
     val sortedWeightLogs = remember(weightLogs) { weightLogs.sortedByDescending { it.timestamp } }
@@ -400,10 +404,10 @@ fun InsightsScreen(
             VisualDiarySection(
                 photoLogs = photoLogs,
                 photoWeights = photoWeights,
-                onPhotoClick = { clickedPhoto = it }
-            ) {
-                photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }
+                onPhotoClick = { clickedPhoto = it },
+                onAddPhoto = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                isImporting = photoImport.isImporting
+            )
             Spacer(modifier = Modifier.height(100.dp)) // espaço para navegação inferior
         }
     }
@@ -488,10 +492,12 @@ fun InsightsScreen(
                             Button(
                                 onClick = {
                                     selectedUrisForLogging?.let { uris ->
-                                        progressViewModel.addPhotoLogs(context, uris, photoTimestamp)
+                                        if (progressViewModel.addPhotoLogs(context, uris, photoTimestamp)) {
+                                            selectedUrisForLogging = null
+                                        }
                                     }
-                                    selectedUrisForLogging = null
                                 },
+                                enabled = !photoImport.isImporting,
                                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
                                 shape = RoundedCornerShape(8.dp)
                             ) {

@@ -241,14 +241,15 @@ fun VisualDiarySection(
     photoLogs: List<PhotoLogEntity>,
     photoWeights: PhotoWeightIndex,
     onPhotoClick: (PhotoLogEntity) -> Unit,
-    onAddPhoto: () -> Unit
+    onAddPhoto: () -> Unit,
+    isImporting: Boolean = false
 ) {
     val zone = TimeZone.getDefault()
     val dateFormat = remember(zone.id) { SimpleDateFormat("MMM dd", Locale.US).apply { timeZone = zone } }
     val sortedPhotos = remember(photoLogs) { photoLogs.sortedBy { it.timestamp } } // mais antigas à esquerda e recentes à direita
     val lazyListState = rememberLazyListState()
 
-    // deslizar automaticamente para a última foto
+    // A batch reaches this list only after its atomic commit: one final scroll, no per-row restarts.
     LaunchedEffect(sortedPhotos) {
         if (sortedPhotos.isNotEmpty()) {
             lazyListState.scrollToItem(sortedPhotos.size - 1)
@@ -258,8 +259,13 @@ fun VisualDiarySection(
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(com.example.baselift.R.string.insights_visual_diary), color = CrystalWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Icon(Icons.Default.CameraAlt, contentDescription = "Add Photo", tint = NeonGreen, modifier = Modifier.clickable { onAddPhoto() })
+            if (isImporting) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = NeonGreen, strokeWidth = 2.dp)
+            } else {
+                Icon(Icons.Default.CameraAlt, contentDescription = "Add Photo", tint = NeonGreen, modifier = Modifier.clickable { onAddPhoto() })
+            }
         }
+        if (isImporting) Text(stringResource(com.example.baselift.R.string.insights_photo_importing), color = MediumGrey)
         
         Spacer(modifier = Modifier.height(16.dp))
 

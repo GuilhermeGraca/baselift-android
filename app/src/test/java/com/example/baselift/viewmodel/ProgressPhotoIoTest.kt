@@ -66,34 +66,31 @@ class ProgressPhotoIoTest {
         verify(exactly = 1) { resolver.takePersistableUriPermission(third, flags) }
     }
 
-    @Test fun `individual persistence failure retains prior success and continues the existing partial import policy`() = runTest {
+    @Test fun `batch persistence failure saves no eligible rows and reports the unsaved selection`() = runTest {
         val source = object : IProgressRepository by progress {
-            override suspend fun insertPhotoLog(photoUri: String, timestamp: Long) {
-                if (photoUri == second.toString()) error("write failed")
-                progress.insertPhotoLog(photoUri, timestamp)
-            }
+            override suspend fun insertPhotoLogs(photoUris: List<String>, timestamp: Long) { error("write failed") }
         }
         start(source); vm.addPhotoLogs(context, listOf(first, second, third), 1234L); runCurrent()
-        assertEquals(listOf(first, third).map { it.toString() }, progress.allPhotoLogs.first().map { it.photoUri })
+        assertTrue(progress.allPhotoLogs.first().isEmpty())
+        assertEquals(3, vm.photoImport.value.result!!.failedCount)
     }
 
     @Test fun `provider cancellation stops the selection without treating it as a failed item`() = runTest {
         start(); every { resolver.takePersistableUriPermission(second, flags) } throws CancellationException("cancelled")
         vm.addPhotoLogs(context, listOf(first, second, third), 1234L); runCurrent()
-        assertEquals(listOf(first.toString()), progress.allPhotoLogs.first().map { it.photoUri })
+        assertTrue(progress.allPhotoLogs.first().isEmpty())
+        assertTrue(vm.photoImport.value.result!!.wasCancelled)
         verify(exactly = 0) { resolver.takePersistableUriPermission(third, flags) }
     }
 
-    @Test fun `repository cancellation stops remaining permission requests and inserts`() = runTest {
+    @Test fun `repository cancellation reports the preflight selection as unsaved`() = runTest {
         val source = object : IProgressRepository by progress {
-            override suspend fun insertPhotoLog(photoUri: String, timestamp: Long) {
-                if (photoUri == second.toString()) throw CancellationException("cancelled")
-                progress.insertPhotoLog(photoUri, timestamp)
-            }
+            override suspend fun insertPhotoLogs(photoUris: List<String>, timestamp: Long) { throw CancellationException("cancelled") }
         }
         start(source); vm.addPhotoLogs(context, listOf(first, second, third), 1234L); runCurrent()
-        assertEquals(1, progress.allPhotoLogs.first().size)
-        verify(exactly = 0) { resolver.takePersistableUriPermission(third, flags) }
+        assertTrue(progress.allPhotoLogs.first().isEmpty())
+        assertTrue(vm.photoImport.value.result!!.wasCancelled)
+        verify(exactly = 1) { resolver.takePersistableUriPermission(third, flags) }
     }
 
     @Test fun `empty selection performs no permission or repository operations`() = runTest {
@@ -105,8 +102,8 @@ class ProgressPhotoIoTest {
     @Test fun `single import persists only after permission with a current timestamp`() = runTest {
         var permitted = false
         val source = object : IProgressRepository by progress {
-            override suspend fun insertPhotoLog(photoUri: String, timestamp: Long) {
-                assertTrue(permitted); progress.insertPhotoLog(photoUri, timestamp)
+            override suspend fun insertPhotoLogs(photoUris: List<String>, timestamp: Long) {
+                assertTrue(permitted); progress.insertPhotoLogs(photoUris, timestamp)
             }
         }
         start(source); every { resolver.takePersistableUriPermission(first, flags) } answers { permitted = true }

@@ -177,6 +177,11 @@
     <string name="insights_associate_date">ASSOCIATE DATE TO PHOTOS</string>
     <string name="insights_select_date_desc">Select the date for the %1$d selected progress photos:</string>
     <string name="insights_save_photos">SAVE PHOTOS</string>
+    <string name="insights_photo_importing">Importing photos…</string>
+    <string name="insights_photo_import_incomplete">Some photos were not saved</string>
+    <string name="insights_photo_import_stopped">Photo import stopped</string>
+    <string name="insights_photo_import_result">%1$d photos saved. %2$d photos were not saved. Retrying will only import the unsaved photos.</string>
+    <string name="insights_photo_import_retry">Retry unsaved photos</string>
     <string name="insights_weight_trend">Weight Trend</string>
     <string name="insights_log_weight">LOG WEIGHT</string>
     <string name="insights_new_manual_entry">NEW MANUAL ENTRY</string>

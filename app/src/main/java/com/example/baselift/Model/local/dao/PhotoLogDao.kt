@@ -13,6 +13,10 @@ interface PhotoLogDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPhotoLog(photoLog: PhotoLogEntity)
 
+    // Room executes a collection @Insert in one transaction: no partial batch is published.
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPhotoLogs(photoLogs: List<PhotoLogEntity>)
+
     @Delete
     suspend fun deletePhotoLog(photoLog: PhotoLogEntity)
 
