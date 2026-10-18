@@ -261,16 +261,17 @@ class DashboardAnalyticsTest {
     }
 
     @Test
-    fun `existing calendar year ISO week collision remains unchanged in performance refactor`() {
+    fun `unrelated January and December weeks never share a volume bucket`() {
         val analytics = DashboardAnalytics { timestamp(2024, 12, 30) }
-        // The legacy key uses calendar year rather than ISO week year: both are 2024-W1.
+        // Both dates have ISO week number 1, but belong to different Monday-to-Sunday weeks.
         val logs = listOf(timestamp(2024, 1, 1), timestamp(2024, 12, 30)).mapIndexed { i, time ->
             SetLogEntity(id = i + 1, sessionId = 1, exerciseId = 1, setNumber = 1,
                 weight = 100f, reps = 10, isCompleted = true, timestamp = time)
         }
         val history = analytics.setHistory(logs)
-        assertEquals(2_000f, history.weeklyVolumes.single().totalVolume, 0f)
-        assertEquals(timestamp(2024, 1, 1, 0), history.weeklyVolumes.single().weekStartTimestamp)
+        assertEquals(listOf(1_000f, 1_000f), history.weeklyVolumes.map { it.totalVolume })
+        assertEquals(listOf(timestamp(2024, 1, 1, 0), timestamp(2024, 12, 30, 0)),
+            history.weeklyVolumes.map { it.weekStartTimestamp })
         assertEquals(2, analytics.exerciseCharts(logs).volumeTrend.size)
     }
 }

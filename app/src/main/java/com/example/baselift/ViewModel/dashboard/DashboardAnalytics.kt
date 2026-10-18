@@ -206,20 +206,18 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
     }
 
     private fun weeklyVolumes(setLogs: List<SetLogEntity>): List<WeeklyVolume> {
-        val cal = isoCalendar()
-        val volumeByWeek = mutableMapOf<String, Pair<Long, Float>>()
+        val cal = Calendar.getInstance()
+        val volumeByWeek = mutableMapOf<Long, Float>()
         setLogs.forEach { log ->
             cal.timeInMillis = log.timestamp
-            val key = weekKey(cal)
+            // The local Monday is the week identity across calendar years, locales and DST.
+            cal.add(Calendar.DAY_OF_YEAR, -((cal.get(Calendar.DAY_OF_WEEK) + 5) % 7))
+            atMidnight(cal)
+            val weekStart = cal.timeInMillis
             val volume = log.weight * log.reps
-            val existing = volumeByWeek[key]
-            volumeByWeek[key] = if (existing != null) {
-                existing.copy(second = existing.second + volume)
-            } else {
-                mondayTimestamp(log.timestamp) to volume
-            }
+            volumeByWeek[weekStart] = (volumeByWeek[weekStart] ?: 0f) + volume
         }
-        return volumeByWeek.values.sortedBy { it.first }.map { WeeklyVolume(it.first, it.second) }
+        return volumeByWeek.entries.sortedBy { it.key }.map { WeeklyVolume(it.key, it.value) }
     }
 
     fun currentWeekBounds(): Pair<Long, Long> {
@@ -239,13 +237,6 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
         return start to cal.timeInMillis
     }
 
-    private fun mondayTimestamp(timestamp: Long): Long {
-        val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
-        while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) cal.add(Calendar.DAY_OF_YEAR, -1)
-        atMidnight(cal)
-        return cal.timeInMillis
-    }
-
     private fun atMidnight(cal: Calendar) {
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
@@ -253,13 +244,6 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
         cal.set(Calendar.MILLISECOND, 0)
     }
 
-    private fun isoCalendar() = Calendar.getInstance().apply {
-        firstDayOfWeek = Calendar.MONDAY
-        minimalDaysInFirstWeek = 4
-    }
-
-    // Preserve the existing calendar-year/week-number semantics in this performance change.
-    private fun weekKey(cal: Calendar) = "${cal.get(Calendar.YEAR)}-W${cal.get(Calendar.WEEK_OF_YEAR)}"
     private fun dateKey(cal: Calendar) = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
     private fun dayOfWeek(cal: Calendar): Int =
         if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) 7 else cal.get(Calendar.DAY_OF_WEEK) - 1

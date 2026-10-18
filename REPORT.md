@@ -434,6 +434,8 @@ Isto permitiu usar a app a sério durante o desenvolvimento, o que revelou probl
 
 ## 12. Otimizações de Performance
 
+- **Volume semanal correto na passagem de ano**: os registos são agrupados pelo timestamp da segunda-feira local, em vez de combinar ano civil com número da semana ISO. Isto impede juntar semanas distintas de janeiro/dezembro ou dividir uma semana entre dois anos, mantendo ordenação cronológica, volume total e semanas de segunda a domingo mesmo com mudanças de hora e locale. Não altera registos persistidos nem streaks.
+
 - **Arranque e perfil coerentes**: a navegação e o cabeçalho usam uma única emissão confirmada do perfil, distinguindo uma leitura pendente de ausência real do utilizador. Falhas de leitura têm retry explícito e preservam o último perfil e o grafo já composto; reler o mesmo perfil não substitui o draft de recalibração. O destino inicial é guardado, sem reconstruir o grafo ao editar/criar o perfil, e as tabs usam Insights como âncora após concluir onboarding. A recuperação de leituras não altera os contratos de gravação do perfil.
 
 - **Remoção do crossfade** na `NavHost` entre tabs para evitar sobreposição de ecrãs
