@@ -12,7 +12,8 @@ import java.util.Locale
 
 internal data class NutritionHistory(
     val weeklyDays: Map<Int, NutritionSummary>,
-    val calendar: Map<String, DayMarkerState>
+    val calendar: Map<String, DayMarkerState>,
+    val activeDates: Set<String> = calendar.keys
 )
 
 internal data class SessionHistory(
@@ -42,24 +43,28 @@ data class ExerciseCharts(
 
 // Pure history preparation. No shared Calendar/formatter state crosses coroutine branches.
 internal class DashboardAnalytics(private val clockMillis: () -> Long) {
-    fun nutritionHistory(logs: List<NutritionLogEntity>): NutritionHistory {
+    fun nutritionHistory(logs: List<NutritionLogEntity>, visibleDates: Set<String>? = null): NutritionHistory {
         val (weekStart, weekEnd) = currentWeekBounds()
         val cal = Calendar.getInstance()
         val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val weeklyDays = mutableMapOf<Int, NutritionSummary>()
         val calendar = mutableMapOf<String, DayMarkerState>()
+        val activeDates = mutableSetOf<String>()
 
         logs.forEach { log ->
             cal.timeInMillis = log.timestamp
             val ymd = formatter.format(Date(log.timestamp))
-            val previous = calendar[ymd] ?: DayMarkerState()
-            calendar[ymd] = previous.copy(
-                hasNutrition = true,
-                nutritionCalories = (previous.nutritionCalories ?: 0) + log.calories,
-                nutritionProtein = (previous.nutritionProtein ?: 0) + log.protein,
-                nutritionCarbs = (previous.nutritionCarbs ?: 0) + log.carbs,
-                nutritionFats = (previous.nutritionFats ?: 0) + log.fats
-            )
+            activeDates += ymd
+            if (visibleDates == null || ymd in visibleDates) {
+                val previous = calendar[ymd] ?: DayMarkerState()
+                calendar[ymd] = previous.copy(
+                    hasNutrition = true,
+                    nutritionCalories = (previous.nutritionCalories ?: 0) + log.calories,
+                    nutritionProtein = (previous.nutritionProtein ?: 0) + log.protein,
+                    nutritionCarbs = (previous.nutritionCarbs ?: 0) + log.carbs,
+                    nutritionFats = (previous.nutritionFats ?: 0) + log.fats
+                )
+            }
             if (log.timestamp in weekStart until weekEnd) {
                 val day = dayOfWeek(cal)
                 val current = weeklyDays[day] ?: NutritionSummary(0, 0, 0, 0)
@@ -69,7 +74,7 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
                 )
             }
         }
-        return NutritionHistory(weeklyDays, calendar)
+        return NutritionHistory(weeklyDays, calendar, activeDates)
     }
 
     fun sessionHistory(sessions: List<WorkoutSessionEntity>): SessionHistory {
@@ -121,8 +126,11 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
         return count
     }
 
-    fun setHistory(setLogs: List<SetLogEntity>): SetHistory {
-        val weeklyVolumes = weeklyVolumes(setLogs)
+    fun setHistory(setLogs: List<SetLogEntity>, includeDailyVolumes: Boolean = true): SetHistory {
+        return SetHistory(weeklyVolumes(setLogs), if (includeDailyVolumes) dailyVolumes(setLogs) else emptyList())
+    }
+
+    fun dailyVolumes(setLogs: List<SetLogEntity>): List<DailyExerciseVolume> {
         val cal = Calendar.getInstance()
         val logsByDate = setLogs.groupBy {
             cal.timeInMillis = it.timestamp
@@ -141,7 +149,7 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
                 dailyVolumes += DailyExerciseVolume(exerciseId, midnightTs, totalVolume, dateLabel)
             }
         }
-        return SetHistory(weeklyVolumes, dailyVolumes)
+        return dailyVolumes
     }
 
     fun exerciseCharts(setLogs: List<SetLogEntity>): ExerciseCharts {
@@ -192,10 +200,26 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
         return trends
     }
 
-    fun workoutCalendar(history: SessionHistory, names: Map<Int, String>): Map<String, DayMarkerState> =
-        history.calendarWorkoutIds.mapValues { (_, ids) ->
+    fun workoutCalendar(history: SessionHistory, names: Map<Int, String>, visibleDates: Set<String>? = null): Map<String, DayMarkerState> =
+        history.calendarWorkoutIds.filterKeys { visibleDates == null || it in visibleDates }.mapValues { (_, ids) ->
             DayMarkerState(hasWorkout = true, workoutNames = ids.mapNotNull { names[it] }.distinct())
         }
+
+    fun calendarMonthDates(timestamp: Long?): Set<String> {
+        if (timestamp == null) return emptySet()
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = timestamp
+            set(Calendar.DAY_OF_MONTH, 1)
+            atMidnight(this)
+        }
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        return buildSet {
+            repeat(cal.getActualMaximum(Calendar.DAY_OF_MONTH)) {
+                add(formatter.format(cal.time))
+                cal.add(Calendar.DAY_OF_MONTH, 1)
+            }
+        }
+    }
 
     fun mergeCalendar(nutrition: Map<String, DayMarkerState>, workouts: Map<String, DayMarkerState>): Map<String, DayMarkerState> {
         val combined = nutrition.toMutableMap()

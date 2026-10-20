@@ -34,6 +34,7 @@ class WorkoutStartupInteractionTest {
     private lateinit var db: AppDatabase
     private val failRoutines = MutableStateFlow(false)
     private val publishRoutines = MutableStateFlow(true)
+    private val publishExercises = MutableStateFlow(true)
     private val activeRoutines = AtomicInteger()
     private val activeExercises = AtomicInteger()
     private val recoveries = AtomicInteger()
@@ -71,7 +72,9 @@ class WorkoutStartupInteractionTest {
             override suspend fun startOrGetSession(workoutId: Int) = dao.getOrCreateActiveSession(workoutId).also { sessions.incrementAndGet() }
             override fun getExercisesForWorkout(workoutId: Int) = flow {
                 activeExercises.incrementAndGet()
-                try { emitAll(real.getExercisesForWorkout(workoutId)) }
+                try { emitAll(combine(real.getExercisesForWorkout(workoutId), publishExercises) { rows, publish ->
+                    rows to publish
+                }.filter { it.second }.map { it.first }) }
                 finally { activeExercises.decrementAndGet() }
             }
         }
@@ -102,6 +105,31 @@ class WorkoutStartupInteractionTest {
         compose.onNodeWithText("10").assertIsDisplayed()
         assertEquals(1, recoveries.get()); assertEquals(1, sessions.get())
         assertEquals(1, vm.uiState.value.activeSession?.id)
+    }
+
+    @Test fun returnRetainsReadOnlyRowsAfterMembershipValidationUntilFreshRowsArrive() {
+        val vm = prepare()
+        val visible = mutableStateOf(true)
+        compose.setContent { MaterialTheme { if (visible.value) WorkoutScreen(vm) } }
+        compose.waitUntil(5_000) { vm.uiState.value.exercises.isNotEmpty() }
+        compose.runOnIdle { visible.value = false }
+        compose.waitUntil(5_000) { activeRoutines.get() == 0 && activeExercises.get() == 0 }
+        publishExercises.value = false
+        compose.runOnIdle { visible.value = true }
+        compose.waitUntil(5_000) { !vm.uiState.value.isLoading && activeExercises.get() == 1 }
+        compose.onNodeWithText("Bench").assertIsDisplayed()
+        assertTrue(vm.uiState.value.isSelectionLoading)
+        compose.runOnIdle { vm.logSet(1, 1, 80f, 10, true) }
+        runBlocking { assertTrue(db.workoutDao().getSetsForSession(1).first().isEmpty()) }
+        assertEquals(1, sessions.get())
+        runBlocking { db.workoutDao().updateExerciseMetadata(1, "Renamed Bench", "", "") }
+        publishExercises.value = true
+        compose.waitUntil(5_000) { !vm.uiState.value.isSelectionLoading }
+        compose.onNodeWithText("Renamed Bench").assertIsDisplayed()
+        compose.onNodeWithText("Bench").assertDoesNotExist()
+        assertEquals(1, vm.uiState.value.activeSession?.id)
+        assertEquals("80", vm.getDraftWeight(1, 1))
+        assertEquals(1, sessions.get())
     }
 
     @Test fun returnWaitsForFreshRoutineMembershipBeforeShowingRowsOrAcceptingCachedCallbacks() {

@@ -61,11 +61,18 @@ class DashboardViewModelTest {
             analyticsDispatcher = mainDispatcherRule.testDispatcher
         )
         viewModelStore.put("dashboard", viewModel)
+        requestDetails(viewModel)
     }
 
     @After
     fun tearDown() {
         viewModelStore.clear()
+    }
+
+    private fun requestDetails(dashboard: DashboardViewModel, month: Long = System.currentTimeMillis()) {
+        dashboard.setCalendarMonth(month)
+        dashboard.setRoutineExpanded(1, true)
+        dashboard.setRoutineExpanded(2, true)
     }
 
     private class SubscriptionTracker {
@@ -97,6 +104,7 @@ class DashboardViewModelTest {
         }
         return DashboardViewModel(trackedWorkouts, trackedNutrition, mainDispatcherRule.testDispatcher).also {
             viewModelStore.put("tracked-dashboard", it)
+            requestDetails(it)
         }
     }
 
@@ -151,13 +159,81 @@ class DashboardViewModelTest {
 
         fun dashboard(clock: () -> Long = { now }) = DashboardViewModel(
             workouts, meals, mainDispatcherRule.testDispatcher, clock
-        ).also { viewModelStore.put("observed-dashboard", it) }
+        ).also { viewModelStore.put("observed-dashboard", it); requestDetails(it, now) }
 
         fun resetReads() {
             nutrition.reads = 0
             sessions.reads = 0
             sets.reads = 0
         }
+    }
+
+    @Test
+    fun `closed details retain full streaks and weekly volume without preparing detail output`() = runTest {
+        val sources = HistorySources(System.currentTimeMillis())
+        val dashboard = DashboardViewModel(sources.workouts, sources.meals, mainDispatcherRule.testDispatcher) { sources.now }
+        viewModelStore.put("demand-dashboard", dashboard)
+        dashboard.setRestDays(7)
+        dashboard.setNutritionRestDays(7)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+        val closed = dashboard.uiState.value
+        assertEquals(200, closed.workoutStreak)
+        assertEquals(1_095, closed.nutritionStreak)
+        assertTrue(closed.historicalCalendarData.isEmpty())
+        assertTrue(closed.workoutVolumeTrends.isEmpty())
+        assertEquals(4_800_000.0, closed.weeklyVolumes.sumOf { it.totalVolume.toDouble() }, 0.0)
+
+        dashboard.setRoutineExpanded(1, true)
+        runCurrent()
+        assertEquals(setOf(1), dashboard.uiState.value.workoutVolumeTrends.keys)
+        dashboard.setRoutineExpanded(2, true)
+        runCurrent()
+        val expanded = dashboard.uiState.value
+        assertSame(closed.weeklyVolumes, expanded.weeklyVolumes)
+        assertEquals(setOf(1, 2), expanded.workoutVolumeTrends.keys)
+        assertEquals(4_800_000.0, expanded.workoutVolumeTrends.values.flatten().sumOf { it.yValue.toDouble() }, 0.0)
+        dashboard.setRoutineExpanded(1, false)
+        runCurrent()
+        assertEquals(setOf(2), dashboard.uiState.value.workoutVolumeTrends.keys)
+        dashboard.setRoutineExpanded(2, false)
+        runCurrent()
+        assertTrue(dashboard.uiState.value.workoutVolumeTrends.isEmpty())
+        assertSame(closed.weeklyVolumes, dashboard.uiState.value.weeklyVolumes)
+        assertEquals(closed.workoutStreak, dashboard.uiState.value.workoutStreak)
+    }
+
+    @Test
+    fun `calendar prepares only requested month and closes without truncating streak history`() = runTest {
+        val now = Calendar.getInstance().apply { set(2026, Calendar.OCTOBER, 20, 12, 0, 0) }.timeInMillis
+        val sources = HistorySources(now)
+        val dashboard = DashboardViewModel(sources.workouts, sources.meals, mainDispatcherRule.testDispatcher) { now }
+        viewModelStore.put("month-dashboard", dashboard)
+        dashboard.setRestDays(7)
+        dashboard.setNutritionRestDays(7)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+        dashboard.setCalendarMonth(now)
+        runCurrent()
+        val october = dashboard.uiState.value
+        assertEquals(20, october.historicalCalendarData.size)
+        assertTrue(october.historicalCalendarData.keys.all { it.startsWith("2026-10-") })
+        assertEquals(100, october.historicalCalendarData.getValue("2026-10-20").nutritionCalories)
+        sources.nutritionFlow.value += NutritionLogEntity(id = 2_000, calories = 250, protein = 10,
+            carbs = 20, fats = 5, timestamp = now)
+        runCurrent()
+        assertEquals(350, dashboard.uiState.value.historicalCalendarData.getValue("2026-10-20").nutritionCalories)
+        val september = Calendar.getInstance().apply { timeInMillis = now; add(Calendar.MONTH, -1) }.timeInMillis
+        dashboard.setCalendarMonth(september)
+        runCurrent()
+        assertEquals(30, dashboard.uiState.value.historicalCalendarData.size)
+        assertTrue(dashboard.uiState.value.historicalCalendarData.keys.all { it.startsWith("2026-09-") })
+        dashboard.setCalendarMonth(null)
+        runCurrent()
+        val closed = dashboard.uiState.value
+        assertTrue(closed.historicalCalendarData.isEmpty())
+        assertEquals(200, closed.workoutStreak)
+        assertEquals(1_095, closed.nutritionStreak)
     }
 
     @Test
@@ -322,6 +398,7 @@ class DashboardViewModelTest {
         val dashboard = DashboardViewModel(workoutRepository, nutritionRepository,
             mainDispatcherRule.testDispatcher, clockMillis = { october(11) })
         viewModelStore.put("calendar-regression", dashboard)
+        dashboard.setCalendarMonth(october(11))
         dashboard.setRestDays(0)
         dashboard.setNutritionRestDays(0)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
@@ -510,6 +587,7 @@ class DashboardViewModelTest {
             Thread(runnable, "dashboard-analytics-test").also { analyticsThread.set(it) }
         }.asCoroutineDispatcher().use { dispatcher ->
             val backgroundViewModel = DashboardViewModel(workoutRepository, repository, dispatcher)
+            requestDetails(backgroundViewModel, timestamp)
             val store = ViewModelStore().apply { put("dashboard", backgroundViewModel) }
             try {
                 val state = backgroundViewModel.uiState.first { !it.isLoading }

@@ -54,7 +54,8 @@ fun CustomCalendar(
     markedDays: Map<String, DayMarkerState> = emptyMap(),
     onDateSelected: (Long) -> Unit = {},
     onDayClickInViewMode: (Long, DayMarkerState) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onVisibleMonthChanged: (Long) -> Unit = {}
 ) {
     val initialCal = Calendar.getInstance()
     if (selectedDate != null) initialCal.timeInMillis = selectedDate
@@ -65,6 +66,8 @@ fun CustomCalendar(
     initialCal.set(Calendar.MILLISECOND, 0)
 
     var currentMonth by remember { mutableStateOf(initialCal) }
+    val onMonthChanged by rememberUpdatedState(onVisibleMonthChanged)
+    LaunchedEffect(currentMonth.timeInMillis) { onMonthChanged(currentMonth.timeInMillis) }
     var showYearSelector by remember { mutableStateOf(false) }
 
     val monthFormat = remember { SimpleDateFormat("MMMM", Locale.US) }

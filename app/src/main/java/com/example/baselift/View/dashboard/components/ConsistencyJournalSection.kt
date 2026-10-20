@@ -39,7 +39,8 @@ fun ConsistencyJournalSection(
     restDays: Int,
     nutritionRestDays: Int,
     onSetRestDays: (Int) -> Unit = {},
-    onSetNutritionRestDays: (Int) -> Unit = {}
+    onSetNutritionRestDays: (Int) -> Unit = {},
+    onCalendarMonthChanged: (Long?) -> Unit = {}
 ) {
     Text(
         stringResource(com.example.baselift.R.string.dash_consistency_journal),
@@ -172,6 +173,10 @@ fun ConsistencyJournalSection(
     }
 
     if (showCalendarDialog) {
+        val onMonthChanged by androidx.compose.runtime.rememberUpdatedState(onCalendarMonthChanged)
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            onDispose { onMonthChanged(null) }
+        }
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { showCalendarDialog = false },
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
@@ -188,6 +193,7 @@ fun ConsistencyJournalSection(
                     mode = com.example.baselift.View.components.CalendarMode.VIEW,
                     maxDate = System.currentTimeMillis(),
                     markedDays = historicalCalendarData,
+                    onVisibleMonthChanged = { onMonthChanged(it) },
                     onDayClickInViewMode = { _, marker ->
                         if (marker.hasWorkout || marker.hasNutrition) {
                             clickedMarker = marker

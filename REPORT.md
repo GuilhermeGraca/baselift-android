@@ -434,6 +434,12 @@ Isto permitiu usar a app a sério durante o desenvolvimento, o que revelou probl
 
 ## 12. Otimizações de Performance
 
+- **Release otimizada e dependências**: R8 e remoção de recursos não utilizados ativos apenas em `release`; dependências Vico removidas após confirmar que os gráficos usam Canvas. O injetor local opcional de dados de demonstração fica excluído da compilação release. O modo `debug` e a execução normal pelo Android Studio mantêm-se. O cruncher de PNGs está desativado em release devido à falha do AAPT neste caminho Windows com espaços; a remoção de recursos continua ativa.
+
+- **Dashboard conforme o conteúdo aberto**: os detalhes do calendário são preparados apenas para o mês visível e libertados ao fechar; a preparação diária dos gráficos de rotinas só ocorre enquanto há cartões expandidos, produzindo séries apenas para essas rotinas. Streaks, resumos semanais, volume total e filtros ALL mantêm o histórico completo. Expansão/filtros guardam o estado por ID, e os formatadores de datas dos gráficos são reutilizados.
+
+- **Regresso ao treino**: depois de confirmar que a rotina ainda existe, os exercícios já carregados mantêm-se visíveis enquanto chegam os registos atuais, com indicador de atualização e ações sobre séries/ordem/finalização bloqueadas até à nova emissão. Selecionar outra rotina, renovar a sessão após finalizar e recuperar erros continuam a respeitar a identidade da sessão e os contratos de gravação existentes.
+
 - **Volume semanal correto na passagem de ano**: os registos são agrupados pelo timestamp da segunda-feira local, em vez de combinar ano civil com número da semana ISO. Isto impede juntar semanas distintas de janeiro/dezembro ou dividir uma semana entre dois anos, mantendo ordenação cronológica, volume total e semanas de segunda a domingo mesmo com mudanças de hora e locale. Não altera registos persistidos nem streaks.
 
 - **Arranque e perfil coerentes**: a navegação e o cabeçalho usam uma única emissão confirmada do perfil, distinguindo uma leitura pendente de ausência real do utilizador. Falhas de leitura têm retry explícito e preservam o último perfil e o grafo já composto; reler o mesmo perfil não substitui o draft de recalibração. O destino inicial é guardado, sem reconstruir o grafo ao editar/criar o perfil, e as tabs usam Insights como âncora após concluir onboarding. A recuperação de leituras não altera os contratos de gravação do perfil.

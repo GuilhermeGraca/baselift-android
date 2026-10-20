@@ -261,6 +261,8 @@ fun AppNavigation(
                             sharedPrefs.edit().putInt("workout_rest_days", days).apply()
                         },
                         exerciseCharts = dashboardViewModel::exerciseCharts,
+                        onRoutineExpansionChanged = dashboardViewModel::setRoutineExpanded,
+                        onCalendarMonthChanged = dashboardViewModel::setCalendarMonth,
                         onSetNutritionRestDays = { days ->
                             dashboardViewModel.setNutritionRestDays(days)
                             val sharedPrefs = context.getSharedPreferences("baselift_settings", android.content.Context.MODE_PRIVATE)

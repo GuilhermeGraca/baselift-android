@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.update
 import com.example.baselift.View.components.ChartDataPoint
 import com.example.baselift.View.components.DayMarkerState
 import androidx.compose.runtime.Stable
@@ -75,6 +76,16 @@ class DashboardViewModel(
 
     private val restDaysFlow = MutableStateFlow(4) // por defeito 4 dias de descanso
     private val nutritionRestDaysFlow = MutableStateFlow(0) // por defeito 0 dias de descanso na nutrição
+    private val expandedRoutines = MutableStateFlow<Set<Int>>(emptySet())
+    private val calendarMonth = MutableStateFlow<Long?>(null)
+
+    fun setRoutineExpanded(workoutId: Int, expanded: Boolean) {
+        expandedRoutines.update { if (expanded) it + workoutId else it - workoutId }
+    }
+
+    fun setCalendarMonth(timestamp: Long?) {
+        calendarMonth.value = timestamp
+    }
 
     fun setRestDays(days: Int) {
         restDaysFlow.value = days
@@ -131,6 +142,8 @@ class DashboardViewModel(
                 }
             }.distinctUntilChanged().shareIn(this, SharingStarted.Lazily, replay = 1)
             val week = day.map { analytics.currentWeekBounds().first }.distinctUntilChanged()
+            val visibleDates = calendarMonth.map(analytics::calendarMonthDates).distinctUntilChanged()
+                .shareIn(this, SharingStarted.Lazily, replay = 1)
 
             val metadata = combine(
                 workoutRepository.allWorkouts.distinctUntilChanged(),
@@ -144,25 +157,26 @@ class DashboardViewModel(
             }.shareIn(this, SharingStarted.Lazily, replay = 1)
 
             val nutrition = combine(
-                combine(nutritionRepository.getAllNutritionLogs().distinctUntilChanged(), week) { logs, _ ->
-                    analytics.nutritionHistory(logs)
+                combine(nutritionRepository.getAllNutritionLogs().distinctUntilChanged(), week, visibleDates) { logs, _, dates ->
+                    analytics.nutritionHistory(logs, dates)
                 },
                 nutritionRestDaysFlow,
                 day
             ) { history, restDays, _ ->
-                NutritionAnalytics(history, analytics.streak(history.calendar.keys, restDays), restDays)
+                NutritionAnalytics(history, analytics.streak(history.activeDates, restDays), restDays)
             }
 
             val sessionCalendar = combine(
                 combine(workoutRepository.getAllCompletedSessions().distinctUntilChanged(), week) { history, _ ->
                     analytics.sessionHistory(history)
                 },
-                metadata.map { it.workoutNames }.distinctUntilChanged()
-            ) { history, names ->
+                metadata.map { it.workoutNames }.distinctUntilChanged(),
+                visibleDates
+            ) { history, names, dates ->
                 SessionCalendar(
                     history = history,
                     weeklyDays = history.weeklyWorkoutIds.mapValues { (_, ids) -> ids.map { names[it] ?: "Unknown" } },
-                    calendar = analytics.workoutCalendar(history, names)
+                    calendar = analytics.workoutCalendar(history, names, dates)
                 )
             }
             val sessions = combine(sessionCalendar, restDaysFlow, day) { calendar, restDays, _ ->
@@ -176,11 +190,18 @@ class DashboardViewModel(
             }
 
             val charts = combine(
-                workoutRepository.getAllCompletedSetLogs().distinctUntilChanged().map(analytics::setHistory),
+                combine(workoutRepository.getAllCompletedSetLogs().distinctUntilChanged().map { logs ->
+                    // Opening/closing a detail must not regroup the full weekly history.
+                    logs to analytics.setHistory(logs, includeDailyVolumes = false).weeklyVolumes
+                }, expandedRoutines.map { it.isNotEmpty() }.distinctUntilChanged()) { (logs, weekly), needsDailyVolumes ->
+                    SetHistory(weekly, if (needsDailyVolumes) analytics.dailyVolumes(logs) else emptyList())
+                },
                 // Renames and set-count/order edits do not change routine membership.
-                metadata.map { it.workoutByExercise }.distinctUntilChanged()
-            ) { history, workoutByExercise ->
-                ChartAnalytics(history, analytics.workoutVolumeTrends(history, workoutByExercise))
+                metadata.map { it.workoutByExercise }.distinctUntilChanged(),
+                expandedRoutines
+            ) { history, workoutByExercise, expanded ->
+                ChartAnalytics(history, if (expanded.isEmpty()) emptyMap() else
+                    analytics.workoutVolumeTrends(history, workoutByExercise.filterValues { it in expanded }))
             }
 
             emitAll(combine(nutrition, sessions, charts, metadata) { nutritionData, sessionData, chartData, meta ->

@@ -34,6 +34,7 @@ class DashboardExerciseCardsTest {
     fun collapsedPanelsDoNotQueryAndCollapseAndReopenManageSubscriptions() {
         val queries = AtomicInteger()
         val active = AtomicInteger()
+        val routineActive = AtomicInteger()
         var weight = 100f
         val charts: (Int) -> Flow<ExerciseCharts> = { id ->
             queries.incrementAndGet()
@@ -53,14 +54,19 @@ class DashboardExerciseCardsTest {
                 LazyColumn {
                     RoutinesSection(
                         workouts = listOf(WorkoutEntity(id = 1, name = "Push")),
-                        exercisesMap = mapOf(1 to listOf(bench, squat)), exerciseCharts = charts
+                        exercisesMap = mapOf(1 to listOf(bench, squat)), exerciseCharts = charts,
+                        onRoutineExpansionChanged = { id, expanded ->
+                            assertEquals(1, id)
+                            routineActive.addAndGet(if (expanded) 1 else -1)
+                        }
                     )
                 }
             }
         }
-        compose.runOnIdle { assertEquals(0, queries.get()) }
+        compose.runOnIdle { assertEquals(0, queries.get()); assertEquals(0, routineActive.get()) }
         compose.onNodeWithText("PUSH").performClick()
         compose.onNodeWithText("Bench").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(1, routineActive.get()) }
         compose.runOnIdle { assertEquals(0, queries.get()) }
         // Tap the name: the merged header's center can hit a nested time filter.
         compose.onNodeWithText("Bench", useUnmergedTree = true).performClick()
@@ -77,6 +83,7 @@ class DashboardExerciseCardsTest {
         // Closing the parent routine also removes the exercise's query collector.
         compose.onNodeWithText("PUSH").performClick()
         compose.waitUntil(2_000) { active.get() == 0 }
+        compose.waitUntil(2_000) { routineActive.get() == 0 }
     }
 
     @Test

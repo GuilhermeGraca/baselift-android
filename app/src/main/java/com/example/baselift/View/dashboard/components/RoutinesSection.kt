@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Alignment
@@ -38,7 +39,8 @@ fun LazyListScope.RoutinesSection(
     workouts: List<WorkoutEntity>,
     exercisesMap: Map<Int, List<ExerciseEntity>>,
     workoutVolumeTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>> = emptyMap(),
-    exerciseCharts: (Int) -> Flow<ExerciseCharts>
+    exerciseCharts: (Int) -> Flow<ExerciseCharts>,
+    onRoutineExpansionChanged: (Int, Boolean) -> Unit = { _, _ -> }
 ) {
     item {
         Text(
@@ -74,6 +76,7 @@ fun LazyListScope.RoutinesSection(
                 exercises = exercises,
                 workoutVolumeTrend = workoutVolumeTrends[workout.id] ?: emptyList(),
                 exerciseCharts = exerciseCharts,
+                onRoutineExpansionChanged = onRoutineExpansionChanged,
                 routineColor = rColor
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -87,10 +90,13 @@ fun WorkoutCollapsibleCard(
     exercises: List<ExerciseEntity>,
     workoutVolumeTrend: List<com.example.baselift.View.components.ChartDataPoint>,
     exerciseCharts: (Int) -> Flow<ExerciseCharts>,
-    routineColor: Color = NeonGreen
+    routineColor: Color = NeonGreen,
+    onRoutineExpansionChanged: (Int, Boolean) -> Unit = { _, _ -> }
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
-    var selectedFilter by remember { mutableStateOf("ALL") }
+    var isExpanded by rememberSaveable(workout.id) { mutableStateOf(false) }
+    var selectedFilter by rememberSaveable(workout.id) { mutableStateOf("ALL") }
+    val onExpansionChanged by rememberUpdatedState(onRoutineExpansionChanged)
+    val dateFormatter = remember { java.text.SimpleDateFormat("MMM dd", java.util.Locale.US) }
     val filters = listOf("1M", "3M", "1Y", "ALL")
 
     Column(
@@ -137,6 +143,10 @@ fun WorkoutCollapsibleCard(
         }
 
         AnimatedVisibility(visible = isExpanded) {
+            DisposableEffect(workout.id) {
+                onExpansionChanged(workout.id, true)
+                onDispose { onExpansionChanged(workout.id, false) }
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -190,7 +200,7 @@ fun WorkoutCollapsibleCard(
                         lineColor = routineColor,
                         yUnit = "kg",
                         formatYLabel = { String.format(java.util.Locale.US, "%.0f", it) },
-                        formatXLabel = { java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(it)) },
+                        formatXLabel = { dateFormatter.format(java.util.Date(it)) },
                         targetValue = null,
                         onSetTargetValue = {},
                         showTimeFilters = false,
@@ -232,8 +242,9 @@ fun ExerciseCollapsibleCard(
     exercise: ExerciseEntity,
     exerciseCharts: (Int) -> Flow<ExerciseCharts>
 ) {
-    var isExpanded by remember(exercise.id) { mutableStateOf(false) }
-    var selectedFilter by remember(exercise.id) { mutableStateOf("ALL") }
+    var isExpanded by rememberSaveable(exercise.id) { mutableStateOf(false) }
+    var selectedFilter by rememberSaveable(exercise.id) { mutableStateOf("ALL") }
+    val dateFormatter = remember { java.text.SimpleDateFormat("MMM dd", java.util.Locale.US) }
     var retryVersion by remember(exercise.id) { mutableIntStateOf(0) }
     val filters = listOf("1M", "3M", "1Y", "ALL")
 
@@ -411,7 +422,7 @@ fun ExerciseCollapsibleCard(
                             barColor = ElectricBlue,
                             yUnit = "kg",
                             formatYLabel = { String.format(java.util.Locale.US, "%.0f", it) },
-                            formatXLabel = { java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(it)) },
+                            formatXLabel = { dateFormatter.format(java.util.Date(it)) },
                             summaryValue = null,
                             summarySubtitle = null,
                             summarySubtitleColor = CrystalWhite,
@@ -438,7 +449,7 @@ fun ExerciseCollapsibleCard(
                             lineColor = NeonGreen,
                             yUnit = "kg",
                             formatYLabel = { String.format(java.util.Locale.US, "%.1f", it) },
-                            formatXLabel = { java.text.SimpleDateFormat("MMM dd", java.util.Locale.US).format(java.util.Date(it)) },
+                            formatXLabel = { dateFormatter.format(java.util.Date(it)) },
                             targetValue = targetWeight,
                             onSetTargetValue = { newTarget: Float? ->
                                 targetWeight = newTarget

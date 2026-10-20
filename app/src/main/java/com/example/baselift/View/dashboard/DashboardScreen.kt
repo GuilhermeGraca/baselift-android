@@ -20,7 +20,9 @@ fun DashboardScreen(
     uiState: DashboardUiState,
     onSetRestDays: (Int) -> Unit = {},
     onSetNutritionRestDays: (Int) -> Unit = {},
-    exerciseCharts: (Int) -> Flow<ExerciseCharts>
+    exerciseCharts: (Int) -> Flow<ExerciseCharts>,
+    onRoutineExpansionChanged: (Int, Boolean) -> Unit = { _, _ -> },
+    onCalendarMonthChanged: (Long?) -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -40,7 +42,8 @@ fun DashboardScreen(
                 restDays = uiState.restDays,
                 nutritionRestDays = uiState.nutritionRestDays,
                 onSetRestDays = onSetRestDays,
-                onSetNutritionRestDays = onSetNutritionRestDays
+                onSetNutritionRestDays = onSetNutritionRestDays,
+                onCalendarMonthChanged = onCalendarMonthChanged
             )
             Spacer(modifier = Modifier.height(32.dp))
         }
@@ -55,7 +58,8 @@ fun DashboardScreen(
             workouts = uiState.workouts,
             exercisesMap = uiState.exercises,
             workoutVolumeTrends = uiState.workoutVolumeTrends,
-            exerciseCharts = exerciseCharts
+            exerciseCharts = exerciseCharts,
+            onRoutineExpansionChanged = onRoutineExpansionChanged
         )
     }
 }
