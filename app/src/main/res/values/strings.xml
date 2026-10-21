@@ -78,6 +78,7 @@
     <string name="workout_selection_error">Unable to load this routine. Your saved sets and inputs have been kept.</string>
     <string name="workout_selection_retry">Retry loading</string>
     <string name="workout_list_error">Unable to load your routines. Your saved workouts and inputs have been kept.</string>
+    <string name="workout_refreshing">Updating routine…</string>
     <string name="workout_edit_saving">SAVING…</string>
     <string name="workout_edit_close">Close</string>
     <string name="workout_edit_error">Unable to save these changes. Your entries have been kept. Please try saving again.</string>
@@ -256,11 +257,11 @@
     <string name="onboarding_based_on_profile">Based on your selected profile.</string>
     <string name="onboarding_daily_maintenance">DAILY MAINTENANCE</string>
     <string name="onboarding_protein">PROTEIN</string>
-    <string name="onboarding_protein_desc">30% P</string>
+    <string name="onboarding_protein_desc" formatted="false">30% P</string>
     <string name="onboarding_carbs">CARBS</string>
-    <string name="onboarding_carbs_desc">45% C</string>
+    <string name="onboarding_carbs_desc" formatted="false">45% C</string>
     <string name="onboarding_fats">FATS</string>
-    <string name="onboarding_fats_desc">25% F</string>
+    <string name="onboarding_fats_desc" formatted="false">25% F</string>
     <string name="onboarding_update_baseline">UPDATE BASELINE</string>
     <string name="onboarding_get_started">GET STARTED</string>
     <string name="onboarding_custom_plan_msg">Have a custom plan? Set macros manually ></string>

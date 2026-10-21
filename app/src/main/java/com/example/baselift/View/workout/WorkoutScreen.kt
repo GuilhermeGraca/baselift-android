@@ -177,9 +177,17 @@ fun WorkoutScreen(
             .fillMaxSize()
             .background(PureBlack)
     ) {
+        val selectedWorkout = uiState.selectedWorkout
+        val hasRetainedSnapshot = selectedWorkout != null && uiState.hasRowsSnapshot &&
+            uiState.activeSession?.workoutId == selectedWorkout.id
+        val rowsRefreshing = uiState.isLoading || !uiState.areRowsValidated
+        val writesBlocked = rowsRefreshing || uiState.workoutsLoadFailed ||
+            uiState.selectionLoadFailed || uiState.isFinalizing
+
         Column(modifier = Modifier.fillMaxSize()) {
             // barra superior para abas de treino
-            if (!uiState.isLoading && !uiState.workoutsLoadFailed && uiState.workouts.isNotEmpty()) {
+            if (uiState.workouts.isNotEmpty() &&
+                ((!uiState.isLoading && !uiState.workoutsLoadFailed) || hasRetainedSnapshot)) {
                 androidx.compose.foundation.lazy.LazyRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -204,7 +212,8 @@ fun WorkoutScreen(
                                                 )
                                             )
                                         )
-                                        .pointerInput(Unit) {
+                                        .pointerInput(workout.id, uiState.isLoading, uiState.workoutsLoadFailed) {
+                                            if (uiState.isLoading || uiState.workoutsLoadFailed) return@pointerInput
                                             detectTapGestures(
                                                 onPress = {
                                                     isPressed = true
@@ -245,15 +254,13 @@ fun WorkoutScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             // lista de exercícios
-            val selectedWorkout = uiState.selectedWorkout
-            val rowsRefreshing = uiState.isLoading || uiState.isSelectionLoading
-            val hasRetainedRows = uiState.activeSession != null && uiState.exercises.isNotEmpty()
-            // Cached rows are safe to display only after fresh routine membership is confirmed.
-            if (uiState.isLoading) {
+            // A same-session snapshot stays visible while membership and rows are revalidated.
+            // Its controls remain blocked until a fresh row emission confirms it.
+            if (uiState.isLoading && !hasRetainedSnapshot) {
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = NeonGreen)
                 }
-            } else if (uiState.workoutsLoadFailed) {
+            } else if (uiState.workoutsLoadFailed && !hasRetainedSnapshot) {
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -264,11 +271,11 @@ fun WorkoutScreen(
                         Text(stringResource(com.example.baselift.R.string.workout_selection_retry), color = NeonGreen)
                     }
                 }
-            } else if (selectedWorkout != null && uiState.isSelectionLoading && !hasRetainedRows) {
+            } else if (selectedWorkout != null && uiState.isSelectionLoading && !hasRetainedSnapshot) {
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = NeonGreen)
                 }
-            } else if (selectedWorkout != null && uiState.selectionLoadFailed) {
+            } else if (selectedWorkout != null && uiState.selectionLoadFailed && !hasRetainedSnapshot) {
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -280,7 +287,26 @@ fun WorkoutScreen(
                     }
                 }
             } else if (selectedWorkout != null) {
-                if (rowsRefreshing) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NeonGreen)
+                if (uiState.workoutsLoadFailed) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(stringResource(com.example.baselift.R.string.workout_list_error),
+                            color = MediumGrey, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        TextButton(onClick = viewModel::retryWorkouts) {
+                            Text(stringResource(com.example.baselift.R.string.workout_selection_retry), color = NeonGreen)
+                        }
+                    }
+                }
+                // Reserve this slim status strip so the cards never jump when validation starts.
+                Box(modifier = Modifier.fillMaxWidth().height(20.dp)) {
+                    if (rowsRefreshing && !uiState.workoutsLoadFailed) {
+                        Text(stringResource(com.example.baselift.R.string.workout_refreshing),
+                            color = MediumGrey, fontSize = 11.sp,
+                            modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp))
+                    }
+                }
                 key(selectedWorkout.id) {
                     var draggedIndex by remember { mutableStateOf<Int?>(null) }
                     var hoverIndex by remember { mutableStateOf<Int?>(null) }
@@ -323,8 +349,8 @@ fun WorkoutScreen(
                                 if (isDragged) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             }
 
-                            val dragModifier = Modifier.pointerInput(exerciseModel.exercise.id, index, rowsRefreshing) {
-                                        if (rowsRefreshing) return@pointerInput
+                            val dragModifier = Modifier.pointerInput(exerciseModel.exercise.id, index, writesBlocked) {
+                                        if (writesBlocked) return@pointerInput
                                         detectDragGesturesAfterLongPress(
                                             onDragStart = { _ ->
                                                 settlementJob?.cancel()
@@ -470,7 +496,7 @@ fun WorkoutScreen(
                                     savingSetNumbers = uiState.pendingSetWrites.filter {
                                         it.sessionId == displayedSessionId && it.exerciseId == exerciseModel.exercise.id
                                     }.map { it.setNumber }.toSet(),
-                                    writesBlocked = uiState.isFinalizing || rowsRefreshing,
+                                    writesBlocked = writesBlocked,
                                     removingSetNumbers = uiState.pendingSetRemovals.filter {
                                         it.sessionId == displayedSessionId && it.exerciseId == exerciseModel.exercise.id
                                     }.map { it.setNumber }.toSet(),
@@ -494,7 +520,7 @@ fun WorkoutScreen(
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(Color.Transparent)
                                             .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                            .clickable(enabled = !rowsRefreshing) { showAddExerciseDialog = true }
+                                            .clickable(enabled = !writesBlocked) { showAddExerciseDialog = true }
                                             .padding(24.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -516,6 +542,7 @@ fun WorkoutScreen(
                                     RestTimerWidget(
                                         modifier = Modifier.fillMaxWidth(),
                                         initialTimerSeconds = uiState.selectedWorkout?.defaultRestTimer ?: 105,
+                                        settingsEnabled = !writesBlocked,
                                         onTimerSaved = { seconds ->
                                             viewModel.updateWorkoutRestTimer(seconds)
                                         }
@@ -530,7 +557,7 @@ fun WorkoutScreen(
 
                                         Button(
                                             onClick = { viewModel.finalizeWorkout(activeSessionId) },
-                                            enabled = hasCompletedSets && !rowsRefreshing && !uiState.isFinalizing &&
+                                            enabled = hasCompletedSets && !writesBlocked &&
                                                 uiState.pendingSetWrites.none { it.sessionId == activeSessionId } &&
                                                 uiState.pendingSetRemovals.none { it.sessionId == activeSessionId },
                                             modifier = Modifier.fillMaxWidth().height(56.dp),

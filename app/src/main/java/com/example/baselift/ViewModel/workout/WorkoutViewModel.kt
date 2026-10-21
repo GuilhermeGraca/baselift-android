@@ -59,10 +59,13 @@ data class WorkoutUiState(
     val selectedWorkout: WorkoutEntity? = null,
     val activeSession: WorkoutSessionEntity? = null,
     val exercises: List<ExerciseUiModel> = emptyList(),
+    val hasRowsSnapshot: Boolean = false,
     val isLoading: Boolean = true,
     val workoutsLoadFailed: Boolean = false,
     val isSelectionLoading: Boolean = false,
     val selectionLoadFailed: Boolean = false,
+    // A retained snapshot can be rendered while Room reconnects, but it is not actionable.
+    val areRowsValidated: Boolean = false,
     val exerciseEdits: Map<Int, ExerciseEditState> = emptyMap(),
     val isFinalizing: Boolean = false,
     val finalizationFailed: Boolean = false,
@@ -324,7 +327,8 @@ class WorkoutViewModel(
                 .command(_uiState.subscriptionCount).collectLatest { command ->
                     if (command != SharingCommand.START) return@collectLatest
                     routinesRetry.collectLatest {
-                        _uiState.update { it.copy(isLoading = true, workoutsLoadFailed = false) }
+                        _uiState.update { it.copy(isLoading = true, workoutsLoadFailed = false,
+                            areRowsValidated = false) }
                         try {
                             // Recover the initial routine once, only when Workout is first requested.
                             if (!recoveredInitialSelection) {
@@ -339,12 +343,12 @@ class WorkoutViewModel(
                                 val selected = workouts.find { it.id == selectedId }
                                     ?: workouts.find { it.id == recoveredWorkoutId }
                                     ?: workouts.firstOrNull()
+                                // Discard a deleted routine's snapshot before publishing the fresh list.
+                                if (selected?.id != selectedId) loadWorkout(selected)
                                 _uiState.update {
                                     it.copy(workouts = workouts, isLoading = false,
-                                        selectedWorkout = if (selected?.id == selectedId) selected else it.selectedWorkout)
+                                        selectedWorkout = selected)
                                 }
-                                // Validate the selected ID before allowing current-row observation.
-                                if (selected?.id != selectedId) loadWorkout(selected)
                                 routinesReady.value = true
                             }
                         } catch (cancelled: CancellationException) {
@@ -354,7 +358,8 @@ class WorkoutViewModel(
                             _uiState.update { it.copy(isLoading = false, workoutsLoadFailed = true) }
                         } finally {
                             routinesReady.value = false
-                            _uiState.update { it.copy(isLoading = !it.workoutsLoadFailed) }
+                            _uiState.update { it.copy(isLoading = !it.workoutsLoadFailed,
+                                areRowsValidated = false) }
                         }
                     }
                 }
@@ -364,7 +369,8 @@ class WorkoutViewModel(
     fun retryWorkouts() {
         val state = _uiState.value
         if (!state.workoutsLoadFailed || state.isLoading || _uiState.subscriptionCount.value == 0) return
-        _uiState.update { it.copy(isLoading = true, workoutsLoadFailed = false) }
+        _uiState.update { it.copy(isLoading = true, workoutsLoadFailed = false,
+            areRowsValidated = false) }
         routinesRetry.value += 1
     }
 
@@ -397,7 +403,9 @@ class WorkoutViewModel(
         observedExerciseModels = null
         _uiState.update {
             it.copy(selectedWorkout = workout, activeSession = null, exercises = emptyList(),
+                hasRowsSnapshot = false,
                 isSelectionLoading = workout != null, selectionLoadFailed = false,
+                areRowsValidated = false,
                 pendingSetWrites = pendingSetWrites.keys.toSet(),
                 pendingSetRemovals = pendingSetRemovals.keys.toSet())
         }
@@ -427,7 +435,7 @@ class WorkoutViewModel(
                 routinesReady.collectLatest { ready ->
                     if (!ready) return@collectLatest
                     observingSelection = true
-                    _uiState.update { it.copy(isSelectionLoading = true) }
+                    _uiState.update { it.copy(isSelectionLoading = true, areRowsValidated = false) }
                     try {
                         repository.getExercisesForWorkout(workout.id).distinctUntilChanged()
                             .combine(repository.getSetsForSession(session.id).distinctUntilChanged()) { exercises, setLogs ->
@@ -439,7 +447,9 @@ class WorkoutViewModel(
                                     _uiState.value.activeSession?.id != session.id) return@collect
                                 observedExerciseModels = exerciseModels
                                 val displayed = displayedExerciseOrder(workout.id, exerciseModels)
-                                _uiState.update { it.copy(exercises = displayed, isSelectionLoading = false) }
+                                _uiState.update { it.copy(exercises = displayed, hasRowsSnapshot = true,
+                                    isSelectionLoading = false,
+                                    areRowsValidated = true) }
                                 reconcileSetWrites(session.id, exerciseModels)
                                 reconcileSetRemovals(session.id, exerciseModels)
                                 reconcileExerciseEdits(exerciseModels)
@@ -449,7 +459,7 @@ class WorkoutViewModel(
                             observingSelection = false
                             observedExerciseModels = null
                             releaseSavedAcknowledgements()
-                            _uiState.update { it.copy(isSelectionLoading = true) }
+                            _uiState.update { it.copy(isSelectionLoading = true, areRowsValidated = false) }
                         }
                     }
                 }
@@ -461,7 +471,9 @@ class WorkoutViewModel(
                     pendingExerciseEdits.filterValues { it.saved }.keys.toList().forEach(::finishExerciseEdit)
                     observedExerciseModels = null
                     _uiState.update {
-                        it.copy(activeSession = null, exercises = emptyList(), selectionLoadFailed = true)
+                        it.copy(activeSession = null, exercises = emptyList(), hasRowsSnapshot = false,
+                            selectionLoadFailed = true,
+                            areRowsValidated = false)
                     }
                 }
             } finally {

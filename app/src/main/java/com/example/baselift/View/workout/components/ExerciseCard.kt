@@ -113,6 +113,7 @@ fun ExerciseCard(
                     ) {
                         DropdownMenuItem(
                             text = { Text(stringResource(com.example.baselift.R.string.workout_edit_exercise), color = CrystalWhite, fontSize = 14.sp) },
+                            enabled = !writesBlocked && !isSavingMetadata,
                             leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = MediumGrey, modifier = Modifier.size(18.dp)) },
                             onClick = { showMenu = false; onEditExercise() }
                         )

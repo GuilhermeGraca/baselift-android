@@ -178,6 +178,8 @@ class WorkoutViewModelTest {
         runCurrent()
         viewModel.selectWorkout(repository.allWorkouts.first().single { it.id == otherWorkoutId })
         runCurrent()
+        assertEquals(otherWorkoutId, viewModel.uiState.value.activeSession?.workoutId)
+        assertTrue(viewModel.uiState.value.hasRowsSnapshot)
         val otherExerciseId = viewModel.uiState.value.exercises.single().exercise.id
         viewModel.updateDraftWeight(otherExerciseId, 1, "50")
         viewModel.addSetToExercise(otherExerciseId)
@@ -191,6 +193,8 @@ class WorkoutViewModelTest {
         assertEquals(1, source.calls.count { it.id == otherExerciseId })
         viewModel.selectWorkout(firstWorkout)
         runCurrent()
+        assertEquals(firstWorkout.id, viewModel.uiState.value.activeSession?.workoutId)
+        assertTrue(viewModel.uiState.value.areRowsValidated)
         assertEquals(4, viewModel.uiState.value.exercises.single().sets.size)
     }
 

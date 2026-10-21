@@ -40,7 +40,8 @@ class WorkoutStartupInteractionTest {
     private val recoveries = AtomicInteger()
     private val sessions = AtomicInteger()
 
-    private fun text(id: Int) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
+    private fun text(id: Int, vararg args: Any) =
+        InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
     @After fun tearDown() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync { store.clear() }
         if (::db.isInitialized) db.close()
@@ -119,12 +120,16 @@ class WorkoutStartupInteractionTest {
         compose.waitUntil(5_000) { !vm.uiState.value.isLoading && activeExercises.get() == 1 }
         compose.onNodeWithText("Bench").assertIsDisplayed()
         assertTrue(vm.uiState.value.isSelectionLoading)
+        assertFalse(vm.uiState.value.areRowsValidated)
+        compose.onNodeWithContentDescription(text(R.string.workout_set_check, 1))
+            .assertIsNotEnabled()
         compose.runOnIdle { vm.logSet(1, 1, 80f, 10, true) }
         runBlocking { assertTrue(db.workoutDao().getSetsForSession(1).first().isEmpty()) }
         assertEquals(1, sessions.get())
         runBlocking { db.workoutDao().updateExerciseMetadata(1, "Renamed Bench", "", "") }
         publishExercises.value = true
         compose.waitUntil(5_000) { !vm.uiState.value.isSelectionLoading }
+        assertTrue(vm.uiState.value.areRowsValidated)
         compose.onNodeWithText("Renamed Bench").assertIsDisplayed()
         compose.onNodeWithText("Bench").assertDoesNotExist()
         assertEquals(1, vm.uiState.value.activeSession?.id)
@@ -132,7 +137,34 @@ class WorkoutStartupInteractionTest {
         assertEquals(1, sessions.get())
     }
 
-    @Test fun returnWaitsForFreshRoutineMembershipBeforeShowingRowsOrAcceptingCachedCallbacks() {
+    @Test fun returnKeepsAnEmptyRoutineSnapshotInsteadOfShowingTheStartupSpinner() {
+        val vm = prepare()
+        runBlocking { db.workoutDao().insertWorkout(WorkoutEntity(id = 3, name = "Empty")) }
+        val visible = mutableStateOf(true)
+        compose.setContent { MaterialTheme { if (visible.value) WorkoutScreen(vm) } }
+        compose.waitUntil(5_000) { vm.uiState.value.areRowsValidated }
+        compose.runOnIdle { vm.selectWorkout(vm.uiState.value.workouts.single { it.id == 3 }) }
+        compose.waitUntil(5_000) {
+            vm.uiState.value.selectedWorkout?.id == 3 && vm.uiState.value.hasRowsSnapshot &&
+                vm.uiState.value.areRowsValidated
+        }
+        assertTrue(vm.uiState.value.exercises.isEmpty())
+        compose.runOnIdle { visible.value = false }
+        compose.waitUntil(5_000) { activeRoutines.get() == 0 && activeExercises.get() == 0 }
+        publishRoutines.value = false
+        compose.runOnIdle { visible.value = true }
+        compose.waitUntil(5_000) { activeRoutines.get() == 1 }
+        compose.onNodeWithText("EMPTY").assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.workout_refreshing)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.workout_add_exercise_session)).assertIsDisplayed()
+        assertFalse(vm.uiState.value.areRowsValidated)
+        publishRoutines.value = true
+        compose.waitUntil(5_000) { vm.uiState.value.areRowsValidated }
+        compose.onNodeWithText(text(R.string.workout_refreshing)).assertDoesNotExist()
+        assertEquals(3, vm.uiState.value.activeSession?.workoutId)
+    }
+
+    @Test fun returnShowsReadOnlySnapshotUntilFreshRoutineMembershipReplacesDeletedRoutine() {
         val vm = prepare()
         val visible = mutableStateOf(true)
         compose.setContent { MaterialTheme { if (visible.value) WorkoutScreen(vm) } }
@@ -144,7 +176,9 @@ class WorkoutStartupInteractionTest {
         publishRoutines.value = false
         compose.runOnIdle { visible.value = true }
         compose.waitUntil(5_000) { activeRoutines.get() == 1 }
-        compose.onNodeWithText("Bench").assertDoesNotExist()
+        compose.onNodeWithText("Bench").assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.workout_refreshing)).assertIsDisplayed()
+        assertFalse(vm.uiState.value.areRowsValidated)
         compose.onNodeWithText("Squat").assertDoesNotExist()
         compose.onNodeWithContentDescription("Add Workout").assertDoesNotExist()
         compose.runOnIdle {
@@ -153,6 +187,7 @@ class WorkoutStartupInteractionTest {
         assertEquals(1, sessions.get()); assertEquals(0, activeExercises.get())
         publishRoutines.value = true
         compose.waitUntil(5_000) { vm.uiState.value.selectedWorkout?.id == 2 && !vm.uiState.value.isSelectionLoading }
+        assertTrue(vm.uiState.value.areRowsValidated)
         compose.onNodeWithText("Squat").assertIsDisplayed()
         compose.onNodeWithText("LEGS").assertIsDisplayed()
         compose.onNodeWithText("Bench").assertDoesNotExist()

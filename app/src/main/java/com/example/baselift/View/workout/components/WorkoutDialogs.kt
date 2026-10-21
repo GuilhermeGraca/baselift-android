@@ -38,6 +38,7 @@ import androidx.compose.material3.CircularProgressIndicator
 fun RestTimerWidget(
     modifier: Modifier = Modifier,
     initialTimerSeconds: Int = 105,
+    settingsEnabled: Boolean = true,
     onTimerSaved: (Int) -> Unit = {}
 ) {
     var totalSeconds by remember { mutableIntStateOf(initialTimerSeconds) }
@@ -77,7 +78,7 @@ fun RestTimerWidget(
                 color = CrystalWhite,
                 fontSize = 42.sp,
                 fontWeight = FontWeight.Light,
-                modifier = Modifier.clickable { showEditDialog = true }
+                modifier = Modifier.clickable(enabled = settingsEnabled) { showEditDialog = true }
             )
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -119,6 +120,7 @@ fun RestTimerWidget(
         Dialog(onDismissRequest = { showEditDialog = false }) {
             GenericInputDialog(
                 title = stringResource(com.example.baselift.R.string.workout_set_rest_timer),
+                confirmEnabled = settingsEnabled,
                 content = {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                         BasicTextField(
@@ -141,6 +143,7 @@ fun RestTimerWidget(
                     }
                 },
                 onConfirm = {
+                    if (!settingsEnabled) return@GenericInputDialog
                     val m = minInput.toIntOrNull() ?: 0
                     val s = secInput.toIntOrNull() ?: 0
                     defaultSeconds = (m * 60) + s
