@@ -272,8 +272,35 @@ fun WorkoutScreen(
                     }
                 }
             } else if (selectedWorkout != null && uiState.isSelectionLoading && !hasRetainedSnapshot) {
-                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = NeonGreen)
+                if (uiState.loadingExerciseHeaders.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = NeonGreen)
+                    }
+                } else {
+                    Column(Modifier.fillMaxWidth().weight(1f)) {
+                        Text(stringResource(com.example.baselift.R.string.workout_preparing_sets),
+                            color = MediumGrey, fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
+                            contentPadding = PaddingValues(bottom = 120.dp),
+                            userScrollEnabled = false
+                        ) {
+                            items(uiState.loadingExerciseHeaders, key = { it.id }) { exercise ->
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                                        .background(Color(0xFF1B1B1B), RoundedCornerShape(12.dp))
+                                        .padding(16.dp)
+                                ) {
+                                    Text(exercise.name, color = CrystalWhite, fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold)
+                                    if (exercise.equipment.isNotBlank()) {
+                                        Text(exercise.equipment, color = MediumGrey, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             } else if (selectedWorkout != null && uiState.selectionLoadFailed && !hasRetainedSnapshot) {
                 Column(

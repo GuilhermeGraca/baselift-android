@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -77,14 +78,18 @@ class ScreenReadinessTest {
     }
 
     @Test
-    fun workoutWaitsForRealHistoryAndPublishesRowsWhenItArrives() {
+    fun workoutShowsReadOnlyHeadersWhileHistoryLoadsAndPublishesRowsWhenItArrives() {
         val historyReady = CompletableDeferred<Unit>()
         val vm = workoutViewModel(historyReady)
         compose.mainClock.autoAdvance = false
         compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
         compose.waitUntil(5_000) { vm.uiState.value.activeSession != null }
+        compose.waitUntil(5_000) { vm.uiState.value.loadingExerciseHeaders.isNotEmpty() }
         val enteredAt = compose.mainClock.currentTime
-        compose.onNodeWithText("Bench").assertDoesNotExist()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("Bench").assertIsDisplayed()
+        compose.onNodeWithText("Set 1 completion").assertDoesNotExist()
+        assertFalse(vm.uiState.value.areRowsValidated)
         historyReady.complete(Unit)
         compose.waitUntil(5_000) { vm.uiState.value.exercises.isNotEmpty() }
         compose.mainClock.advanceTimeByFrame()

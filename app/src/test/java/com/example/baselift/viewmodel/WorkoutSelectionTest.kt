@@ -12,6 +12,7 @@ import com.example.baselift.helpers.MainDispatcherRule
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -102,7 +103,8 @@ class WorkoutSelectionTest {
         assertTrue(vm.uiState.value.isSelectionLoading)
         assertNull(vm.uiState.value.activeSession)
         assertEquals(listOf(1), source.sessionReads)
-        assertTrue(source.historyReads.isEmpty())
+        assertEquals(listOf(1), source.historyReads)
+        assertTrue(source.exerciseReads.isEmpty())
         gate.complete(Unit); runCurrent()
         assertFalse(vm.uiState.value.isSelectionLoading)
         assertEquals(1, vm.uiState.value.exercises.size)
@@ -119,9 +121,16 @@ class WorkoutSelectionTest {
         assertTrue(vm.uiState.value.exercises.isEmpty())
         assertEquals(listOf(1), source.sessionReads)
         assertEquals(listOf(1), source.historyReads)
+        advanceTimeBy(100); runCurrent()
+        assertEquals("Bench", vm.uiState.value.loadingExerciseHeaders.single().name)
+        assertFalse(vm.uiState.value.areRowsValidated)
+        vm.logSet(1, 1, 80f, 10, true); runCurrent()
+        assertTrue(repository.getSetsForSession(session!!.id).first().isEmpty())
         gate.complete(Unit); runCurrent()
         assertEquals(session, vm.uiState.value.activeSession)
         assertEquals(1, vm.uiState.value.exercises.size)
+        assertTrue(vm.uiState.value.loadingExerciseHeaders.isEmpty())
+        assertTrue(vm.uiState.value.areRowsValidated)
     }
 
     @Test fun `cancelled late session result cannot overwrite a newer attempt for the same routine`() = runTest {
@@ -139,7 +148,7 @@ class WorkoutSelectionTest {
         gate.complete(Unit); runCurrent()
         assertEquals(current, vm.uiState.value)
         assertNotEquals(999, vm.uiState.value.activeSession?.id)
-        assertEquals(listOf(2, 1), source.historyReads)
+        assertEquals(listOf(1, 2, 1), source.historyReads)
         assertEquals(listOf(2, 1), source.exerciseReads)
     }
 
@@ -159,6 +168,24 @@ class WorkoutSelectionTest {
         assertEquals(current, vm.uiState.value)
         assertFalse(vm.uiState.value.selectionLoadFailed)
         assertFalse(vm.uiState.value.isSelectionLoading)
+    }
+
+    @Test fun `preview from an old routine cannot appear after switching to another`() = runTest {
+        fixtures()
+        val oldHistory = CompletableDeferred<Unit>()
+        source.beforeHistory = { workoutId, attempt ->
+            if (workoutId == 1 && attempt == 1) oldHistory.await()
+        }
+        start(); runCurrent()
+        advanceTimeBy(100); runCurrent()
+        assertEquals("Bench", vm.uiState.value.loadingExerciseHeaders.single().name)
+        select(2); runCurrent()
+        assertEquals(2, vm.uiState.value.selectedWorkout?.id)
+        assertEquals("Squat", vm.uiState.value.exercises.single().exercise.name)
+        assertTrue(vm.uiState.value.loadingExerciseHeaders.isEmpty())
+        oldHistory.complete(Unit); runCurrent()
+        assertEquals("Squat", vm.uiState.value.exercises.single().exercise.name)
+        assertTrue(vm.uiState.value.areRowsValidated)
     }
 
     @Test fun `session failure is recoverable and repeated retry taps start one request`() = runTest {

@@ -16,8 +16,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.supervisorScope
 import androidx.compose.runtime.Stable
 
 @Stable
@@ -59,6 +62,7 @@ data class WorkoutUiState(
     val selectedWorkout: WorkoutEntity? = null,
     val activeSession: WorkoutSessionEntity? = null,
     val exercises: List<ExerciseUiModel> = emptyList(),
+    val loadingExerciseHeaders: List<ExerciseEntity> = emptyList(),
     val hasRowsSnapshot: Boolean = false,
     val isLoading: Boolean = true,
     val workoutsLoadFailed: Boolean = false,
@@ -359,7 +363,7 @@ class WorkoutViewModel(
                         } finally {
                             routinesReady.value = false
                             _uiState.update { it.copy(isLoading = !it.workoutsLoadFailed,
-                                areRowsValidated = false) }
+                                areRowsValidated = false, loadingExerciseHeaders = emptyList()) }
                         }
                     }
                 }
@@ -403,6 +407,7 @@ class WorkoutViewModel(
         observedExerciseModels = null
         _uiState.update {
             it.copy(selectedWorkout = workout, activeSession = null, exercises = emptyList(),
+                loadingExerciseHeaders = emptyList(),
                 hasRowsSnapshot = false,
                 isSelectionLoading = workout != null, selectionLoadFailed = false,
                 areRowsValidated = false,
@@ -418,14 +423,40 @@ class WorkoutViewModel(
             try {
                 // A post-finalization renewal may be requested after presentation has stopped.
                 routinesReady.first { it }
-                // iniciar ou obter a sessão
-                val session = repository.startOrGetSession(workout.id)
-                currentCoroutineContext().ensureActive()
-                if (selectionToken !== token) return@launch
-                _uiState.update { it.copy(activeSession = session) }
-
-                // Keep immutable history local to this selection; load before publishing actionable rows.
-                val previousSets = repository.getPreviousSetsForWorkout(workout.id)
+                // History does not depend on the current session. Overlap both reads, but keep
+                // them owned by this selection so a switch or failure cancels the remaining work.
+                val (session, previousSets) = supervisorScope {
+                    val headers = launch {
+                        // Fast loads do not need a second Room query or a transient preview.
+                        delay(100)
+                        if (_uiState.subscriptionCount.value == 0 || !routinesReady.value ||
+                            selectionToken !== token) return@launch
+                        try {
+                            val exercises = repository.getExercisesForWorkout(workout.id).first()
+                            if (_uiState.subscriptionCount.value > 0 && routinesReady.value &&
+                                selectionToken === token &&
+                                _uiState.value.selectedWorkout?.id == workout.id &&
+                                !_uiState.value.areRowsValidated) {
+                                _uiState.update { it.copy(loadingExerciseHeaders = exercises) }
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            // The normal row subscription still owns error and retry feedback.
+                        }
+                    }
+                    val history = async { repository.getPreviousSetsForWorkout(workout.id) }
+                    try {
+                        val currentSession = repository.startOrGetSession(workout.id)
+                        currentCoroutineContext().ensureActive()
+                        if (selectionToken !== token) throw CancellationException("Obsolete workout selection")
+                        _uiState.update { it.copy(activeSession = currentSession) }
+                        currentSession to history.await()
+                    } finally {
+                        headers.cancel()
+                        history.cancel()
+                    }
+                }
                 currentCoroutineContext().ensureActive()
                 if (selectionToken !== token) return@launch
                 val previousSetsByKey = previousSets.associateBy { it.exerciseId to it.setNumber }
@@ -448,6 +479,7 @@ class WorkoutViewModel(
                                 observedExerciseModels = exerciseModels
                                 val displayed = displayedExerciseOrder(workout.id, exerciseModels)
                                 _uiState.update { it.copy(exercises = displayed, hasRowsSnapshot = true,
+                                    loadingExerciseHeaders = emptyList(),
                                     isSelectionLoading = false,
                                     areRowsValidated = true) }
                                 reconcileSetWrites(session.id, exerciseModels)
@@ -472,6 +504,7 @@ class WorkoutViewModel(
                     observedExerciseModels = null
                     _uiState.update {
                         it.copy(activeSession = null, exercises = emptyList(), hasRowsSnapshot = false,
+                            loadingExerciseHeaders = emptyList(),
                             selectionLoadFailed = true,
                             areRowsValidated = false)
                     }

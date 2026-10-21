@@ -79,6 +79,7 @@
     <string name="workout_selection_retry">Retry loading</string>
     <string name="workout_list_error">Unable to load your routines. Your saved workouts and inputs have been kept.</string>
     <string name="workout_refreshing">Updating routine…</string>
+    <string name="workout_preparing_sets">Preparing sets and previous results…</string>
     <string name="workout_edit_saving">SAVING…</string>
     <string name="workout_edit_close">Close</string>
     <string name="workout_edit_error">Unable to save these changes. Your entries have been kept. Please try saving again.</string>
