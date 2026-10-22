@@ -36,6 +36,8 @@ import com.example.baselift.View.workout.components.EditExerciseDialog
 import com.example.baselift.View.workout.components.GenericInputDialog
 import com.example.baselift.View.workout.components.RestTimerWidget
 import com.example.baselift.View.workout.components.ConfirmDeleteDialog
+import com.example.baselift.View.workout.components.WorkoutLoadingContent
+import com.example.baselift.View.workout.components.WorkoutRoutineTabsPlaceholder
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.Position
@@ -242,6 +244,8 @@ fun WorkoutScreen(
                         }
                     }
                 }
+            } else if (uiState.isLoading && !hasRetainedSnapshot) {
+                WorkoutRoutineTabsPlaceholder()
             } else if (!uiState.isLoading && !uiState.workoutsLoadFailed) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -257,9 +261,7 @@ fun WorkoutScreen(
             // A same-session snapshot stays visible while membership and rows are revalidated.
             // Its controls remain blocked until a fresh row emission confirms it.
             if (uiState.isLoading && !hasRetainedSnapshot) {
-                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = NeonGreen)
-                }
+                WorkoutLoadingContent(emptyList(), Modifier.weight(1f))
             } else if (uiState.workoutsLoadFailed && !hasRetainedSnapshot) {
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(24.dp),
@@ -272,35 +274,13 @@ fun WorkoutScreen(
                     }
                 }
             } else if (selectedWorkout != null && uiState.isSelectionLoading && !hasRetainedSnapshot) {
-                if (uiState.loadingExerciseHeaders.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = NeonGreen)
-                    }
-                } else {
-                    Column(Modifier.fillMaxWidth().weight(1f)) {
+                Column(Modifier.fillMaxWidth().weight(1f)) {
+                    if (uiState.loadingExerciseHeaders.isNotEmpty()) {
                         Text(stringResource(com.example.baselift.R.string.workout_preparing_sets),
                             color = MediumGrey, fontSize = 11.sp,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
-                            contentPadding = PaddingValues(bottom = 120.dp),
-                            userScrollEnabled = false
-                        ) {
-                            items(uiState.loadingExerciseHeaders, key = { it.id }) { exercise ->
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-                                        .background(Color(0xFF1B1B1B), RoundedCornerShape(12.dp))
-                                        .padding(16.dp)
-                                ) {
-                                    Text(exercise.name, color = CrystalWhite, fontSize = 24.sp,
-                                        fontWeight = FontWeight.Bold)
-                                    if (exercise.equipment.isNotBlank()) {
-                                        Text(exercise.equipment, color = MediumGrey, fontSize = 12.sp)
-                                    }
-                                }
-                            }
-                        }
                     }
+                    WorkoutLoadingContent(uiState.loadingExerciseHeaders, Modifier.weight(1f))
                 }
             } else if (selectedWorkout != null && uiState.selectionLoadFailed && !hasRetainedSnapshot) {
                 Column(

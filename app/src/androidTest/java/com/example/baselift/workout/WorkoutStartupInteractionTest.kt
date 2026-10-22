@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.baselift.Model.local.AppDatabase
 import com.example.baselift.Model.local.entity.ExerciseEntity
+import com.example.baselift.Model.local.entity.SetLogEntity
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.Model.local.entity.WorkoutSessionEntity
 import com.example.baselift.Model.repository.IWorkoutRepository
@@ -19,6 +20,7 @@ import com.example.baselift.R
 import com.example.baselift.View.workout.WorkoutScreen
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
@@ -39,6 +41,8 @@ class WorkoutStartupInteractionTest {
     private val activeExercises = AtomicInteger()
     private val recoveries = AtomicInteger()
     private val sessions = AtomicInteger()
+    @Volatile private var holdHistory = false
+    private val releaseHistory = CompletableDeferred<Unit>()
 
     private fun text(id: Int, vararg args: Any) =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
@@ -71,6 +75,10 @@ class WorkoutStartupInteractionTest {
             }
             override suspend fun getAnyActiveSession() = real.getAnyActiveSession().also { recoveries.incrementAndGet() }
             override suspend fun startOrGetSession(workoutId: Int) = dao.getOrCreateActiveSession(workoutId).also { sessions.incrementAndGet() }
+            override suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity> {
+                if (holdHistory) releaseHistory.await()
+                return real.getPreviousSetsForWorkout(workoutId)
+            }
             override fun getExercisesForWorkout(workoutId: Int) = flow {
                 activeExercises.incrementAndGet()
                 try { emitAll(combine(real.getExercisesForWorkout(workoutId), publishExercises) { rows, publish ->
@@ -86,6 +94,40 @@ class WorkoutStartupInteractionTest {
             vm.updateDraftReps(1, 1, "10")
         }
         return vm
+    }
+
+    @Test fun firstRoutineReadShowsCardSkeletonThenRemovesItAsSoonAsRowsArrive() {
+        publishRoutines.value = false
+        val vm = prepare()
+        compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
+        compose.waitUntil(5_000) { activeRoutines.get() == 1 }
+        compose.onNodeWithTag("workout-tabs-skeleton").assertIsDisplayed()
+        compose.onNodeWithTag("workout-loading-skeleton").assertIsDisplayed()
+        compose.onNodeWithText("Bench").assertDoesNotExist()
+        publishRoutines.value = true
+        compose.waitUntil(5_000) { vm.uiState.value.areRowsValidated }
+        compose.onNodeWithTag("workout-tabs-skeleton").assertDoesNotExist()
+        compose.onNodeWithTag("workout-loading-skeleton").assertDoesNotExist()
+        compose.onNodeWithText("Bench").assertIsDisplayed()
+    }
+
+    @Test fun changingRoutineShowsItsRealHeaderAndSkeletonSetsWithoutOldControls() {
+        val vm = prepare()
+        compose.setContent { MaterialTheme { WorkoutScreen(vm) } }
+        compose.waitUntil(5_000) { vm.uiState.value.areRowsValidated }
+        holdHistory = true
+        compose.runOnIdle { vm.selectWorkout(vm.uiState.value.workouts.single { it.id == 2 }) }
+        compose.waitUntil(5_000) { vm.uiState.value.loadingExerciseHeaders.any { it.name == "Squat" } }
+        compose.onNodeWithText("LEGS").assertIsDisplayed()
+        compose.onNodeWithText("Squat").assertIsDisplayed()
+        compose.onNodeWithTag("workout-loading-skeleton").assertIsDisplayed()
+        compose.onAllNodesWithTag("workout-skeleton-set-row").onFirst().assertIsDisplayed()
+        compose.onNodeWithText("Bench").assertDoesNotExist()
+        compose.onNodeWithContentDescription(text(R.string.workout_set_check, 1)).assertDoesNotExist()
+        releaseHistory.complete(Unit)
+        compose.waitUntil(5_000) { vm.uiState.value.selectedWorkout?.id == 2 && vm.uiState.value.areRowsValidated }
+        compose.onNodeWithTag("workout-loading-skeleton").assertDoesNotExist()
+        compose.onNodeWithText("Squat").assertIsDisplayed()
     }
 
     @Test fun routineListFailureShowsRetryAndRecoversSavedRoutineAndInputs() {
