@@ -5,18 +5,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -39,6 +47,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -60,6 +69,16 @@ class SetWriteInteractionTest {
     private val row = SetUiModel(1, null, 70f, 8, canBeChecked = true)
     private val editable = SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText)
 
+    private fun samePixels(first: ImageBitmap, second: ImageBitmap): Boolean {
+        if (first.width != second.width || first.height != second.height) return false
+        val before = first.toPixelMap()
+        val after = second.toPixelMap()
+        for (y in 0 until first.height) for (x in 0 until first.width) {
+            if (before[x, y] != after[x, y]) return false
+        }
+        return true
+    }
+
     @Test
     fun removingBlocksChecksAndAddWhileShowingTheTargetRow() {
         val model = ExerciseUiModel(ExerciseEntity(id = 1, workoutId = 1, name = "Bench", setCount = 2),
@@ -78,6 +97,7 @@ class SetWriteInteractionTest {
         compose.onNodeWithContentDescription("Set 1 completion").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Set 2 completion").assertIsNotEnabled()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Removing set…"))
+        compose.onNodeWithText("Removing set…").assertExists()
         val label = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.workout_add_set)
         compose.onNodeWithText(label).assertIsNotEnabled().performTouchInput { click() }
         compose.runOnIdle { assertEquals(0, adds); assertEquals(0, logs) }
@@ -112,10 +132,57 @@ class SetWriteInteractionTest {
     }
 
     @Test
+    fun completedValuesKeepRowHeightWithoutKeepingTextEditors() {
+        val completed = mutableStateOf(false)
+        compose.setContent {
+            MaterialTheme {
+                Column(Modifier.testTag("set-row")) {
+                    SetRow(1, row.copy(isCompleted = completed.value), "80", "10",
+                        { _, _, _ -> }, { _, _, _ -> }, onLogSet = { _, _, _, _, _ -> })
+                }
+            }
+        }
+        val height = compose.onNodeWithTag("set-row").getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        assertEquals(2, compose.onAllNodes(editable).fetchSemanticsNodes().size)
+        compose.runOnIdle { completed.value = true }
+        assertEquals(0, compose.onAllNodes(editable).fetchSemanticsNodes().size)
+        compose.onNodeWithText("80").assertExists()
+        compose.onNodeWithText("10").assertExists()
+        assertEquals(height, compose.onNodeWithTag("set-row").getUnclippedBoundsInRoot().let { it.bottom - it.top })
+        compose.runOnIdle { completed.value = false }
+        assertEquals(2, compose.onAllNodes(editable).fetchSemanticsNodes().size)
+        assertEquals(height, compose.onNodeWithTag("set-row").getUnclippedBoundsInRoot().let { it.bottom - it.top })
+    }
+
+    @Test
+    fun instantaneousSaveDoesNotDelayConfirmedCheck() {
+        val completed = mutableStateOf(false)
+        var writes = 0
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            MaterialTheme {
+                SetRow(1, row.copy(isCompleted = completed.value), "", "",
+                    { _, _, _ -> }, { _, _, _ -> },
+                    onLogSet = { _, _, _, _, _ ->
+                        writes++
+                        completed.value = true
+                    })
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val checkbox = compose.onNodeWithContentDescription("Set 1 completion")
+        checkbox.performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("set-pending-spinner", useUnmergedTree = true).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, writes) }
+        checkbox.assertIsEnabled()
+    }
+
+    @Test
     fun savingDisablesCheckboxAndInputsThenAllowsRetryWithPreservedValues() {
         val saving = mutableStateOf(false)
-        val inputs = mapOf("1_1" to "80")
-        val reps = mapOf("1_1" to "10")
+        val inputs = "80"
+        val reps = "10"
         val calls = mutableListOf<Pair<Float, Int>>()
         compose.mainClock.autoAdvance = false
         compose.setContent {
@@ -133,6 +200,15 @@ class SetWriteInteractionTest {
         compose.mainClock.advanceTimeByFrame()
         checkbox.assertIsNotEnabled()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Saving set…"))
+        val spinner = compose.onNodeWithTag("set-pending-spinner", useUnmergedTree = true)
+        val firstFrame = spinner.captureToImage()
+        compose.onNodeWithText("Saving set…").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(64)
+        assertFalse("The pending indicator must visibly rotate within a short write",
+            samePixels(firstFrame, spinner.captureToImage()))
+        compose.mainClock.advanceTimeBy(320)
+        compose.onNodeWithText("Saving set…").assertExists()
+        compose.onNodeWithText("70kg x 8").assertExists()
         compose.onAllNodes(editable).apply {
             assertEquals(2, fetchSemanticsNodes().size)
             this[0].assertIsNotEnabled()
@@ -145,6 +221,7 @@ class SetWriteInteractionTest {
             saving.value = false
         }
         compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("Saving set…").assertDoesNotExist()
         checkbox.assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(listOf(80f to 10, 80f to 10), calls) }
     }
@@ -156,11 +233,12 @@ class SetWriteInteractionTest {
         val model = ExerciseUiModel(exercise, listOf(row,
             SetUiModel(2, null, 60f, 10, canBeChecked = true, canBeRemoved = true)))
         var calls = 0
+        val draftUpdates = mutableListOf<String>()
         compose.mainClock.autoAdvance = false
         compose.setContent {
             MaterialTheme {
                 Column {
-                    ExerciseCard(model, emptyMap(), emptyMap(), { _, _, _ -> }, { _, _, _ -> }, {}, {},
+                    ExerciseCard(model, emptyMap(), emptyMap(), { _, _, value -> draftUpdates += value }, { _, _, _ -> }, {}, {},
                         onLogSet = { _, _, _, _, _ -> calls++ }, onDeleteExercise = {},
                         onEditExercise = {}, savingSetNumbers = pending.value)
                 }
@@ -170,6 +248,9 @@ class SetWriteInteractionTest {
         compose.onNodeWithContentDescription("Set 1 completion").assertIsNotEnabled()
         val next = compose.onNodeWithContentDescription("Set 2 completion")
         next.assertIsNotEnabled().performTouchInput { click() }
+        compose.onAllNodes(editable)[0].assertIsNotEnabled()
+        compose.onAllNodes(editable)[2].assertIsEnabled().performTextReplacement("82.5")
+        compose.runOnIdle { assertEquals(listOf("82.5"), draftUpdates) }
         compose.runOnIdle { assertEquals(0, calls); pending.value = emptySet() }
         compose.mainClock.advanceTimeByFrame()
         next.assertIsEnabled().performClick()
@@ -181,7 +262,7 @@ class SetWriteInteractionTest {
         var calls = 0
         compose.setContent {
             MaterialTheme {
-                SetRow(1, row, emptyMap(), emptyMap(), { _, _, _ -> }, { _, _, _ -> },
+                SetRow(1, row, "", "", { _, _, _ -> }, { _, _, _ -> },
                     onLogSet = { _, _, _, _, _ -> calls++ }, writesBlocked = true)
             }
         }
@@ -226,7 +307,7 @@ class SetWriteInteractionTest {
             val state by vm.uiState.collectAsState()
             MaterialTheme {
                 state.exercises.firstOrNull()?.sets?.firstOrNull()?.let { set ->
-                    SetRow(exerciseId, set, vm.draftWeights, vm.draftReps,
+                    SetRow(exerciseId, set, vm.getDraftWeight(exerciseId, set.setNumber), vm.getDraftReps(exerciseId, set.setNumber),
                         vm::updateDraftWeight, vm::updateDraftReps,
                         onLogSet = { number, weight, reps, completed, _ ->
                             vm.logSet(exerciseId, number, weight, reps, completed, sessionId)
@@ -253,15 +334,15 @@ class SetWriteInteractionTest {
         }
         val firstId = runBlocking { dao.getSetsForSession(sessionId).first().single().id }
         assertTrue(firstId > 0)
-        compose.mainClock.advanceTimeBy(100)
-        checkbox.performClick()
+        compose.mainClock.advanceTimeByFrame()
+        checkbox.assertIsEnabled().performClick()
         compose.waitUntil(5_000) {
             vm.uiState.value.pendingSetWrites.isEmpty() &&
                 !vm.uiState.value.exercises.first().sets.first().isCompleted
         }
         assertTrue(runBlocking { dao.getSetsForSession(sessionId).first().isEmpty() })
-        compose.mainClock.advanceTimeBy(100)
-        checkbox.performClick()
+        compose.mainClock.advanceTimeByFrame()
+        checkbox.assertIsEnabled().performClick()
         compose.waitUntil(5_000) {
             vm.uiState.value.pendingSetWrites.isEmpty() &&
                 vm.uiState.value.exercises.first().sets.first().isCompleted

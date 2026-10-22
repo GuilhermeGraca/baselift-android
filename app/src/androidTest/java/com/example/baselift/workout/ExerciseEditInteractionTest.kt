@@ -1,6 +1,7 @@
 package com.example.baselift.workout
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.lifecycle.ViewModelStore
@@ -105,6 +106,8 @@ class ExerciseEditInteractionTest {
         compose.mainClock.advanceTimeByFrame()
         compose.waitUntil(5_000) { requests.size == 1 }
         compose.onNodeWithText(text(R.string.workout_edit_saving)).assertIsNotEnabled()
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .assertCountEquals(0)
         compose.onNodeWithText("Incline").assertIsNotEnabled()
         repeat(3) { compose.onNodeWithText(text(R.string.workout_edit_saving)).performTouchInput { click() } }
         assertEquals(1, requests.size)

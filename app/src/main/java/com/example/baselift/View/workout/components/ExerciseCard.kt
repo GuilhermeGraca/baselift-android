@@ -180,14 +180,15 @@ fun ExerciseCard(
                         SetRow(
                             exerciseId = exerciseModel.exercise.id,
                             setModel = setModel,
-                            draftWeights = draftWeights,
-                            draftReps = draftReps,
+                            weightInput = draftWeights["${exerciseModel.exercise.id}_${setModel.setNumber}"] ?: "",
+                            repsInput = draftReps["${exerciseModel.exercise.id}_${setModel.setNumber}"] ?: "",
                             onUpdateDraftWeight = onUpdateDraftWeight,
                             onUpdateDraftReps = onUpdateDraftReps,
                             onRemove = onRemoveLastSet,
                             onLogSet = onLogSet,
                             isSaving = setModel.setNumber in savingSetNumbers,
-                            writesBlocked = writesBlocked || savingSetNumbers.isNotEmpty() || removingSetNumbers.isNotEmpty(),
+                            writesBlocked = writesBlocked,
+                            otherWritesPending = savingSetNumbers.isNotEmpty() || removingSetNumbers.isNotEmpty(),
                             isRemoving = setModel.setNumber in removingSetNumbers,
                             removalBlocked = isAddingSets
                         )

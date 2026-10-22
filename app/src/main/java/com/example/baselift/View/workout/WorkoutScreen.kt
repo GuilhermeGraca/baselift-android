@@ -353,6 +353,7 @@ fun WorkoutScreen(
                     ) {
                         items(uiState.exercises.size, key = { uiState.exercises[it].exercise.id }) { index ->
                             val exerciseModel = uiState.exercises[index]
+                            val exerciseId = exerciseModel.exercise.id
                             val isDragged = draggedIndex == index
                             val isAnyDragging = draggedIndex != null
 
@@ -376,7 +377,7 @@ fun WorkoutScreen(
                                 if (isDragged) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             }
 
-                            val dragModifier = Modifier.pointerInput(exerciseModel.exercise.id, index, writesBlocked) {
+                            val dragModifier = Modifier.pointerInput(exerciseId, index, writesBlocked) {
                                         if (writesBlocked) return@pointerInput
                                         detectDragGesturesAfterLongPress(
                                             onDragStart = { _ ->
@@ -441,12 +442,12 @@ fun WorkoutScreen(
                                                     if (draggedIndex != dropIdx) {
                                                         viewModel.moveExercise(
                                                             draggedIndex!!, dropIdx, selectedWorkout.id,
-                                                            exerciseModel.exercise.id
+                                                            exerciseId
                                                         )
                                                     }
 
                                                     settlementJob?.cancel()
-                                                    val droppedExerciseId = exerciseModel.exercise.id
+                                                    val droppedExerciseId = exerciseId
                                                     settlementJob = coroutineScope.launch {
                                                         val currentOffset = awaitStableDraggedItemOffset(dropIdx) {
                                                             lazyListState.layoutInfo.visibleItemsInfo
@@ -501,15 +502,15 @@ fun WorkoutScreen(
                                     draftReps = viewModel.draftReps,
                                     onUpdateDraftWeight = { exId, setNum, v -> viewModel.updateDraftWeight(exId, setNum, v) },
                                     onUpdateDraftReps = { exId, setNum, v -> viewModel.updateDraftReps(exId, setNum, v) },
-                                    onAddSet = { viewModel.addSetToExercise(exerciseModel.exercise.id) },
+                                    onAddSet = { viewModel.addSetToExercise(exerciseId) },
                                     onRemoveLastSet = { number ->
-                                        viewModel.removeLastSet(exerciseModel.exercise.id, number, displayedSessionId)
+                                        viewModel.removeLastSet(exerciseId, number, displayedSessionId)
                                     },
-                                    onDeleteExercise = { viewModel.deleteExercise(exerciseModel.exercise.id) },
-                                    onEditExercise = { viewModel.beginExerciseEdit(exerciseModel.exercise.id) },
+                                    onDeleteExercise = { viewModel.deleteExercise(exerciseId) },
+                                    onEditExercise = { viewModel.beginExerciseEdit(exerciseId) },
                                     onLogSet = { setNumber, weight, reps, isCompleted, _ ->
                                         viewModel.logSet(
-                                            exerciseId = exerciseModel.exercise.id,
+                                            exerciseId = exerciseId,
                                             setNumber = setNumber,
                                             weight = weight,
                                             reps = reps,
@@ -521,14 +522,14 @@ fun WorkoutScreen(
                                     isAnyDragging = isAnyDragging,
                                     dragModifier = dragModifier,
                                     savingSetNumbers = uiState.pendingSetWrites.filter {
-                                        it.sessionId == displayedSessionId && it.exerciseId == exerciseModel.exercise.id
+                                        it.sessionId == displayedSessionId && it.exerciseId == exerciseId
                                     }.map { it.setNumber }.toSet(),
                                     writesBlocked = writesBlocked,
                                     removingSetNumbers = uiState.pendingSetRemovals.filter {
-                                        it.sessionId == displayedSessionId && it.exerciseId == exerciseModel.exercise.id
+                                        it.sessionId == displayedSessionId && it.exerciseId == exerciseId
                                     }.map { it.setNumber }.toSet(),
-                                    isAddingSets = exerciseModel.exercise.id in uiState.addingSetExerciseIds,
-                                    isSavingMetadata = uiState.exerciseEdits[exerciseModel.exercise.id]?.isSaving == true
+                                    isAddingSets = exerciseId in uiState.addingSetExerciseIds,
+                                    isSavingMetadata = uiState.exerciseEdits[exerciseId]?.isSaving == true
                                 )
                             }
                         }

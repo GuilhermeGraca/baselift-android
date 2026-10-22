@@ -32,7 +32,6 @@ import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
 import com.example.baselift.View.theme.*
 import com.example.baselift.ViewModel.workout.ExerciseEditState
-import androidx.compose.material3.CircularProgressIndicator
 
 @Composable
 fun RestTimerWidget(
@@ -187,13 +186,14 @@ fun GenericInputDialog(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(onClick = onConfirm, enabled = confirmEnabled && !isSaving,
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)) {
-                    if (isSaving) {
-                        CircularProgressIndicator(Modifier.size(16.dp), color = PureBlack, strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                    }
+                    modifier = Modifier.widthIn(min = 112.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NeonGreen,
+                        disabledContainerColor = if (isSaving) NeonGreen.copy(alpha = 0.72f) else DeepCharcoal
+                    )) {
                     Text(stringResource(if (isSaving) com.example.baselift.R.string.workout_edit_saving
-                        else com.example.baselift.R.string.workout_save), color = PureBlack)
+                        else com.example.baselift.R.string.workout_save),
+                        color = if (isSaving || confirmEnabled) PureBlack else MediumGrey)
                 }
             }
         }
