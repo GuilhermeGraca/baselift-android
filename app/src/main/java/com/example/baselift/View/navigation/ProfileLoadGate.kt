@@ -7,8 +7,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.baselift.R
+import com.example.baselift.View.components.DelayedPendingSpinner
 import com.example.baselift.View.theme.*
 import com.example.baselift.ViewModel.onboarding.LoadedProfile
 import com.example.baselift.ViewModel.onboarding.ProfileLoadState
@@ -57,11 +62,24 @@ internal fun ProfileLoadGate(
 
 @Composable
 private fun ProfileRetryButton(isLoading: Boolean, onRetry: () -> Unit) {
-    TextButton(onClick = onRetry, enabled = !isLoading) {
+    val retryLabel = stringResource(R.string.dash_retry)
+    val loadingLabel = stringResource(R.string.profile_loading)
+    TextButton(
+        onClick = onRetry,
+        enabled = !isLoading,
+        modifier = Modifier.semantics {
+            contentDescription = retryLabel
+            if (isLoading) stateDescription = loadingLabel
+        }
+    ) {
         if (isLoading) {
-            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            DelayedPendingSpinner(
+                color = NeonGreen,
+                modifier = Modifier.widthIn(min = 56.dp).height(20.dp),
+                spinnerModifier = Modifier.testTag("profile-retry-pending-spinner")
+            ) { Text(retryLabel) }
         } else {
-            Text(stringResource(R.string.dash_retry))
+            Text(retryLabel)
         }
     }
 }

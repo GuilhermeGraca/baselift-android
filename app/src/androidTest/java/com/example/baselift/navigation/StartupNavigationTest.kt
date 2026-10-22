@@ -107,9 +107,15 @@ class StartupNavigationTest {
         val saved = UserEntity(name = "Existing", weight = 70f)
         val users = prepare(saved, stallOtherReaders = true)
         compose.onNodeWithText("BaseLift").assertIsDisplayed()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("startup-pending-spinner", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("startup-pending-spinner", useUnmergedTree = true).assertIsDisplayed()
         main { assertNull(nav.currentDestination) }
         users.firstRead.complete(Unit)
         waitRoute(Routes.INSIGHTS)
+        compose.onNodeWithTag("startup-pending-spinner", useUnmergedTree = true).assertDoesNotExist()
         compose.waitForIdle()
         // Navigation, header and Insights share one reader; any second reader would remain blocked.
         assertEquals(1, users.observations.get())
@@ -134,11 +140,28 @@ class StartupNavigationTest {
         main { assertSame(initialGraph, nav.graph) }
     }
 
+    @Test fun fastProfileReadDoesNotLeaveAStartupSpinner() {
+        val loaded = LoadedProfile(UserEntity(name = "Ready"))
+        val state = mutableStateOf(ProfileLoadState(null, isLoading = true))
+        compose.mainClock.autoAdvance = false
+        compose.setContent { MaterialTheme {
+            ProfileLoadGate(state.value, onRetry = {}) { Text(it.user?.name ?: "Empty") }
+        } }
+        compose.mainClock.advanceTimeBy(100)
+        compose.onNodeWithText("BaseLift").assertIsDisplayed()
+        compose.onNodeWithTag("startup-pending-spinner", useUnmergedTree = true).assertDoesNotExist()
+        compose.runOnIdle { state.value = ProfileLoadState(loaded, isLoading = false) }
+        compose.mainClock.advanceTimeBy(250)
+        compose.onNodeWithText("Ready").assertIsDisplayed()
+        compose.onNodeWithTag("startup-pending-spinner", useUnmergedTree = true).assertDoesNotExist()
+    }
+
     @Test fun firstUseKeepsCustomTargetsAndUsesOneGraphWhenProfileIsSaved() {
         val users = prepare(null)
         main { assertNull(nav.currentDestination) }
         users.firstRead.complete(Unit)
         waitRoute(Routes.ONBOARDING)
+        compose.onNodeWithTag("startup-pending-spinner", useUnmergedTree = true).assertDoesNotExist()
         lateinit var initialGraph: androidx.navigation.NavGraph
         main { initialGraph = nav.graph; nav.navigate(Routes.CUSTOM_TARGETS) }
         waitRoute(Routes.CUSTOM_TARGETS)
@@ -174,9 +197,15 @@ class StartupNavigationTest {
         main { assertNull(nav.currentDestination) }
         compose.onNodeWithText("Retry").performClick()
         compose.waitUntil(5_000) { users.observations.get() == 2 }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("profile-retry-pending-spinner", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("profile-retry-pending-spinner", useUnmergedTree = true).assertIsDisplayed()
         main { assertNull(nav.currentDestination) }
         users.retryRead.complete(Unit)
         waitRoute(Routes.INSIGHTS)
+        compose.onNodeWithTag("profile-retry-pending-spinner", useUnmergedTree = true).assertDoesNotExist()
         assertEquals("Recovered", onboarding.profileLoadState.value.profile!!.user!!.name)
     }
 
@@ -193,7 +222,14 @@ class StartupNavigationTest {
         compose.runOnIdle { state.value = state.value.copy(hasError = true) }
         compose.onNodeWithText("Unable to load your profile").assertIsDisplayed()
         compose.onNodeWithText("Retry").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("profile-retry-pending-spinner", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("profile-retry-pending-spinner", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Edited draft").assertIsDisplayed()
         compose.runOnIdle { assertTrue(state.value.isLoading); state.value = ProfileLoadState(saved, isLoading = false) }
+        compose.onNodeWithTag("profile-retry-pending-spinner", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("Edited draft").assertIsDisplayed()
     }
 }

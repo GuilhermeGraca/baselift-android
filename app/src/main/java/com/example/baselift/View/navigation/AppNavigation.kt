@@ -34,6 +34,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.baselift.AppContainer
+import com.example.baselift.View.components.DelayedPendingSpinner
 import com.example.baselift.View.dashboard.DashboardScreen
 import com.example.baselift.View.insights.InsightsScreen
 import com.example.baselift.View.onboarding.CustomTargetsScreen
@@ -51,6 +52,9 @@ import com.example.baselift.ViewModel.nutrition.NutritionViewModelFactory
 import com.example.baselift.View.nutrition.NutritionScreen
 import com.example.baselift.ViewModel.dashboard.DashboardViewModel
 import com.example.baselift.ViewModel.dashboard.DashboardViewModelFactory
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 /**
  * Rotas da aplicação
@@ -514,10 +518,13 @@ fun PremiumSplashScreen() {
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            CircularProgressIndicator(
+            val loadingLabel = stringResource(R.string.profile_loading)
+            DelayedPendingSpinner(
                 color = NeonGreen,
                 strokeWidth = 3.dp,
-                modifier = Modifier.size(36.dp)
+                spinnerSize = 36.dp,
+                modifier = Modifier.size(36.dp).semantics { contentDescription = loadingLabel },
+                spinnerModifier = Modifier.testTag("startup-pending-spinner")
             )
         }
     }

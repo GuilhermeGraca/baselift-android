@@ -38,7 +38,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import com.example.baselift.ViewModel.workout.SetUiModel
-import com.example.baselift.View.components.PendingSpinner
+import com.example.baselift.View.components.DelayedPendingSpinner
 import com.example.baselift.View.theme.*
 import kotlinx.coroutines.delay
 
@@ -279,10 +279,14 @@ fun SetRow(
         ) {
             if (isBusy) {
                 // The background still reflects Room's latest confirmed completion state.
-                PendingSpinner(
+                DelayedPendingSpinner(
                     color = if (setModel.isCompleted) PureBlack else NeonGreen,
-                    modifier = Modifier.size(20.dp).testTag("set-pending-spinner")
-                )
+                    modifier = Modifier.size(20.dp),
+                    spinnerModifier = Modifier.testTag("set-pending-spinner")
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = checkTint,
+                        modifier = Modifier.size(20.dp))
+                }
             } else {
                 Icon(
                     Icons.Default.Check,

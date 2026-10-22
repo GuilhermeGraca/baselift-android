@@ -49,6 +49,8 @@ class SetSpinnerReducedMotionTest {
         }
         compose.mainClock.advanceTimeByFrame()
         val spinner = compose.onNodeWithTag("set-pending-spinner", useUnmergedTree = true)
+        spinner.assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(300)
         val still = spinner.captureToImage()
         compose.mainClock.advanceTimeBy(180)
         assertTrue("Reduced motion should keep a stable, visible pending arc",

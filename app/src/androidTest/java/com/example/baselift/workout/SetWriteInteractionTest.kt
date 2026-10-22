@@ -179,6 +179,28 @@ class SetWriteInteractionTest {
     }
 
     @Test
+    fun shortPendingWriteNeverFlashesAStaticArcOrDelaysTheCheck() {
+        val saving = mutableStateOf(false)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            MaterialTheme {
+                SetRow(1, row, "", "", { _, _, _ -> }, { _, _, _ -> },
+                    onLogSet = { _, _, _, _, _ -> saving.value = true }, isSaving = saving.value)
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val checkbox = compose.onNodeWithContentDescription("Set 1 completion")
+        checkbox.performClick()
+        compose.mainClock.advanceTimeBy(100)
+        checkbox.assertIsNotEnabled()
+        compose.onNodeWithTag("set-pending-spinner", useUnmergedTree = true).assertDoesNotExist()
+        compose.runOnIdle { saving.value = false }
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag("set-pending-spinner", useUnmergedTree = true).assertDoesNotExist()
+        checkbox.assertIsEnabled()
+    }
+
+    @Test
     fun savingDisablesCheckboxAndInputsThenAllowsRetryWithPreservedValues() {
         val saving = mutableStateOf(false)
         val inputs = "80"
@@ -201,12 +223,14 @@ class SetWriteInteractionTest {
         checkbox.assertIsNotEnabled()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Saving set…"))
         val spinner = compose.onNodeWithTag("set-pending-spinner", useUnmergedTree = true)
+        spinner.assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(320)
         val firstFrame = spinner.captureToImage()
         compose.onNodeWithText("Saving set…").assertDoesNotExist()
         compose.mainClock.advanceTimeBy(64)
         assertFalse("The pending indicator must visibly rotate within a short write",
             samePixels(firstFrame, spinner.captureToImage()))
-        compose.mainClock.advanceTimeBy(320)
+        compose.mainClock.advanceTimeBy(32)
         compose.onNodeWithText("Saving set…").assertExists()
         compose.onNodeWithText("70kg x 8").assertExists()
         compose.onAllNodes(editable).apply {
