@@ -101,7 +101,8 @@ class ScreenReadinessTest {
     @Test
     fun dashboardRoutinesAreImmediatelyAvailableToScrollOnEntryAndReturn() {
         val visible = mutableStateOf(true)
-        val state = DashboardUiState(workouts = listOf(WorkoutEntity(id = 1, name = "Push")), isLoading = false)
+        val state = DashboardUiState(workouts = listOf(WorkoutEntity(id = 1, name = "Push")),
+            routinesLoaded = true, isLoading = false)
         var chartRequests = 0
         compose.mainClock.autoAdvance = false
         compose.setContent { MaterialTheme {

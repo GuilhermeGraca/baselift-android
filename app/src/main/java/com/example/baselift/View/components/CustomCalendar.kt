@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +53,7 @@ fun CustomCalendar(
     minDate: Long? = null,
     maxDate: Long? = null,
     markedDays: Map<String, DayMarkerState> = emptyMap(),
+    markersLoading: Boolean = false,
     onDateSelected: (Long) -> Unit = {},
     onDayClickInViewMode: (Long, DayMarkerState) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
@@ -67,6 +69,7 @@ fun CustomCalendar(
 
     var currentMonth by remember { mutableStateOf(initialCal) }
     val onMonthChanged by rememberUpdatedState(onVisibleMonthChanged)
+    val markerOpacity = if (markersLoading) rememberSkeletonOpacity() else null
     LaunchedEffect(currentMonth.timeInMillis) { onMonthChanged(currentMonth.timeInMillis) }
     var showYearSelector by remember { mutableStateOf(false) }
 
@@ -228,7 +231,13 @@ fun CustomCalendar(
                                 }
 
                                 // marcadores de eventos
-                                if (marker != null && (marker.hasWorkout || marker.hasNutrition)) {
+                                if (markersLoading && dayNumber <= 7 && markerOpacity != null) {
+                                    Box(Modifier.fillMaxSize().padding(bottom = 2.dp),
+                                        contentAlignment = Alignment.BottomCenter) {
+                                        SkeletonBlock(Modifier.size(10.dp).testTag("calendar-markers-skeleton"),
+                                            markerOpacity, CircleShape)
+                                    }
+                                } else if (marker != null && (marker.hasWorkout || marker.hasNutrition)) {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()

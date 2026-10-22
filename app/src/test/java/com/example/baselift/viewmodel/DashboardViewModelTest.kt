@@ -13,6 +13,7 @@ import com.example.baselift.fakes.FakeNutritionRepository
 import com.example.baselift.fakes.FakeWorkoutRepository
 import com.example.baselift.helpers.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -112,6 +113,63 @@ class DashboardViewModelTest {
         val cal = Calendar.getInstance()
         cal.add(Calendar.DAY_OF_YEAR, -daysAgo)
         return cal.timeInMillis
+    }
+
+    @Test
+    fun `dashboard publishes ready sections while nutrition is still unknown`() = runTest {
+        val releaseNutrition = CompletableDeferred<Unit>()
+        val delayedNutrition = object : INutritionRepository by nutritionRepository {
+            override fun getAllNutritionLogs(): Flow<List<NutritionLogEntity>> = flow {
+                releaseNutrition.await()
+                emitAll(nutritionRepository.getAllNutritionLogs())
+            }
+        }
+        val dashboard = DashboardViewModel(workoutRepository, delayedNutrition,
+            mainDispatcherRule.testDispatcher)
+        viewModelStore.put("partial-dashboard", dashboard)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+
+        val partial = dashboard.uiState.value
+        assertFalse(partial.nutritionLoaded)
+        assertTrue(partial.sessionsLoaded)
+        assertTrue(partial.volumeLoaded)
+        assertTrue(partial.routinesLoaded)
+        assertTrue(partial.isLoading)
+        assertEquals(0, partial.workoutStreak) // A confirmed empty history, not a placeholder.
+
+        releaseNutrition.complete(Unit)
+        runCurrent()
+        val complete = dashboard.uiState.value
+        assertTrue(complete.nutritionLoaded)
+        assertFalse(complete.isLoading)
+        assertEquals(0, complete.nutritionStreak)
+    }
+
+    @Test
+    fun `routine trend distinguishes an unread history from a confirmed empty one`() = runTest {
+        val pendingSets = MutableSharedFlow<List<SetLogEntity>>()
+        val delayedWorkouts = object : IWorkoutRepository by workoutRepository {
+            override fun getAllCompletedSetLogs(): Flow<List<SetLogEntity>> = pendingSets
+        }
+        val dashboard = DashboardViewModel(delayedWorkouts, nutritionRepository,
+            mainDispatcherRule.testDispatcher)
+        viewModelStore.put("pending-trend-dashboard", dashboard)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
+        runCurrent()
+        dashboard.setRoutineExpanded(1, true)
+        runCurrent()
+        val pending = dashboard.uiState.value
+        assertEquals(setOf(1), pending.requestedRoutineTrends)
+        assertFalse(pending.volumeLoaded)
+        assertFalse(1 in pending.preparedRoutineTrends)
+
+        pendingSets.emit(emptyList())
+        runCurrent()
+        val ready = dashboard.uiState.value
+        assertTrue(ready.volumeLoaded)
+        assertEquals(setOf(1), ready.preparedRoutineTrends)
+        assertTrue(ready.workoutVolumeTrends.isEmpty())
     }
 
     private class ObservedHistory<T>(private val values: List<T>) : AbstractList<T>() {

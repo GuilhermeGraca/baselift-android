@@ -31,14 +31,16 @@ import com.example.baselift.ViewModel.dashboard.ExerciseCharts
 import com.example.baselift.View.components.rememberChartRange
 import kotlinx.coroutines.flow.Flow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
 import com.example.baselift.View.theme.*
 
 fun LazyListScope.RoutinesSection(
     workouts: List<WorkoutEntity>,
+    isLoading: Boolean = false,
     exercisesMap: Map<Int, List<ExerciseEntity>>,
     workoutVolumeTrends: Map<Int, List<com.example.baselift.View.components.ChartDataPoint>> = emptyMap(),
+    preparedRoutineTrends: Set<Int> = emptySet(),
+    requestedRoutineTrends: Set<Int> = emptySet(),
     exerciseCharts: (Int) -> Flow<ExerciseCharts>,
     onRoutineExpansionChanged: (Int, Boolean) -> Unit = { _, _ -> }
 ) {
@@ -52,7 +54,9 @@ fun LazyListScope.RoutinesSection(
         Spacer(modifier = Modifier.height(16.dp))
     }
 
-    if (workouts.isEmpty()) {
+    if (isLoading) {
+        item { DashboardRoutinesSkeleton() }
+    } else if (workouts.isEmpty()) {
         item {
             Box(
                 modifier = Modifier
@@ -75,6 +79,7 @@ fun LazyListScope.RoutinesSection(
                 workout = workout,
                 exercises = exercises,
                 workoutVolumeTrend = workoutVolumeTrends[workout.id] ?: emptyList(),
+                trendLoading = workout.id in requestedRoutineTrends && workout.id !in preparedRoutineTrends,
                 exerciseCharts = exerciseCharts,
                 onRoutineExpansionChanged = onRoutineExpansionChanged,
                 routineColor = rColor
@@ -89,6 +94,7 @@ fun WorkoutCollapsibleCard(
     workout: WorkoutEntity, 
     exercises: List<ExerciseEntity>,
     workoutVolumeTrend: List<com.example.baselift.View.components.ChartDataPoint>,
+    trendLoading: Boolean = false,
     exerciseCharts: (Int) -> Flow<ExerciseCharts>,
     routineColor: Color = NeonGreen,
     onRoutineExpansionChanged: (Int, Boolean) -> Unit = { _, _ -> }
@@ -193,7 +199,9 @@ fun WorkoutCollapsibleCard(
                 }
                 val filteredWorkoutTrend = rememberChartRange(workoutVolumeTrend, rangeDays)
 
-                if (filteredWorkoutTrend.isNotEmpty()) {
+                if (trendLoading) {
+                    DashboardChartSkeleton()
+                } else if (filteredWorkoutTrend.isNotEmpty()) {
                     com.example.baselift.View.components.InteractiveChartWithControls(
                         title = "",
                         dataPoints = filteredWorkoutTrend,
@@ -316,11 +324,7 @@ fun ExerciseCollapsibleCard(
             val chartFlow = remember(exercise.id, exerciseCharts, retryVersion) { exerciseCharts(exercise.id) }
             val charts by chartFlow.collectAsStateWithLifecycle(initialValue = ExerciseCharts())
             if (charts.isLoading) {
-                Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = NeonGreen)
-                    Spacer(Modifier.height(8.dp))
-                    Text(stringResource(com.example.baselift.R.string.dash_exercise_loading), color = MediumGrey)
-                }
+                DashboardExerciseChartsSkeleton()
             } else if (charts.loadFailed) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(stringResource(com.example.baselift.R.string.dash_exercise_load_error), color = MediumGrey)

@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import com.example.baselift.View.dashboard.components.ConsistencyJournalSection
 import com.example.baselift.View.dashboard.components.TotalTrainingVolumeSection
 import com.example.baselift.View.dashboard.components.RoutinesSection
+import com.example.baselift.View.dashboard.components.DashboardVolumeSkeleton
 import com.example.baselift.View.theme.PureBlack
 import com.example.baselift.ViewModel.dashboard.DashboardUiState
 import com.example.baselift.ViewModel.dashboard.ExerciseCharts
@@ -41,6 +42,9 @@ fun DashboardScreen(
                 historicalCalendarData = uiState.historicalCalendarData,
                 restDays = uiState.restDays,
                 nutritionRestDays = uiState.nutritionRestDays,
+                nutritionLoading = !uiState.nutritionLoaded,
+                workoutLoading = !uiState.sessionsLoaded,
+                calendarLoading = uiState.calendarLoading,
                 onSetRestDays = onSetRestDays,
                 onSetNutritionRestDays = onSetNutritionRestDays,
                 onCalendarMonthChanged = onCalendarMonthChanged
@@ -50,14 +54,21 @@ fun DashboardScreen(
 
         item {
             // secção de volume total de treino
-            TotalTrainingVolumeSection(weeklyVolumes = uiState.weeklyVolumes)
+            if (uiState.volumeLoaded) {
+                TotalTrainingVolumeSection(weeklyVolumes = uiState.weeklyVolumes)
+            } else {
+                DashboardVolumeSkeleton()
+            }
         }
 
         // secção de rotinas (carregada lazy)
         RoutinesSection(
             workouts = uiState.workouts,
+            isLoading = !uiState.routinesLoaded,
             exercisesMap = uiState.exercises,
             workoutVolumeTrends = uiState.workoutVolumeTrends,
+            preparedRoutineTrends = uiState.preparedRoutineTrends,
+            requestedRoutineTrends = uiState.requestedRoutineTrends,
             exerciseCharts = exerciseCharts,
             onRoutineExpansionChanged = onRoutineExpansionChanged
         )
