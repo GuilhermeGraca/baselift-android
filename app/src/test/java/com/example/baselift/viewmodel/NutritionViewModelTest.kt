@@ -65,6 +65,28 @@ class NutritionViewModelTest {
         }
     }
 
+    private class ControlledInsertRepository(
+        private val source: INutritionRepository
+    ) : INutritionRepository by source {
+        val startedLogs = mutableListOf<NutritionLogEntity>()
+        val release = CompletableDeferred<Unit>()
+        var failure: Exception? = null
+
+        override suspend fun insertNutritionLog(log: NutritionLogEntity) {
+            startedLogs += log
+            release.await()
+            failure?.let { throw it }
+            source.insertNutritionLog(log)
+        }
+    }
+
+    private fun useControlledInsert(clock: () -> Long = System::currentTimeMillis): ControlledInsertRepository {
+        val controlled = ControlledInsertRepository(nutritionRepository)
+        viewModel = NutritionViewModel(controlled, userRepository, clock)
+        viewModelStore.put("nutrition", viewModel)
+        return controlled
+    }
+
     private fun useControlledDeletion(): ControlledDeletionRepository {
         val controlled = ControlledDeletionRepository(nutritionRepository)
         viewModel = NutritionViewModel(controlled, userRepository)
@@ -138,6 +160,77 @@ class NutritionViewModelTest {
         
         val logs = nutritionRepository.getAllNutritionLogs().first()
         assertTrue(logs.isEmpty())
+    }
+
+    @Test
+    fun `quick log scales by consumed grams and ignores hidden macros in calories only mode`() = runTest {
+        val detailedId = viewModel.addQuickLog(200, 10, 20, 5,
+            isCaloriesOnly = false, isPer100g = true, grams = 150)
+        runCurrent()
+        assertEquals(detailedId, viewModel.quickLogSubmission.value.completedRequestId)
+        val detailed = nutritionRepository.getAllNutritionLogs().first().single()
+        assertEquals(listOf(300, 15, 30, 8),
+            listOf(detailed.calories, detailed.protein, detailed.carbs, detailed.fats))
+
+        viewModel.addQuickLog(200, 99, 99, 99,
+            isCaloriesOnly = true, isPer100g = true, grams = 125)
+        runCurrent()
+        val caloriesOnly = nutritionRepository.getAllNutritionLogs().first().single { it.name == "Quick Add" }
+        assertEquals(listOf(250, 0, 0, 0),
+            listOf(caloriesOnly.calories, caloriesOnly.protein, caloriesOnly.carbs, caloriesOnly.fats))
+    }
+
+    @Test
+    fun `quick log rejects missing amount, rounded zero and overflow before inserting`() = runTest {
+        assertNull(viewModel.addQuickLog(200, isCaloriesOnly = true, isPer100g = true))
+        assertNull(viewModel.addQuickLog(200, isCaloriesOnly = true, isPer100g = true, grams = 0))
+        assertNull(viewModel.addQuickLog(1, isCaloriesOnly = true, isPer100g = true, grams = 1))
+        assertNull(viewModel.addQuickLog(Int.MAX_VALUE, isCaloriesOnly = true, isPer100g = true, grams = 101))
+        runCurrent()
+        assertTrue(nutritionRepository.getAllNutritionLogs().first().isEmpty())
+        assertNull(viewModel.quickLogSubmission.value.pendingRequestId)
+    }
+
+    @Test
+    fun `quick log reports failure and retries the same values without a phantom entry`() = runTest {
+        val controlled = useControlledInsert()
+        val firstRequest = viewModel.addQuickLog(200, 10, 20, 5,
+            isCaloriesOnly = false, isPer100g = true, grams = 150)
+        assertEquals(firstRequest, viewModel.quickLogSubmission.value.pendingRequestId)
+        runCurrent()
+        assertEquals(1, controlled.startedLogs.size)
+        controlled.failure = IllegalStateException("Database unavailable")
+        controlled.release.complete(Unit)
+        runCurrent()
+        assertEquals(firstRequest, viewModel.quickLogSubmission.value.failedRequestId)
+        assertTrue(nutritionRepository.getAllNutritionLogs().first().isEmpty())
+
+        controlled.failure = null
+        val retryRequest = viewModel.addQuickLog(200, 10, 20, 5,
+            isCaloriesOnly = false, isPer100g = true, grams = 150)
+        runCurrent()
+        assertEquals(retryRequest, viewModel.quickLogSubmission.value.completedRequestId)
+        assertEquals(2, controlled.startedLogs.size)
+        assertEquals(1, nutritionRepository.getAllNutritionLogs().first().size)
+    }
+
+    @Test
+    fun `quick log accepted offscreen keeps its original timestamp and completes`() = runTest {
+        var now = 1_000L
+        val controlled = useControlledInsert { now }
+        val subscription = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+        val request = viewModel.addQuickLog(200,
+            isCaloriesOnly = true, isPer100g = true, grams = 150)
+        runCurrent()
+        subscription.cancel()
+        now = 100_000L
+        controlled.release.complete(Unit)
+        runCurrent()
+        val stored = nutritionRepository.getAllNutritionLogs().first().single()
+        assertEquals(1_000L, stored.timestamp)
+        assertEquals(request, viewModel.quickLogSubmission.value.completedRequestId)
     }
 
     @Test

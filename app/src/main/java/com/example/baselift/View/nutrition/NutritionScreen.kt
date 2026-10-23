@@ -38,6 +38,7 @@ fun NutritionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mealTemplateDeletion by viewModel.mealTemplateDeletion.collectAsStateWithLifecycle()
+    val quickLogSubmission by viewModel.quickLogSubmission.collectAsStateWithLifecycle()
     val loadingOpacity = if (uiState.isLoading) rememberSkeletonOpacity() else null
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current.applicationContext
@@ -139,8 +140,12 @@ fun NutritionScreen(
         item {
             // secção de registo rápido
             QuickLogSection(
-                onAddEntry = { kcal, p, c, f, isCaloriesOnly ->
-                    viewModel.addQuickLog(kcal, p, c, f, isCaloriesOnly)
+                submissionState = quickLogSubmission,
+                onAddEntry = { values, isCaloriesOnly, isPer100g, grams ->
+                    viewModel.addQuickLog(
+                        values.calories, values.protein, values.carbs, values.fats,
+                        isCaloriesOnly = isCaloriesOnly, isPer100g = isPer100g, grams = grams
+                    )
                 },
                 modifier = Modifier.testTag("nutrition_quick_log")
             )

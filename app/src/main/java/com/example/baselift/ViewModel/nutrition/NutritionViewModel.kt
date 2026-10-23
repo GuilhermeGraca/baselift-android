@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.baselift.Model.local.entity.MealTemplateEntity
 import com.example.baselift.Model.local.entity.NutritionLogEntity
+import com.example.baselift.Model.nutrition.NutritionPortionCalculator
+import com.example.baselift.Model.nutrition.NutritionValues
 import com.example.baselift.Model.repository.INutritionRepository
 import com.example.baselift.Model.repository.IUserRepository
 import com.example.baselift.Model.repository.NutritionDay
@@ -53,6 +55,13 @@ data class MealTemplateDeletionState(
     val failedTemplate: MealTemplateEntity? = null
 )
 
+@Stable
+data class QuickLogSubmissionState(
+    val pendingRequestId: Long? = null,
+    val completedRequestId: Long? = null,
+    val failedRequestId: Long? = null
+)
+
 // modelo de vista responsável pela aba de nutrição
 class NutritionViewModel(
     private val nutritionRepository: INutritionRepository,
@@ -65,6 +74,9 @@ class NutritionViewModel(
         onBufferOverflow = BufferOverflow.DROP_OLDEST)
     private val _mealTemplateDeletion = MutableStateFlow(MealTemplateDeletionState())
     val mealTemplateDeletion: StateFlow<MealTemplateDeletionState> = _mealTemplateDeletion.asStateFlow()
+    private val _quickLogSubmission = MutableStateFlow(QuickLogSubmissionState())
+    val quickLogSubmission: StateFlow<QuickLogSubmissionState> = _quickLogSubmission.asStateFlow()
+    private var nextQuickLogRequestId = 0L
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<NutritionUiState> = combine(
@@ -112,22 +124,53 @@ class NutritionViewModel(
     }
 
     // adiciona um registo rápido
-    fun addQuickLog(calories: Int, protein: Int = 0, carbs: Int = 0, fats: Int = 0, isCaloriesOnly: Boolean) {
-        if (calories <= 0 && protein <= 0 && carbs <= 0 && fats <= 0) return
-
+    fun addQuickLog(
+        calories: Int,
+        protein: Int = 0,
+        carbs: Int = 0,
+        fats: Int = 0,
+        isCaloriesOnly: Boolean,
+        isPer100g: Boolean = false,
+        grams: Int? = null
+    ): Long? {
+        val totals = NutritionPortionCalculator.calculate(
+            NutritionValues(calories, if (isCaloriesOnly) 0 else protein,
+                if (isCaloriesOnly) 0 else carbs, if (isCaloriesOnly) 0 else fats),
+            per100g = isPer100g,
+            grams = grams
+        ) ?: return null
         val logName = if (isCaloriesOnly) "Quick Add" else "Detailed Macros"
-
+        val acceptedAt = clockMillis()
+        val requestId = ++nextQuickLogRequestId
+        _quickLogSubmission.value = QuickLogSubmissionState(pendingRequestId = requestId)
         viewModelScope.launch {
-            val log = NutritionLogEntity(
-                name = logName,
-                calories = calories,
-                protein = protein,
-                carbs = carbs,
-                fats = fats,
-                timestamp = clockMillis()
-            )
-            nutritionRepository.insertNutritionLog(log)
+            try {
+                nutritionRepository.insertNutritionLog(
+                    NutritionLogEntity(
+                        name = logName,
+                        calories = totals.calories,
+                        protein = totals.protein,
+                        carbs = totals.carbs,
+                        fats = totals.fats,
+                        timestamp = acceptedAt
+                    )
+                )
+                _quickLogSubmission.update { state ->
+                    if (state.pendingRequestId == requestId) {
+                        QuickLogSubmissionState(completedRequestId = requestId)
+                    } else state
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _quickLogSubmission.update { state ->
+                    if (state.pendingRequestId == requestId) {
+                        QuickLogSubmissionState(failedRequestId = requestId)
+                    } else state
+                }
+            }
         }
+        return requestId
     }
 
     // apagar um registo
