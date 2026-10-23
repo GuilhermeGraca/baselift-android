@@ -7,7 +7,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,10 +30,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.View.theme.*
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
-import com.example.baselift.View.workout.components.ExerciseCard
 import com.example.baselift.View.workout.components.EditExerciseDialog
 import com.example.baselift.View.workout.components.GenericInputDialog
-import com.example.baselift.View.workout.components.RestTimerWidget
 import com.example.baselift.View.workout.components.ConfirmDeleteDialog
 import com.example.baselift.View.workout.components.WorkoutLoadingContent
 import com.example.baselift.View.workout.components.WorkoutRoutineTabsPlaceholder
@@ -43,16 +40,6 @@ import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.Position
 import nl.dionsegijn.konfetti.core.emitter.Emitter
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.launch
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.graphics.graphicsLayer
 @Composable
 fun WorkoutScreen(
     viewModel: WorkoutViewModel,
@@ -79,8 +66,6 @@ fun WorkoutScreen(
             showConfetti = false
         }
     }
-    val scope = rememberCoroutineScope()
-    val haptic = LocalHapticFeedback.current
 
     uiState.exerciseEdits.values.firstOrNull {
         it.isOpen && it.workoutId == uiState.selectedWorkout?.id &&
@@ -315,278 +300,27 @@ fun WorkoutScreen(
                     }
                 }
                 key(selectedWorkout.id) {
-                    var draggedIndex by remember { mutableStateOf<Int?>(null) }
-                    var hoverIndex by remember { mutableStateOf<Int?>(null) }
-                    var draggedOffset by remember { mutableStateOf(0f) }
-                    var initialDraggedItemOffset by remember { mutableStateOf(0f) }
-
-                    val lazyListState = rememberLazyListState()
-                    val coroutineScope = rememberCoroutineScope()
-                    var settlementJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
-                    val density = androidx.compose.ui.platform.LocalDensity.current
-                    val shiftPixels = with(density) { 120.dp.toPx() } // Fixed hole size for collapsed cards
-
-                    LazyColumn(
-                        state = lazyListState,
-                        modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
-                        contentPadding = PaddingValues(bottom = 120.dp)
-                    ) {
-                        items(uiState.exercises.size, key = { uiState.exercises[it].exercise.id }) { index ->
-                            val exerciseModel = uiState.exercises[index]
-                            val exerciseId = exerciseModel.exercise.id
-                            val isDragged = draggedIndex == index
-                            val isAnyDragging = draggedIndex != null
-
-                            // Calculate visual shift for items making way for the dragged item
-                            val shiftAmount by animateFloatAsState(
-                                targetValue = if (isAnyDragging && hoverIndex != null && draggedIndex != null) {
-                                    val dIdx = draggedIndex!!
-                                    val hIdx = hoverIndex!!
-
-                                    if (dIdx < hIdx) {
-                                        if (index > dIdx && index <= hIdx) -shiftPixels else 0f
-                                    } else if (dIdx > hIdx) {
-                                        if (index >= hIdx && index < dIdx) shiftPixels else 0f
-                                    } else 0f
-                                } else 0f
-                            )
-
-                            val elevation by animateFloatAsState(if (isDragged) 24f else 0f)
-
-                            LaunchedEffect(isDragged) {
-                                if (isDragged) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            }
-
-                            val dragModifier = Modifier.pointerInput(exerciseId, index, writesBlocked) {
-                                        if (writesBlocked) return@pointerInput
-                                        detectDragGesturesAfterLongPress(
-                                            onDragStart = { _ ->
-                                                settlementJob?.cancel()
-                                                draggedIndex = index
-                                                hoverIndex = index
-                                                draggedOffset = 0f
-                                                val item = lazyListState.layoutInfo.visibleItemsInfo.find { it.index == index }
-                                                initialDraggedItemOffset = item?.offset?.toFloat() ?: 0f
-                                            },
-                                            onDrag = { change, dragAmount ->
-                                                change.consume()
-                                                draggedOffset += dragAmount.y
-
-                                                val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-
-                                                val draggedTop = initialDraggedItemOffset + draggedOffset
-                                                val draggedBottom = draggedTop + shiftPixels
-                                                val centerY = draggedTop + shiftPixels / 2f
-
-                                                var newHover = draggedIndex
-                                                for (item in visibleItems) {
-                                                    val idx = item.index
-                                                    if (idx == draggedIndex) continue
-
-                                                    val itemTop = item.offset.toFloat()
-                                                    val itemBottom = itemTop + item.size.toFloat()
-
-                                                    if (draggedOffset > 0) { // drag down
-                                                        if (idx > draggedIndex!! && draggedBottom > itemTop + 40f) {
-                                                            newHover = maxOf(newHover!!, idx)
-                                                        }
-                                                    } else { // drag up
-                                                        if (idx < draggedIndex!! && draggedTop < itemBottom - 40f) {
-                                                            newHover = minOf(newHover!!, idx)
-                                                        }
-                                                    }
-                                                }
-
-                                                if (newHover != null && newHover < uiState.exercises.size) {
-                                                    hoverIndex = newHover
-                                                }
-
-                                                // Simple Auto-scroll
-                                                val viewportTop = lazyListState.layoutInfo.viewportStartOffset
-                                                val viewportBottom = lazyListState.layoutInfo.viewportEndOffset
-                                                coroutineScope.launch {
-                                                    if (centerY > viewportBottom - 200) {
-                                                        lazyListState.scrollBy(15f)
-                                                    } else if (centerY < viewportTop + 200) {
-                                                        lazyListState.scrollBy(-15f)
-                                                    }
-                                                }
-                                            },
-                                            onDragEnd = {
-                                                if (draggedIndex != null && hoverIndex != null) {
-                                                    val dropIdx = hoverIndex!!
-
-                                                    // Posição visual do card no momento de largar (relativa ao viewport)
-                                                    val targetViewportY = (initialDraggedItemOffset + draggedOffset).toInt()
-
-                                                    if (draggedIndex != dropIdx) {
-                                                        viewModel.moveExercise(
-                                                            draggedIndex!!, dropIdx, selectedWorkout.id,
-                                                            exerciseId
-                                                        )
-                                                    }
-
-                                                    settlementJob?.cancel()
-                                                    val droppedExerciseId = exerciseId
-                                                    settlementJob = coroutineScope.launch {
-                                                        val currentOffset = awaitStableDraggedItemOffset(dropIdx) {
-                                                            lazyListState.layoutInfo.visibleItemsInfo
-                                                                .find { it.key == droppedExerciseId }
-                                                                ?.let { DraggedItemPlacement(it.index, it.offset, it.size) }
-                                                        } ?: return@launch
-                                                        val delta = (currentOffset - targetViewportY).toFloat()
-                                                        if (delta != 0f) {
-                                                            lazyListState.animateScrollBy(delta)
-                                                        }
-                                                    }
-                                                }
-                                                draggedIndex = null
-                                                hoverIndex = null
-                                                draggedOffset = 0f
-                                                initialDraggedItemOffset = 0f
-                                            },
-                                            onDragCancel = {
-                                                settlementJob?.cancel()
-                                                draggedIndex = null
-                                                hoverIndex = null
-                                                draggedOffset = 0f
-                                                initialDraggedItemOffset = 0f
-                                            }
-                                        )
-                                    }
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 16.dp)
-                                    .zIndex(if (isDragged) 1f else 0f)
-                                    .graphicsLayer {
-                                        if (isDragged) {
-                                            val currentItem = lazyListState.layoutInfo.visibleItemsInfo.find { it.index == index }
-                                            val currentItemOffset = currentItem?.offset?.toFloat() ?: 0f
-                                            translationY = initialDraggedItemOffset + draggedOffset - currentItemOffset
-                                            shadowElevation = elevation
-                                            shape = RoundedCornerShape(12.dp)
-                                            ambientShadowColor = androidx.compose.ui.graphics.Color.Black
-                                            spotShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)
-                                        } else {
-                                            translationY = shiftAmount
-                                        }
-                                    }
-                                    .shadow(elevation.dp, RoundedCornerShape(12.dp), ambientColor = androidx.compose.ui.graphics.Color.Black, spotColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f))
-                            ) {
-                                val displayedSessionId = uiState.activeSession?.id
-                                ExerciseCard(
-                                    exerciseModel = exerciseModel,
-                                    draftWeights = viewModel.draftWeights,
-                                    draftReps = viewModel.draftReps,
-                                    onUpdateDraftWeight = { exId, setNum, v -> viewModel.updateDraftWeight(exId, setNum, v) },
-                                    onUpdateDraftReps = { exId, setNum, v -> viewModel.updateDraftReps(exId, setNum, v) },
-                                    onAddSet = { viewModel.addSetToExercise(exerciseId) },
-                                    onRemoveLastSet = { number ->
-                                        viewModel.removeLastSet(exerciseId, number, displayedSessionId)
-                                    },
-                                    onDeleteExercise = { viewModel.deleteExercise(exerciseId) },
-                                    onEditExercise = { viewModel.beginExerciseEdit(exerciseId) },
-                                    onLogSet = { setNumber, weight, reps, isCompleted, _ ->
-                                        viewModel.logSet(
-                                            exerciseId = exerciseId,
-                                            setNumber = setNumber,
-                                            weight = weight,
-                                            reps = reps,
-                                            isCompleted = isCompleted,
-                                            expectedSessionId = displayedSessionId
-                                        )
-                                    },
-                                    isDragging = isDragged,
-                                    isAnyDragging = isAnyDragging,
-                                    dragModifier = dragModifier,
-                                    savingSetNumbers = uiState.pendingSetWrites.filter {
-                                        it.sessionId == displayedSessionId && it.exerciseId == exerciseId
-                                    }.map { it.setNumber }.toSet(),
-                                    writesBlocked = writesBlocked,
-                                    removingSetNumbers = uiState.pendingSetRemovals.filter {
-                                        it.sessionId == displayedSessionId && it.exerciseId == exerciseId
-                                    }.map { it.setNumber }.toSet(),
-                                    isAddingSets = exerciseId in uiState.addingSetExerciseIds,
-                                    isSavingMetadata = uiState.exerciseEdits[exerciseId]?.isSaving == true
-                                )
-                            }
-                        }
-
-                        item {
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = draggedIndex == null,
-                                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
-                                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
-                            ) {
-                                Column {
-                                    // botão para adicionar exercício
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(Color.Transparent)
-                                            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                            .clickable(enabled = !writesBlocked) { showAddExerciseDialog = true }
-                                            .padding(24.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Box(
-                                                modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(Icons.Default.Add, contentDescription = "Add Exercise", tint = CrystalWhite)
-                                            }
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            Text(stringResource(com.example.baselift.R.string.workout_add_exercise_session), color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(32.dp))
-
-                                    // temporizador de descanso
-                                    RestTimerWidget(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        initialTimerSeconds = uiState.selectedWorkout?.defaultRestTimer ?: 105,
-                                        settingsEnabled = !writesBlocked,
-                                        onTimerSaved = { seconds ->
-                                            viewModel.updateWorkoutRestTimer(seconds)
-                                        }
-                                    )
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    // botão para finalizar treino
-                                    if (uiState.exercises.isNotEmpty()) {
-                                        val hasCompletedSets = uiState.exercises.any { ex -> ex.sets.any { set -> set.isCompleted } }
-                                        val activeSessionId = uiState.activeSession?.id
-
-                                        Button(
-                                            onClick = { viewModel.finalizeWorkout(activeSessionId) },
-                                            enabled = hasCompletedSets && !writesBlocked &&
-                                                uiState.pendingSetWrites.none { it.sessionId == activeSessionId } &&
-                                                uiState.pendingSetRemovals.none { it.sessionId == activeSessionId },
-                                            modifier = Modifier.fillMaxWidth().height(56.dp),
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = NeonGreen,
-                                                disabledContainerColor = Color(0xFF222222),
-                                                contentColor = PureBlack,
-                                                disabledContentColor = Color(0xFF555555)
-                                            ),
-                                            shape = RoundedCornerShape(12.dp)
-                                        ) {
-                                            Text(
-                                                stringResource(if (uiState.isFinalizing) com.example.baselift.R.string.workout_finalizing else com.example.baselift.R.string.workout_finalize),
-                                                fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    WorkoutExerciseList(
+                        workoutId = selectedWorkout.id,
+                        uiState = uiState,
+                        draftWeights = viewModel.draftWeights,
+                        draftReps = viewModel.draftReps,
+                        writesBlocked = writesBlocked,
+                        modifier = Modifier.weight(1f),
+                        onMoveExercise = viewModel::moveExercise,
+                        onUpdateDraftWeight = viewModel::updateDraftWeight,
+                        onUpdateDraftReps = viewModel::updateDraftReps,
+                        onAddSet = viewModel::addSetToExercise,
+                        onRemoveLastSet = viewModel::removeLastSet,
+                        onDeleteExercise = viewModel::deleteExercise,
+                        onEditExercise = viewModel::beginExerciseEdit,
+                        onLogSet = { exerciseId, setNumber, weight, reps, completed, sessionId ->
+                            viewModel.logSet(exerciseId, setNumber, weight, reps, completed, sessionId)
+                        },
+                        onAddExercise = { showAddExerciseDialog = true },
+                        onUpdateWorkoutRestTimer = viewModel::updateWorkoutRestTimer,
+                        onFinalizeWorkout = viewModel::finalizeWorkout
+                    )
                 }
             }
         }
