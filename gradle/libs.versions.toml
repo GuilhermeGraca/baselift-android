@@ -12,7 +12,6 @@ ksp = "2.0.21-1.0.28"
 composeBom = "2024.09.00"
 room = "2.6.1"
 navigationCompose = "2.8.3"
-vico = "1.15.0"
 coroutines = "1.9.0"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -35,9 +34,6 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
-vico-compose = { group = "com.patrykandpatrick.vico", name = "compose", version.ref = "vico" }
-vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", version.ref = "vico" }
-vico-core = { group = "com.patrykandpatrick.vico", name = "core", version.ref = "vico" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -24,45 +24,71 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.example.baselift.ViewModel.workout.SetUiModel
+import com.example.baselift.View.components.DelayedPendingSpinner
 import com.example.baselift.View.theme.*
+import kotlinx.coroutines.delay
 
 @Composable
 fun SetRow(
     exerciseId: Int,
     setModel: SetUiModel,
-    draftWeights: Map<String, String>,
-    draftReps: Map<String, String>,
+    weightInput: String,
+    repsInput: String,
     onUpdateDraftWeight: (exerciseId: Int, setNumber: Int, value: String) -> Unit,
     onUpdateDraftReps: (exerciseId: Int, setNumber: Int, value: String) -> Unit,
-    onRemove: () -> Unit = {},
-    onLogSet: (Int, Float, Int, Boolean, Int) -> Unit
+    onRemove: (Int) -> Unit = {},
+    onLogSet: (Int, Float, Int, Boolean, Int) -> Unit,
+    isSaving: Boolean = false,
+    writesBlocked: Boolean = false,
+    isRemoving: Boolean = false,
+    removalBlocked: Boolean = false,
+    otherWritesPending: Boolean = false
 ) {
     var showRemoveDialog by remember { mutableStateOf(false) }
+    val isBusy = isSaving || isRemoving
+    var showSlowWriteLabel by remember(isBusy) { mutableStateOf(false) }
+    LaunchedEffect(isBusy) {
+        if (isBusy) {
+            delay(350)
+            showSlowWriteLabel = true
+        }
+    }
 
     if (showRemoveDialog) {
         ConfirmDeleteDialog(
             title = stringResource(com.example.baselift.R.string.workout_remove_set),
             message = stringResource(com.example.baselift.R.string.workout_remove_set_msg, setModel.setNumber),
-            onConfirm = { onRemove(); showRemoveDialog = false },
-            onDismiss = { showRemoveDialog = false }
+            onConfirm = {
+                onRemove(setModel.setNumber)
+                showRemoveDialog = false
+            },
+            onDismiss = { showRemoveDialog = false },
+            confirmEnabled = !isBusy && !writesBlocked && !removalBlocked && !otherWritesPending
         )
     }
     
     val log = setModel.currentLog
     val existingId = log?.id ?: 0
 
-    // dados vêm do mapa de estado do modelo de vista
-    val draftKey = "${exerciseId}_${setModel.setNumber}"
-    val weightInput = draftWeights[draftKey] ?: ""
-    val repsInput = draftReps[draftKey] ?: ""
+    val setNumber = setModel.setNumber
+    val previousWeightText = remember(setModel.prevWeight) {
+        val df = java.text.DecimalFormat("#.##", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.US))
+        setModel.prevWeight?.let(df::format) ?: "-"
+    }
 
     // sincronização inicial
     LaunchedEffect(exerciseId, setModel.setNumber, log?.id) {
@@ -82,7 +108,6 @@ fun SetRow(
     val prType = log?.prType ?: "NONE"
 
     val rowBgColor = if (setModel.isLastCompleted) Color(0xFF1E2413) else Color.Transparent
-    val inputBgColor = Color(0xFF353535)
 
     val setNumberColor = when {
         setModel.isLastCompleted -> NeonGreen
@@ -106,7 +131,7 @@ fun SetRow(
             .clip(RoundedCornerShape(8.dp))
             .background(rowBgColor)
             .then(
-                if (setModel.canBeRemoved) {
+                if (setModel.canBeRemoved && !writesBlocked && !isBusy && !removalBlocked && !otherWritesPending) {
                     Modifier
                         .background(
                             Brush.horizontalGradient(
@@ -156,131 +181,50 @@ fun SetRow(
 
         // anterior
         val prevText = if (setModel.prevWeight != null && setModel.prevReps != null) {
-            val df = java.text.DecimalFormat("#.##", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.US))
-            "${df.format(setModel.prevWeight)}kg x ${setModel.prevReps}"
+            "${previousWeightText}kg x ${setModel.prevReps}"
         } else "-"
-        Text(prevText, color = Color(0xFFC4C9AC), fontSize = 14.sp, modifier = Modifier.weight(1f))
+        val pendingText = when {
+            isRemoving -> stringResource(com.example.baselift.R.string.workout_set_removing)
+            isSaving -> stringResource(com.example.baselift.R.string.workout_set_saving)
+            else -> null
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(prevText, color = Color(0xFFC4C9AC), fontSize = 14.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (showSlowWriteLabel && pendingText != null) {
+                Text(pendingText, color = NeonGreen, fontSize = 11.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
 
-        // entrada de peso
-        BasicTextField(
+        val hintColor = if (isFocused) MediumGrey else MediumGrey.copy(alpha = 0.5f)
+        SetValueField(
             value = weightInput,
+            hint = previousWeightText,
+            completed = setModel.isCompleted,
+            enabled = !isBusy && !writesBlocked,
+            color = inputTextColor,
+            hintColor = hintColor,
+            modifier = Modifier.weight(0.8f).onFocusChanged { isWeightFocused = it.isFocused },
             onValueChange = { newValue ->
                 var text = newValue.replace(',', '.').filter { it.isDigit() || it == '.' }
-                if (text.count { it == '.' } > 1) {
-                    text = text.substringBeforeLast('.')
-                }
+                if (text.count { it == '.' } > 1) text = text.substringBeforeLast('.')
                 val parts = text.split('.')
-                if (parts.size == 2 && parts[1].length > 2) {
-                    text = parts[0] + "." + parts[1].take(2)
-                }
-                if (text.length > 6) text = text.take(6)
-                onUpdateDraftWeight(exerciseId, setModel.setNumber, text)
-            },
-            enabled = !setModel.isCompleted,
-            modifier = Modifier
-                .weight(0.8f)
-                .background(inputBgColor, RoundedCornerShape(6.dp))
-                .onFocusChanged { isWeightFocused = it.isFocused },
-            textStyle = Typography().bodyLarge.copy(
-                color = inputTextColor,
-                fontSize = 20.sp,
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Black
-            ),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
-            cursorBrush = androidx.compose.ui.graphics.SolidColor(CrystalWhite),
-            decorationBox = { innerTextField ->
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 12.dp, horizontal = 2.dp)) {
-                    if (weightInput.isEmpty()) {
-                        val df = java.text.DecimalFormat("#.##", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.US))
-                        val hint = setModel.prevWeight?.let { df.format(it) } ?: "-"
-                        Text(
-                            hint,
-                            color = if (setModel.isCompleted) inputTextColor else if (isFocused) MediumGrey else MediumGrey.copy(alpha = 0.5f),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    
-                    if (setModel.isCompleted) {
-                        if (weightInput.isNotEmpty()) {
-                            Text(
-                                weightInput,
-                                color = inputTextColor,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Black,
-                                maxLines = 1,
-                                softWrap = false,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        innerTextField()
-                    }
-                }
+                if (parts.size == 2 && parts[1].length > 2) text = parts[0] + "." + parts[1].take(2)
+                onUpdateDraftWeight(exerciseId, setNumber, text.take(6))
             }
         )
         Spacer(modifier = Modifier.width(4.dp))
-
-        // entrada de repetições
-        BasicTextField(
+        SetValueField(
             value = repsInput,
+            hint = setModel.prevReps?.toString() ?: "-",
+            completed = setModel.isCompleted,
+            enabled = !isBusy && !writesBlocked,
+            color = inputTextColor,
+            hintColor = hintColor,
+            modifier = Modifier.weight(0.8f).onFocusChanged { isRepsFocused = it.isFocused },
             onValueChange = { newValue ->
-                val text = newValue.filter { it.isDigit() }.take(4)
-                onUpdateDraftReps(exerciseId, setModel.setNumber, text)
-            },
-            enabled = !setModel.isCompleted,
-            modifier = Modifier
-                .weight(0.8f)
-                .background(inputBgColor, RoundedCornerShape(6.dp))
-                .onFocusChanged { isRepsFocused = it.isFocused },
-            textStyle = Typography().bodyLarge.copy(
-                color = inputTextColor,
-                fontSize = 20.sp,
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Black
-            ),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
-            cursorBrush = androidx.compose.ui.graphics.SolidColor(CrystalWhite),
-            decorationBox = { innerTextField ->
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 12.dp, horizontal = 2.dp)) {
-                    if (repsInput.isEmpty()) {
-                        Text(
-                            setModel.prevReps?.toString() ?: "-",
-                            color = if (setModel.isCompleted) inputTextColor else if (isFocused) MediumGrey else MediumGrey.copy(alpha = 0.5f),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    
-                    if (setModel.isCompleted) {
-                        if (repsInput.isNotEmpty()) {
-                            Text(
-                                repsInput,
-                                color = inputTextColor,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Black,
-                                maxLines = 1,
-                                softWrap = false,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        innerTextField()
-                    }
-                }
+                onUpdateDraftReps(exerciseId, setNumber, newValue.filter { it.isDigit() }.take(4))
             }
         )
         Spacer(modifier = Modifier.width(6.dp))
@@ -308,13 +252,20 @@ fun SetRow(
         // caixa de seleção
         val checkboxBg = if (setModel.isCompleted) NeonGreen else Color(0xFF353535)
         val checkTint = if (setModel.isCompleted) PureBlack else MediumGrey.copy(alpha = 0.3f)
+        val checkDescription = stringResource(com.example.baselift.R.string.workout_set_check, setModel.setNumber)
+        val savingDescription = stringResource(com.example.baselift.R.string.workout_set_saving)
+        val removingDescription = stringResource(com.example.baselift.R.string.workout_set_removing)
         
         Box(
             modifier = Modifier
                 .size(32.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(checkboxBg)
-                .clickable(enabled = setModel.canBeChecked) {
+                .semantics {
+                    contentDescription = checkDescription
+                    if (isBusy) stateDescription = if (isRemoving) removingDescription else savingDescription
+                }
+                .clickable(enabled = setModel.canBeChecked && !isBusy && !writesBlocked && !otherWritesPending, role = Role.Checkbox) {
                     val w = weightInput.toFloatOrNull() ?: setModel.prevWeight ?: 0f
                     val r = repsInput.toIntOrNull() ?: setModel.prevReps ?: 0
                     if (!setModel.isCompleted) {
@@ -326,12 +277,72 @@ fun SetRow(
                 },
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Default.Check,
-                contentDescription = "Check",
-                tint = checkTint,
-                modifier = Modifier.size(20.dp)
-            )
+            if (isBusy) {
+                // The background still reflects Room's latest confirmed completion state.
+                DelayedPendingSpinner(
+                    color = if (setModel.isCompleted) PureBlack else NeonGreen,
+                    modifier = Modifier.size(20.dp),
+                    spinnerModifier = Modifier.testTag("set-pending-spinner")
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = checkTint,
+                        modifier = Modifier.size(20.dp))
+                }
+            } else {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = checkTint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
+    }
+}
+
+// Keep input composition separate from the row's checkbox and pending state. Completed
+// values need no editor, selection machinery or text-field minimum-size measurement.
+private val SetValueTextStyle = Typography().bodyLarge.copy(
+    fontSize = 20.sp,
+    textAlign = TextAlign.Center,
+    fontWeight = FontWeight.Black
+)
+
+@Composable
+private fun SetValueField(
+    value: String,
+    hint: String,
+    completed: Boolean,
+    enabled: Boolean,
+    color: Color,
+    hintColor: Color,
+    modifier: Modifier,
+    onValueChange: (String) -> Unit
+) {
+    val fieldModifier = modifier.background(Color(0xFF353535), RoundedCornerShape(6.dp))
+    if (completed) {
+        Box(fieldModifier.padding(vertical = 12.dp, horizontal = 2.dp), contentAlignment = Alignment.Center) {
+            Text(value.ifEmpty { hint }, color = color, style = SetValueTextStyle,
+                maxLines = 1, softWrap = false, modifier = Modifier.fillMaxWidth())
+        }
+    } else {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = enabled,
+            modifier = fieldModifier,
+            textStyle = SetValueTextStyle.copy(color = color),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(CrystalWhite),
+            decorationBox = { innerTextField ->
+                Box(Modifier.padding(vertical = 12.dp, horizontal = 2.dp), contentAlignment = Alignment.Center) {
+                    if (value.isEmpty()) {
+                        Text(hint, color = hintColor, style = SetValueTextStyle,
+                            maxLines = 1, softWrap = false, modifier = Modifier.fillMaxWidth())
+                    }
+                    innerTextField()
+                }
+            }
+        )
     }
 }

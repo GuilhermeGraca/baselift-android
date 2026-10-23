@@ -6,15 +6,26 @@ import com.example.baselift.Model.local.entity.MealTemplateEntity
 import com.example.baselift.Model.local.entity.NutritionLogEntity
 import com.example.baselift.Model.repository.INutritionRepository
 import com.example.baselift.Model.repository.IUserRepository
+import com.example.baselift.Model.repository.NutritionDay
+import java.util.TimeZone
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import androidx.compose.runtime.Stable
 
@@ -37,18 +48,37 @@ data class NutritionUiState(
     val isLoading: Boolean = true
 )
 
+data class MealTemplateDeletionState(
+    val pendingTemplateIds: Set<Int> = emptySet(),
+    val failedTemplate: MealTemplateEntity? = null
+)
+
 // modelo de vista responsável pela aba de nutrição
 class NutritionViewModel(
     private val nutritionRepository: INutritionRepository,
-    private val userRepository: IUserRepository
+    private val userRepository: IUserRepository,
+    private val clockMillis: () -> Long = System::currentTimeMillis,
+    private val timeZone: () -> TimeZone = TimeZone::getDefault
 ) : ViewModel() {
 
-    private val refreshTrigger = MutableStateFlow(System.currentTimeMillis())
+    private val dateRefresh = MutableSharedFlow<Unit>(extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private val _mealTemplateDeletion = MutableStateFlow(MealTemplateDeletionState())
+    val mealTemplateDeletion: StateFlow<MealTemplateDeletionState> = _mealTemplateDeletion.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<NutritionUiState> = combine(
         userRepository.getUser(),
-        refreshTrigger.flatMapLatest { nutritionRepository.getTodayLogs() },
+        dateRefresh.onStart { emit(Unit) }.flatMapLatest {
+            flow {
+                while (currentCoroutineContext().isActive) {
+                    val now = clockMillis()
+                    val day = NutritionDay.at(now, timeZone())
+                    emit(day)
+                    delay((day.endExclusiveMillis - now).coerceAtLeast(1))
+                }
+            }
+        }.distinctUntilChanged().flatMapLatest(nutritionRepository::getLogsForDay),
         nutritionRepository.getAllMealTemplates()
     ) { user, logs, templates ->
         
@@ -72,12 +102,13 @@ class NutritionViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Lazily,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000),
         initialValue = NutritionUiState()
     )
 
     fun refreshDate() {
-        refreshTrigger.value = System.currentTimeMillis()
+        // Restart the midnight wait after clock/zone/resume events; equal days keep their query.
+        dateRefresh.tryEmit(Unit)
     }
 
     // adiciona um registo rápido
@@ -93,7 +124,7 @@ class NutritionViewModel(
                 protein = protein,
                 carbs = carbs,
                 fats = fats,
-                timestamp = System.currentTimeMillis()
+                timestamp = clockMillis()
             )
             nutritionRepository.insertNutritionLog(log)
         }
@@ -121,10 +152,27 @@ class NutritionViewModel(
     }
 
     // apagar um template
-    fun deleteMealTemplate(template: com.example.baselift.Model.local.entity.MealTemplateEntity) {
-        viewModelScope.launch {
-            nutritionRepository.deleteMealTemplate(template)
+    fun deleteMealTemplate(template: MealTemplateEntity) {
+        if (template.id in _mealTemplateDeletion.value.pendingTemplateIds) return
+        _mealTemplateDeletion.update {
+            it.copy(pendingTemplateIds = it.pendingTemplateIds + template.id, failedTemplate = null)
         }
+        // The command starts now; row exit animations and screen disposal do not own it.
+        viewModelScope.launch {
+            try {
+                nutritionRepository.deleteMealTemplate(template)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _mealTemplateDeletion.update { it.copy(failedTemplate = template) }
+            } finally {
+                _mealTemplateDeletion.update { it.copy(pendingTemplateIds = it.pendingTemplateIds - template.id) }
+            }
+        }
+    }
+
+    fun dismissMealTemplateDeletionError() {
+        _mealTemplateDeletion.update { it.copy(failedTemplate = null) }
     }
 
     // usar um template para registar (Quick Add Meal)
@@ -136,7 +184,7 @@ class NutritionViewModel(
                 protein = template.protein,
                 carbs = template.carbs,
                 fats = template.fats,
-                timestamp = System.currentTimeMillis()
+                timestamp = clockMillis()
             )
             nutritionRepository.insertNutritionLog(log)
         }

@@ -31,11 +31,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
 import com.example.baselift.View.theme.*
+import com.example.baselift.ViewModel.workout.ExerciseEditState
 
 @Composable
 fun RestTimerWidget(
     modifier: Modifier = Modifier,
     initialTimerSeconds: Int = 105,
+    settingsEnabled: Boolean = true,
     onTimerSaved: (Int) -> Unit = {}
 ) {
     var totalSeconds by remember { mutableIntStateOf(initialTimerSeconds) }
@@ -75,7 +77,7 @@ fun RestTimerWidget(
                 color = CrystalWhite,
                 fontSize = 42.sp,
                 fontWeight = FontWeight.Light,
-                modifier = Modifier.clickable { showEditDialog = true }
+                modifier = Modifier.clickable(enabled = settingsEnabled) { showEditDialog = true }
             )
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -117,6 +119,7 @@ fun RestTimerWidget(
         Dialog(onDismissRequest = { showEditDialog = false }) {
             GenericInputDialog(
                 title = stringResource(com.example.baselift.R.string.workout_set_rest_timer),
+                confirmEnabled = settingsEnabled,
                 content = {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                         BasicTextField(
@@ -139,6 +142,7 @@ fun RestTimerWidget(
                     }
                 },
                 onConfirm = {
+                    if (!settingsEnabled) return@GenericInputDialog
                     val m = minInput.toIntOrNull() ?: 0
                     val s = secInput.toIntOrNull() ?: 0
                     defaultSeconds = (m * 60) + s
@@ -158,7 +162,9 @@ fun GenericInputDialog(
     title: String,
     content: @Composable () -> Unit,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    confirmEnabled: Boolean = true,
+    isSaving: Boolean = false
 ) {
     Box(
         modifier = Modifier
@@ -175,11 +181,19 @@ fun GenericInputDialog(
             Spacer(modifier = Modifier.height(24.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) {
-                    Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
+                    Text(stringResource(if (isSaving) com.example.baselift.R.string.workout_edit_close
+                        else com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)) {
-                    Text(stringResource(com.example.baselift.R.string.workout_save), color = PureBlack)
+                Button(onClick = onConfirm, enabled = confirmEnabled && !isSaving,
+                    modifier = Modifier.widthIn(min = 112.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NeonGreen,
+                        disabledContainerColor = if (isSaving) NeonGreen.copy(alpha = 0.72f) else DeepCharcoal
+                    )) {
+                    Text(stringResource(if (isSaving) com.example.baselift.R.string.workout_edit_saving
+                        else com.example.baselift.R.string.workout_save),
+                        color = if (isSaving || confirmEnabled) PureBlack else MediumGrey)
                 }
             }
         }
@@ -188,60 +202,64 @@ fun GenericInputDialog(
 
 @Composable
 fun EditExerciseDialog(
-    currentName: String,
-    currentEquipment: String,
-    currentMuscleGroups: String,
-    onConfirm: (name: String, equipment: String, muscleGroups: String) -> Unit,
+    state: ExerciseEditState,
+    onNameChange: (String) -> Unit,
+    onEquipmentChange: (String) -> Unit,
+    onMuscleGroupsChange: (String) -> Unit,
+    onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var name by remember { mutableStateOf(currentName) }
-    var equipment by remember { mutableStateOf(currentEquipment) }
-    var muscleGroups by remember { mutableStateOf(currentMuscleGroups) }
-
     Dialog(onDismissRequest = onDismiss) {
         GenericInputDialog(
             title = stringResource(com.example.baselift.R.string.workout_edit_ex_title),
             content = {
                 // nome
                 BasicTextField(
-                    value = name,
-                    onValueChange = { name = it },
+                    value = state.name,
+                    onValueChange = onNameChange,
+                    enabled = !state.isSaving,
                     modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(16.dp),
                     textStyle = Typography().bodyLarge.copy(color = CrystalWhite),
                     decorationBox = { inner ->
-                        if (name.isEmpty()) Text(stringResource(com.example.baselift.R.string.workout_edit_ex_name_hint), color = MediumGrey)
+                        if (state.name.isEmpty()) Text(stringResource(com.example.baselift.R.string.workout_edit_ex_name_hint), color = MediumGrey)
                         inner()
                     }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 // equipamento
                 BasicTextField(
-                    value = equipment,
-                    onValueChange = { equipment = it },
+                    value = state.equipment,
+                    onValueChange = onEquipmentChange,
+                    enabled = !state.isSaving,
                     modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(16.dp),
                     textStyle = Typography().bodyLarge.copy(color = CrystalWhite),
                     decorationBox = { inner ->
-                        if (equipment.isEmpty()) Text(stringResource(com.example.baselift.R.string.workout_edit_ex_eq_hint), color = MediumGrey)
+                        if (state.equipment.isEmpty()) Text(stringResource(com.example.baselift.R.string.workout_edit_ex_eq_hint), color = MediumGrey)
                         inner()
                     }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 // grupos musculares
                 BasicTextField(
-                    value = muscleGroups,
-                    onValueChange = { muscleGroups = it },
+                    value = state.muscleGroups,
+                    onValueChange = onMuscleGroupsChange,
+                    enabled = !state.isSaving,
                     modifier = Modifier.fillMaxWidth().background(DeepCharcoal, RoundedCornerShape(8.dp)).padding(16.dp),
                     textStyle = Typography().bodyLarge.copy(color = CrystalWhite),
                     decorationBox = { inner ->
-                        if (muscleGroups.isEmpty()) Text(stringResource(com.example.baselift.R.string.workout_edit_ex_musc_hint), color = MediumGrey)
+                        if (state.muscleGroups.isEmpty()) Text(stringResource(com.example.baselift.R.string.workout_edit_ex_musc_hint), color = MediumGrey)
                         inner()
                     }
                 )
+                if (state.saveFailed) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(stringResource(com.example.baselift.R.string.workout_edit_error), color = SoftCoral)
+                }
             },
-            onConfirm = {
-                if (name.isNotBlank()) onConfirm(name, equipment, muscleGroups)
-            },
-            onDismiss = onDismiss
+            onConfirm = onConfirm,
+            onDismiss = onDismiss,
+            confirmEnabled = state.name.isNotBlank(),
+            isSaving = state.isSaving
         )
     }
 }
@@ -251,7 +269,8 @@ fun ConfirmDeleteDialog(
     title: String,
     message: String,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    confirmEnabled: Boolean = true
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Box(
@@ -272,7 +291,7 @@ fun ConfirmDeleteDialog(
                         Text(stringResource(com.example.baselift.R.string.workout_cancel), color = MediumGrey)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4444))) {
+                    Button(onClick = onConfirm, enabled = confirmEnabled, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4444))) {
                         Text(stringResource(com.example.baselift.R.string.workout_delete), color = CrystalWhite)
                     }
                 }

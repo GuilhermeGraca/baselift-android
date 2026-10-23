@@ -6,9 +6,13 @@ import com.example.baselift.Model.repository.INutritionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import java.util.Calendar
+import java.util.TimeZone
+import com.example.baselift.Model.repository.NutritionDay
 
-class FakeNutritionRepository : INutritionRepository {
+class FakeNutritionRepository(
+    private val clockMillis: () -> Long = System::currentTimeMillis,
+    private val timeZone: () -> TimeZone = TimeZone::getDefault
+) : INutritionRepository {
     private val nutritionLogs = MutableStateFlow<List<NutritionLogEntity>>(emptyList())
     private val mealTemplates = MutableStateFlow<List<MealTemplateEntity>>(emptyList())
 
@@ -36,18 +40,15 @@ class FakeNutritionRepository : INutritionRepository {
     }
 
     override suspend fun resetTodayLogs() {
-        val startOfDay = getStartOfDayTimestamp()
-        val endOfDay = getEndOfDayTimestamp()
+        val day = NutritionDay.at(clockMillis(), timeZone())
         nutritionLogs.value = nutritionLogs.value.filterNot { 
-            it.timestamp in startOfDay..endOfDay 
+            it.timestamp >= day.startMillis && it.timestamp < day.endExclusiveMillis
         }
     }
 
-    override fun getTodayLogs(): Flow<List<NutritionLogEntity>> {
-        val startOfDay = getStartOfDayTimestamp()
-        val endOfDay = getEndOfDayTimestamp()
+    override fun getLogsForDay(day: NutritionDay): Flow<List<NutritionLogEntity>> {
         return nutritionLogs.map { logs ->
-            logs.filter { it.timestamp in startOfDay..endOfDay }
+            logs.filter { it.timestamp >= day.startMillis && it.timestamp < day.endExclusiveMillis }
                 .sortedByDescending { it.timestamp }
         }
     }
@@ -86,21 +87,4 @@ class FakeNutritionRepository : INutritionRepository {
         nextTemplateId = 1
     }
 
-    private fun getStartOfDayTimestamp(): Long {
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        return calendar.timeInMillis
-    }
-
-    private fun getEndOfDayTimestamp(): Long {
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 23)
-        calendar.set(Calendar.MINUTE, 59)
-        calendar.set(Calendar.SECOND, 59)
-        calendar.set(Calendar.MILLISECOND, 999)
-        return calendar.timeInMillis
-    }
 }

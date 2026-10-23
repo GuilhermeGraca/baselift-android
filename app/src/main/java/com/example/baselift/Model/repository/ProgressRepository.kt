@@ -15,6 +15,8 @@ interface IProgressRepository {
     val allPhotoLogs: Flow<List<PhotoLogEntity>>
     suspend fun insertWeightLog(weight: Float, timestamp: Long)
     suspend fun insertPhotoLog(photoUri: String, timestamp: Long)
+    // Atomic: either every supplied photo is saved, or none are. Preserve list order/duplicates.
+    suspend fun insertPhotoLogs(photoUris: List<String>, timestamp: Long)
     suspend fun deleteWeightLog(weightLog: WeightLogEntity)
     suspend fun deletePhotoLog(photoLog: PhotoLogEntity)
     suspend fun clearProgressData()
@@ -36,6 +38,11 @@ class ProgressRepository(
     
     override suspend fun insertPhotoLog(photoUri: String, timestamp: Long) {
         photoLogDao.insertPhotoLog(PhotoLogEntity(photoUri = photoUri, timestamp = timestamp))
+    }
+
+    override suspend fun insertPhotoLogs(photoUris: List<String>, timestamp: Long) {
+        if (photoUris.isEmpty()) return
+        photoLogDao.insertPhotoLogs(photoUris.map { PhotoLogEntity(photoUri = it, timestamp = timestamp) })
     }
 
     override suspend fun deleteWeightLog(weightLog: WeightLogEntity) {

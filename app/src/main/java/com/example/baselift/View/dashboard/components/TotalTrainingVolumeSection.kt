@@ -3,6 +3,7 @@ package com.example.baselift.View.dashboard.components
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -15,16 +16,22 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @Composable
 fun TotalTrainingVolumeSection(weeklyVolumes: List<WeeklyVolume>) {
     // converter WeeklyVolume para ChartDataPoint
-    val dataPoints = weeklyVolumes.map {
-        ChartDataPoint(
-            xValue = it.weekStartTimestamp,
-            yValue = it.totalVolume,
-            tooltipLabel = "${NumberFormat.getNumberInstance(Locale.US).format(it.totalVolume)} kg\nWeek of ${SimpleDateFormat("MMM dd", Locale.US).format(Date(it.weekStartTimestamp))}"
-        )
+    val zone = TimeZone.getDefault()
+    val dataPoints = remember(weeklyVolumes, zone.id) {
+        val numberFormat = NumberFormat.getNumberInstance(Locale.US)
+        val dateFormat = SimpleDateFormat("MMM dd", Locale.US).apply { timeZone = zone }
+        weeklyVolumes.map {
+            ChartDataPoint(
+                xValue = it.weekStartTimestamp,
+                yValue = it.totalVolume,
+                tooltipLabel = "${numberFormat.format(it.totalVolume)} kg\nWeek of ${dateFormat.format(Date(it.weekStartTimestamp))}"
+            )
+        }
     }
 
     // calcular a variação em percentagem entre a última e a penúltima semana
@@ -46,8 +53,10 @@ fun TotalTrainingVolumeSection(weeklyVolumes: List<WeeklyVolume>) {
     }
 
     // calcular volume total da lista completa por defeito
-    val totalVolume = weeklyVolumes.sumOf { it.totalVolume.toDouble() }.toFloat()
-    val summaryValueStr = NumberFormat.getNumberInstance(Locale.US).format(totalVolume)
+    val summaryValueStr = remember(weeklyVolumes) {
+        val totalVolume = weeklyVolumes.sumOf { it.totalVolume.toDouble() }.toFloat()
+        NumberFormat.getNumberInstance(Locale.US).format(totalVolume)
+    }
 
     BarChartWithControls(
         title = stringResource(com.example.baselift.R.string.dash_total_volume),

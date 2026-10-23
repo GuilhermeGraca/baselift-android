@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -82,6 +83,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
 import com.example.baselift.View.insights.components.*
+import com.example.baselift.View.components.rememberSkeletonOpacity
 
 @Composable
 fun InsightsScreen(
@@ -92,11 +94,28 @@ fun InsightsScreen(
     val uiState by onboardingViewModel.uiState.collectAsStateWithLifecycle()
     val weightLogs by progressViewModel.weightLogs.collectAsStateWithLifecycle()
     val photoLogs by progressViewModel.photoLogs.collectAsStateWithLifecycle()
-    val user by progressViewModel.user.collectAsStateWithLifecycle()
+    val weightLogsReady by progressViewModel.weightLogsReady.collectAsStateWithLifecycle()
+    val photoLogsReady by progressViewModel.photoLogsReady.collectAsStateWithLifecycle()
+    val weightLoadingOpacity = if (!weightLogsReady) rememberSkeletonOpacity() else null
+    val profileLoadState by onboardingViewModel.profileLoadState.collectAsStateWithLifecycle()
+    val user = profileLoadState.profile?.user
+    val photoImport by progressViewModel.photoImport.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
+    PhotoImportFeedback(photoImport.result,
+        onRetry = { progressViewModel.retryPhotoImport(context, it) },
+        onDismiss = progressViewModel::dismissPhotoImportResult)
     var selectedUrisForLogging by remember { mutableStateOf<List<Uri>?>(null) }
     var clickedPhoto by remember { mutableStateOf<PhotoLogEntity?>(null) }
+    val sortedWeightLogs = remember(weightLogs) { weightLogs.sortedByDescending { it.timestamp } }
+    val photoWeights = rememberPhotoWeightIndex(weightLogs)
+    var weightHistoryExpanded by rememberSaveable { mutableStateOf(false) }
+    var weightLogToDeleteId by remember { mutableStateOf<Int?>(null) }
+    val weightLogToDelete = weightLogToDeleteId?.let { id -> weightLogs.firstOrNull { it.id == id } }
+
+    LaunchedEffect(weightLogToDeleteId, weightLogToDelete) {
+        if (weightLogToDeleteId != null && weightLogToDelete == null) weightLogToDeleteId = null
+    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
@@ -361,11 +380,15 @@ fun InsightsScreen(
 
         item {
             // tendência de peso
-            WeightTrendSection(
-                weightLogs = weightLogs, 
-                targetWeight = user?.targetWeight,
-                onSetTargetWeight = { progressViewModel.setTargetWeight(it) }
-            )
+            if (weightLoadingOpacity != null) {
+                InsightsWeightChartSkeleton(weightLoadingOpacity)
+            } else {
+                WeightTrendSection(
+                    weightLogs = weightLogs,
+                    targetWeight = user?.targetWeight,
+                    onSetTargetWeight = { progressViewModel.setTargetWeight(it) }
+                )
+            }
             Spacer(modifier = Modifier.height(24.dp))
         }
 
@@ -377,23 +400,40 @@ fun InsightsScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        item {
-            // histórico
-            TechnicalHistoryLedger(weightLogs, user, onDelete = { progressViewModel.deleteWeightLog(it) })
-            Spacer(modifier = Modifier.height(48.dp))
+        if (weightLoadingOpacity != null) {
+            item(key = "weight-history-loading") { InsightsWeightLedgerSkeleton(weightLoadingOpacity) }
+        } else {
+            TechnicalHistoryLedger(
+                sortedLogs = sortedWeightLogs,
+                isGainGoal = user?.goal?.contains("Gain", ignoreCase = true) ?: false,
+                expanded = weightHistoryExpanded,
+                onToggleExpanded = { weightHistoryExpanded = !weightHistoryExpanded },
+                onRequestDelete = { weightLogToDeleteId = it.id }
+            )
         }
 
-        item {
+        item(key = "insights-visual-diary") {
             // diário visual
             VisualDiarySection(
                 photoLogs = photoLogs,
-                weightLogs = weightLogs,
-                onPhotoClick = { clickedPhoto = it }
-            ) {
-                photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }
+                photoWeights = photoWeights,
+                onPhotoClick = { clickedPhoto = it },
+                onAddPhoto = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                isImporting = photoImport.isImporting,
+                isLoading = !photoLogsReady
+            )
             Spacer(modifier = Modifier.height(100.dp)) // espaço para navegação inferior
         }
+    }
+
+    weightLogToDelete?.let { log ->
+        WeightHistoryDeleteDialog(
+            onDismiss = { weightLogToDeleteId = null },
+            onConfirm = {
+                progressViewModel.deleteWeightLog(log)
+                weightLogToDeleteId = null
+            }
+        )
     }
 
     // diálogo para adicionar foto
@@ -466,10 +506,12 @@ fun InsightsScreen(
                             Button(
                                 onClick = {
                                     selectedUrisForLogging?.let { uris ->
-                                        progressViewModel.addPhotoLogs(context, uris, photoTimestamp)
+                                        if (progressViewModel.addPhotoLogs(context, uris, photoTimestamp)) {
+                                            selectedUrisForLogging = null
+                                        }
                                     }
-                                    selectedUrisForLogging = null
                                 },
+                                enabled = !photoImport.isImporting,
                                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
@@ -512,7 +554,7 @@ fun InsightsScreen(
     clickedPhoto?.let { photo ->
         PhotoDetailDialog(
             photoLog = photo,
-            weightLogs = weightLogs,
+            photoWeights = photoWeights,
             onDismiss = { clickedPhoto = null },
             onDelete = {
                 progressViewModel.deletePhotoLog(photo)

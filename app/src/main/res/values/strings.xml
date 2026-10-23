@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="profile_load_error_title">Unable to load your profile</string>
+    <string name="profile_load_error_message">Your saved data has not been changed. Please try loading your profile again.</string>
+    <string name="profile_loading">Loading your profile</string>
     <string name="app_name">BaseLift</string>
     <!-- General -->
     <string name="save">Guardar</string>
@@ -26,15 +29,18 @@
     <string name="dash_consistency_journal">Consistency Journal</string>
     <string name="dash_nutrition_streak">NUTRITION STREAK</string>
     <string name="dash_workout_streak">WORKOUT STREAK</string>
+    <string name="dash_exercise_loading">Loading exercise history…</string>
+    <string name="dash_exercise_load_error">Unable to load exercise history.</string>
+    <string name="dash_retry">Retry</string>
     <string name="dash_nutrition_tab">NUTRITION</string>
     <string name="dash_this_week">This week</string>
     <string name="dash_workout_tab">WORKOUT</string>
     <string name="dash_workouts_count">%1$d workouts</string>
     <string name="dash_view_calendar">VIEW CALENDAR</string>
     <string name="dash_workouts_label">WORKOUTS</string>
-    <string name="dash_rest_days_desc">Set the number of Rest Days per week (0 to 7). If you set 2, you need to workout 5 days a week to keep the streak.</string>
-    <string name="dash_rest_days_note">Note: If you set 7 rest days, the streak never resets and just acts as a total workout counter.</string>
-    <string name="dash_nut_rest_days_desc">Set the number of Rest Days per week (0 to 7). If you set 2, you need to log nutrition 5 days a week to keep the streak.</string>
+    <string name="dash_rest_days_desc">Allow 0 to 7 missed workout days per Monday–Sunday week. With 0, every day must have a workout. With 2, up to 2 missed days per week are allowed. Today can remain unfinished; only workout days add to the streak.</string>
+    <string name="dash_rest_days_note">Note: If you set 7 rest days, the streak never resets and counts total workout days.</string>
+    <string name="dash_nut_rest_days_desc">Allow 0 to 7 missed nutrition days per Monday–Sunday week. With 0, every day must have a nutrition log. With 2, up to 2 missed days per week are allowed. Today can remain unfinished; only logged days add to the streak.</string>
     <string name="dash_nut_rest_days_note">Note: If you set 7 rest days, the streak never resets and just acts as a total nutrition days counter.</string>
     <string name="dash_save">SAVE</string>
     <string name="dash_total_volume">Total Training Volume</string>
@@ -55,6 +61,30 @@
     <string name="workout_no_routines">No routines found. Click \'+\' to create one.</string>
     <string name="workout_add_exercise_session">+ ADD EXERCISE TO SESSION</string>
     <string name="workout_finalize">FINALIZE WORKOUT</string>
+    <string name="workout_finalizing">SAVING WORKOUT…</string>
+    <string name="workout_finalize_error_title">Unable to finish workout</string>
+    <string name="workout_finalize_error_message">Your workout could not be saved. Please try finalizing it again.</string>
+    <string name="workout_finalize_error_dismiss">OK</string>
+    <string name="workout_set_check">Set %1$d completion</string>
+    <string name="workout_set_saving">Saving set…</string>
+    <string name="workout_set_save_error_title">Unable to save set</string>
+    <string name="workout_set_save_error_message">The set change could not be saved. Your inputs have been kept. Please tap the checkbox again to retry.</string>
+    <string name="workout_set_add_error_title">Unable to add set</string>
+    <string name="workout_set_add_error_message">The set could not be added. Please tap Add set again to retry.</string>
+    <string name="workout_set_removing">Removing set…</string>
+    <string name="workout_set_remove_error_title">Unable to remove set</string>
+    <string name="workout_set_remove_error_message">The set could not be removed. Your inputs have been kept. If the set list changed, select the current last set and try again.</string>
+    <string name="workout_reorder_error_title">Unable to save exercise order</string>
+    <string name="workout_reorder_error_message">The exercise order could not be saved. Your sets and inputs have been kept. Please drag the exercises again to retry.</string>
+    <string name="workout_selection_error">Unable to load this routine. Your saved sets and inputs have been kept.</string>
+    <string name="workout_selection_retry">Retry loading</string>
+    <string name="workout_list_error">Unable to load your routines. Your saved workouts and inputs have been kept.</string>
+    <string name="workout_refreshing">Updating routine…</string>
+    <string name="workout_preparing_sets">Preparing sets and previous results…</string>
+    <string name="workout_loading">Loading workout</string>
+    <string name="workout_edit_saving">SAVING…</string>
+    <string name="workout_edit_close">Close</string>
+    <string name="workout_edit_error">Unable to save these changes. Your entries have been kept. Please try saving again.</string>
     <string name="workout_new_routine">NEW ROUTINE</string>
     <string name="workout_add_exercise">ADD EXERCISE</string>
     <string name="workout_ex_name">Exercise Name</string>
@@ -110,6 +140,9 @@
     <string name="nutrition_show_less">SHOW LESS</string>
     <string name="nutrition_show_more">SHOW MORE</string>
     <string name="nutrition_delete_template">Delete Template</string>
+    <string name="nutrition_delete_error_title">Unable to delete meal</string>
+    <string name="nutrition_delete_error_message">Could not delete \'%1$s\'. Your template is still saved. Please try again.</string>
+    <string name="nutrition_delete_error_dismiss">OK</string>
     <string name="nutrition_delete_template_msg">Are you sure you want to remove \'%1$s\' from your templates? This action cannot be undone.</string>
     <string name="nutrition_todays_logs">TODAY\'S LOGS</string>
     <string name="nutrition_reset_all">RESET ALL LOGS</string>
@@ -150,6 +183,11 @@
     <string name="insights_associate_date">ASSOCIATE DATE TO PHOTOS</string>
     <string name="insights_select_date_desc">Select the date for the %1$d selected progress photos:</string>
     <string name="insights_save_photos">SAVE PHOTOS</string>
+    <string name="insights_photo_importing">Importing photos…</string>
+    <string name="insights_photo_import_incomplete">Some photos were not saved</string>
+    <string name="insights_photo_import_stopped">Photo import stopped</string>
+    <string name="insights_photo_import_result">%1$d photos saved. %2$d photos were not saved. Retrying will only import the unsaved photos.</string>
+    <string name="insights_photo_import_retry">Retry unsaved photos</string>
     <string name="insights_weight_trend">Weight Trend</string>
     <string name="insights_log_weight">LOG WEIGHT</string>
     <string name="insights_new_manual_entry">NEW MANUAL ENTRY</string>
@@ -222,11 +260,11 @@
     <string name="onboarding_based_on_profile">Based on your selected profile.</string>
     <string name="onboarding_daily_maintenance">DAILY MAINTENANCE</string>
     <string name="onboarding_protein">PROTEIN</string>
-    <string name="onboarding_protein_desc">30% P</string>
+    <string name="onboarding_protein_desc" formatted="false">30% P</string>
     <string name="onboarding_carbs">CARBS</string>
-    <string name="onboarding_carbs_desc">45% C</string>
+    <string name="onboarding_carbs_desc" formatted="false">45% C</string>
     <string name="onboarding_fats">FATS</string>
-    <string name="onboarding_fats_desc">25% F</string>
+    <string name="onboarding_fats_desc" formatted="false">25% F</string>
     <string name="onboarding_update_baseline">UPDATE BASELINE</string>
     <string name="onboarding_get_started">GET STARTED</string>
     <string name="onboarding_custom_plan_msg">Have a custom plan? Set macros manually ></string>

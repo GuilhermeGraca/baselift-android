@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +34,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.baselift.AppContainer
+import com.example.baselift.View.components.DelayedPendingSpinner
 import com.example.baselift.View.dashboard.DashboardScreen
 import com.example.baselift.View.insights.InsightsScreen
 import com.example.baselift.View.onboarding.CustomTargetsScreen
@@ -50,6 +52,9 @@ import com.example.baselift.ViewModel.nutrition.NutritionViewModelFactory
 import com.example.baselift.View.nutrition.NutritionScreen
 import com.example.baselift.ViewModel.dashboard.DashboardViewModel
 import com.example.baselift.ViewModel.dashboard.DashboardViewModelFactory
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 /**
  * Rotas da aplicação
@@ -101,51 +106,44 @@ fun AppNavigation(
         factory = DashboardViewModelFactory(appContainer.workoutRepository, appContainer.nutritionRepository)
     )
 
-    val isLoaded by onboardingViewModel.isLoaded.collectAsStateWithLifecycle()
+    val profileLoadState by onboardingViewModel.profileLoadState.collectAsStateWithLifecycle()
     val isRecalibrating by onboardingViewModel.isRecalibrating.collectAsStateWithLifecycle()
-    val hasUser by onboardingViewModel.hasUser.collectAsStateWithLifecycle()
-    val userState by progressViewModel.user.collectAsStateWithLifecycle()
     var resetType by remember { mutableStateOf<ResetType?>(null) }
 
-    // redirecionamentos baseados no estado do utilizador
-    LaunchedEffect(isLoaded, userState, hasUser, isRecalibrating) {
-        if (!isLoaded) return@LaunchedEffect
-        
-        val currentRoute = navController.currentDestination?.route
-        
-        // Se os dados foram eliminados, ir para onboarding
-        if (userState == null && currentRoute != Routes.ONBOARDING) {
-            navController.navigate(Routes.ONBOARDING) {
+    // Only confirmed presence changes affect routing. Profile edits must not rebuild the graph.
+    val hasUser = profileLoadState.profile?.let { it.user != null }
+    LaunchedEffect(hasUser, isRecalibrating) {
+        val redirect = profileRedirect(hasUser, isRecalibrating, navController.currentDestination?.route)
+        if (redirect == Routes.ONBOARDING) {
+            navController.navigate(redirect) {
                 popUpTo(0) { inclusive = true }
             }
-        } 
-        // Se tem utilizador e está no onboarding (mas não quer recalibrar), ir para insights
-        else if (hasUser && !isRecalibrating && currentRoute == Routes.ONBOARDING) {
-            navController.navigate(Routes.INSIGHTS) {
+        } else if (redirect != null) {
+            navController.navigate(redirect) {
                 popUpTo(Routes.ONBOARDING) { inclusive = true }
+                launchSingleTop = true
             }
         }
     }
 
-    if (!isLoaded) {
-        PremiumSplashScreen()
-    } else {
-        val startDestination = remember(isLoaded, hasUser, isRecalibrating) {
+    ProfileLoadGate(profileLoadState, onboardingViewModel::retryProfileLoad) { profile ->
+        // Keep the graph identity through first-profile saves, recalibration and profile updates.
+        val startDestination = rememberSaveable {
             when {
-                isRecalibrating -> Routes.ONBOARDING  // utilizador clicou explicitamente em "Recalibrate"
-                hasUser -> Routes.INSIGHTS             // utilizador já existe, ir direto para insights
-                else -> Routes.ONBOARDING              // primeiro uso, sem dados
+                isRecalibrating -> Routes.ONBOARDING
+                profile.user != null -> Routes.INSIGHTS
+                else -> Routes.ONBOARDING
             }
         }
         Scaffold(
             topBar = {
                 if (showBottomBar) {
                     TopHeaderBar(
-                        profilePhotoUri = userState?.profilePhotoUri,
+                        profilePhotoUri = profile.user?.profilePhotoUri,
                         onResetClick = { type -> resetType = type },
                         onProfileClick = {
                             navController.navigate(Routes.INSIGHTS) {
-                                popUpTo(navController.graph.startDestinationId) {
+                                popUpTo(Routes.INSIGHTS) {
                                     saveState = true
                                 }
                                 launchSingleTop = true
@@ -161,7 +159,7 @@ fun AppNavigation(
                         currentRoute = currentRoute,
                         onNavigate = { route ->
                             navController.navigate(route) {
-                                popUpTo(navController.graph.startDestinationId) {
+                                popUpTo(Routes.INSIGHTS) {
                                     saveState = true
                                 }
                                 launchSingleTop = true
@@ -216,6 +214,7 @@ fun AppNavigation(
                         onNavigateToDashboard = {
                             navController.navigate(Routes.INSIGHTS) {
                                 popUpTo(Routes.ONBOARDING) { inclusive = true }
+                                launchSingleTop = true
                             }
                         },
                         onNavigateToCustomTargets = {
@@ -234,6 +233,7 @@ fun AppNavigation(
                             } else {
                                 navController.navigate(Routes.INSIGHTS) {
                                     popUpTo(Routes.ONBOARDING) { inclusive = true }
+                                    launchSingleTop = true
                                 }
                             }
                         },
@@ -264,6 +264,9 @@ fun AppNavigation(
                             val sharedPrefs = context.getSharedPreferences("baselift_settings", android.content.Context.MODE_PRIVATE)
                             sharedPrefs.edit().putInt("workout_rest_days", days).apply()
                         },
+                        exerciseCharts = dashboardViewModel::exerciseCharts,
+                        onRoutineExpansionChanged = dashboardViewModel::setRoutineExpanded,
+                        onCalendarMonthChanged = dashboardViewModel::setCalendarMonth,
                         onSetNutritionRestDays = { days ->
                             dashboardViewModel.setNutritionRestDays(days)
                             val sharedPrefs = context.getSharedPreferences("baselift_settings", android.content.Context.MODE_PRIVATE)
@@ -515,10 +518,13 @@ fun PremiumSplashScreen() {
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            CircularProgressIndicator(
+            val loadingLabel = stringResource(R.string.profile_loading)
+            DelayedPendingSpinner(
                 color = NeonGreen,
                 strokeWidth = 3.dp,
-                modifier = Modifier.size(36.dp)
+                spinnerSize = 36.dp,
+                modifier = Modifier.size(36.dp).semantics { contentDescription = loadingLabel },
+                spinnerModifier = Modifier.testTag("startup-pending-spinner")
             )
         }
     }

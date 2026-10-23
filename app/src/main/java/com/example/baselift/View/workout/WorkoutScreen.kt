@@ -7,7 +7,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,25 +30,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.baselift.Model.local.entity.WorkoutEntity
 import com.example.baselift.View.theme.*
 import com.example.baselift.ViewModel.workout.WorkoutViewModel
-import com.example.baselift.View.workout.components.ExerciseCard
+import com.example.baselift.View.workout.components.EditExerciseDialog
 import com.example.baselift.View.workout.components.GenericInputDialog
-import com.example.baselift.View.workout.components.RestTimerWidget
 import com.example.baselift.View.workout.components.ConfirmDeleteDialog
+import com.example.baselift.View.workout.components.WorkoutLoadingContent
+import com.example.baselift.View.workout.components.WorkoutRoutineTabsPlaceholder
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.Position
 import nl.dionsegijn.konfetti.core.emitter.Emitter
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.launch
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.graphics.graphicsLayer
 @Composable
 fun WorkoutScreen(
     viewModel: WorkoutViewModel,
@@ -62,14 +52,99 @@ fun WorkoutScreen(
     var workoutToDelete by remember { mutableStateOf<WorkoutEntity?>(null) }
     
     var showConfetti by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val haptic = LocalHapticFeedback.current
+    // Only presentation waits for the animation; the save has already succeeded.
+    val finalizedSessionId = uiState.finalizedSessionId
+    LaunchedEffect(finalizedSessionId) {
+        if (finalizedSessionId != null) {
+            viewModel.acknowledgeFinalization(finalizedSessionId)
+            showConfetti = true
+        }
+    }
+    LaunchedEffect(showConfetti) {
+        if (showConfetti) {
+            kotlinx.coroutines.delay(2000)
+            showConfetti = false
+        }
+    }
+
+    uiState.exerciseEdits.values.firstOrNull {
+        it.isOpen && it.workoutId == uiState.selectedWorkout?.id &&
+            !uiState.isLoading && !uiState.isSelectionLoading && !uiState.selectionLoadFailed
+    }?.let { edit ->
+        EditExerciseDialog(
+            state = edit,
+            onNameChange = { viewModel.updateExerciseEditDraft(edit.exerciseId, name = it) },
+            onEquipmentChange = { viewModel.updateExerciseEditDraft(edit.exerciseId, equipment = it) },
+            onMuscleGroupsChange = { viewModel.updateExerciseEditDraft(edit.exerciseId, muscleGroups = it) },
+            onConfirm = { viewModel.saveExerciseEdit(edit.exerciseId) },
+            onDismiss = { viewModel.dismissExerciseEdit(edit.exerciseId) }
+        )
+    }
+
+    val reorderErrorWorkoutId = uiState.selectedWorkout?.id?.takeIf { it in uiState.reorderFailedWorkoutIds }
+    if (reorderErrorWorkoutId != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissReorderError(reorderErrorWorkoutId) },
+            title = { Text(stringResource(com.example.baselift.R.string.workout_reorder_error_title)) },
+            text = { Text(stringResource(com.example.baselift.R.string.workout_reorder_error_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissReorderError(reorderErrorWorkoutId) }) {
+                    Text(stringResource(com.example.baselift.R.string.workout_finalize_error_dismiss))
+                }
+            }
+        )
+    }
     
-    // Defer rendering of heavy lists by a few frames to make tab transition perfectly smooth
-    var isContentReady by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(50)
-        isContentReady = true
+    if (uiState.finalizationFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissFinalizationError,
+            title = { Text(stringResource(com.example.baselift.R.string.workout_finalize_error_title)) },
+            text = { Text(stringResource(com.example.baselift.R.string.workout_finalize_error_message)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissFinalizationError) {
+                    Text(stringResource(com.example.baselift.R.string.workout_finalize_error_dismiss))
+                }
+            }
+        )
+    }
+
+    if (uiState.setSaveFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSetSaveError,
+            title = { Text(stringResource(com.example.baselift.R.string.workout_set_save_error_title)) },
+            text = { Text(stringResource(com.example.baselift.R.string.workout_set_save_error_message)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissSetSaveError) {
+                    Text(stringResource(com.example.baselift.R.string.workout_finalize_error_dismiss))
+                }
+            }
+        )
+    }
+
+    if (uiState.setAddFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSetAddError,
+            title = { Text(stringResource(com.example.baselift.R.string.workout_set_add_error_title)) },
+            text = { Text(stringResource(com.example.baselift.R.string.workout_set_add_error_message)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissSetAddError) {
+                    Text(stringResource(com.example.baselift.R.string.workout_finalize_error_dismiss))
+                }
+            }
+        )
+    }
+
+    if (uiState.setRemovalFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSetRemovalError,
+            title = { Text(stringResource(com.example.baselift.R.string.workout_set_remove_error_title)) },
+            text = { Text(stringResource(com.example.baselift.R.string.workout_set_remove_error_message)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissSetRemovalError) {
+                    Text(stringResource(com.example.baselift.R.string.workout_finalize_error_dismiss))
+                }
+            }
+        )
     }
 
     if (workoutToDelete != null) {
@@ -89,9 +164,17 @@ fun WorkoutScreen(
             .fillMaxSize()
             .background(PureBlack)
     ) {
+        val selectedWorkout = uiState.selectedWorkout
+        val hasRetainedSnapshot = selectedWorkout != null && uiState.hasRowsSnapshot &&
+            uiState.activeSession?.workoutId == selectedWorkout.id
+        val rowsRefreshing = uiState.isLoading || !uiState.areRowsValidated
+        val writesBlocked = rowsRefreshing || uiState.workoutsLoadFailed ||
+            uiState.selectionLoadFailed || uiState.isFinalizing
+
         Column(modifier = Modifier.fillMaxSize()) {
             // barra superior para abas de treino
-            if (uiState.workouts.isNotEmpty()) {
+            if (uiState.workouts.isNotEmpty() &&
+                ((!uiState.isLoading && !uiState.workoutsLoadFailed) || hasRetainedSnapshot)) {
                 androidx.compose.foundation.lazy.LazyRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -116,7 +199,8 @@ fun WorkoutScreen(
                                                 )
                                             )
                                         )
-                                        .pointerInput(Unit) {
+                                        .pointerInput(workout.id, uiState.isLoading, uiState.workoutsLoadFailed) {
+                                            if (uiState.isLoading || uiState.workoutsLoadFailed) return@pointerInput
                                             detectTapGestures(
                                                 onPress = {
                                                     isPressed = true
@@ -145,7 +229,9 @@ fun WorkoutScreen(
                         }
                     }
                 }
-            } else {
+            } else if (uiState.isLoading && !hasRetainedSnapshot) {
+                WorkoutRoutineTabsPlaceholder()
+            } else if (!uiState.isLoading && !uiState.workoutsLoadFailed) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     contentAlignment = Alignment.Center
@@ -157,266 +243,84 @@ fun WorkoutScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             // lista de exercícios
-            if (uiState.selectedWorkout != null && isContentReady) {
-                var draggedIndex by remember { mutableStateOf<Int?>(null) }
-                var hoverIndex by remember { mutableStateOf<Int?>(null) }
-                var draggedOffset by remember { mutableStateOf(0f) }
-                var initialDraggedItemOffset by remember { mutableStateOf(0f) }
-                
-                val lazyListState = rememberLazyListState()
-                val coroutineScope = rememberCoroutineScope()
-                val density = androidx.compose.ui.platform.LocalDensity.current
-                val shiftPixels = with(density) { 120.dp.toPx() } // Fixed hole size for collapsed cards
-                
-                LazyColumn(
-                    state = lazyListState,
-                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(bottom = 120.dp)
+            // A same-session snapshot stays visible while membership and rows are revalidated.
+            // Its controls remain blocked until a fresh row emission confirms it.
+            if (uiState.isLoading && !hasRetainedSnapshot) {
+                WorkoutLoadingContent(emptyList(), Modifier.weight(1f))
+            } else if (uiState.workoutsLoadFailed && !hasRetainedSnapshot) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    items(uiState.exercises.size, key = { uiState.exercises[it].exercise.id }) { index ->
-                        val exerciseModel = uiState.exercises[index]
-                        val isDragged = draggedIndex == index
-                        val isAnyDragging = draggedIndex != null
-                        
-                        // Calculate visual shift for items making way for the dragged item
-                        val shiftAmount by animateFloatAsState(
-                            targetValue = if (isAnyDragging && hoverIndex != null && draggedIndex != null) {
-                                val dIdx = draggedIndex!!
-                                val hIdx = hoverIndex!!
-                                
-                                if (dIdx < hIdx) {
-                                    if (index > dIdx && index <= hIdx) -shiftPixels else 0f
-                                } else if (dIdx > hIdx) {
-                                    if (index >= hIdx && index < dIdx) shiftPixels else 0f
-                                } else 0f
-                            } else 0f
-                        )
-                        
-                        val elevation by animateFloatAsState(if (isDragged) 24f else 0f)
-                        
-                        LaunchedEffect(isDragged) {
-                            if (isDragged) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        }
-                        
-                        val dragModifier = Modifier.pointerInput(Unit) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = { _ ->
-                                            draggedIndex = index
-                                            hoverIndex = index
-                                            draggedOffset = 0f
-                                            val item = lazyListState.layoutInfo.visibleItemsInfo.find { it.index == index }
-                                            initialDraggedItemOffset = item?.offset?.toFloat() ?: 0f
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            draggedOffset += dragAmount.y
-                                            
-                                            val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-                                            
-                                            val draggedTop = initialDraggedItemOffset + draggedOffset
-                                            val draggedBottom = draggedTop + shiftPixels
-                                            val centerY = draggedTop + shiftPixels / 2f
-                                            
-                                            var newHover = draggedIndex
-                                            for (item in visibleItems) {
-                                                val idx = item.index
-                                                if (idx == draggedIndex) continue
-                                                
-                                                val itemTop = item.offset.toFloat()
-                                                val itemBottom = itemTop + item.size.toFloat()
-                                                
-                                                if (draggedOffset > 0) { // drag down
-                                                    if (idx > draggedIndex!! && draggedBottom > itemTop + 40f) {
-                                                        newHover = maxOf(newHover!!, idx)
-                                                    }
-                                                } else { // drag up
-                                                    if (idx < draggedIndex!! && draggedTop < itemBottom - 40f) {
-                                                        newHover = minOf(newHover!!, idx)
-                                                    }
-                                                }
-                                            }
-                                            
-                                            if (newHover != null && newHover < uiState.exercises.size) {
-                                                hoverIndex = newHover
-                                            }
-                                            
-                                            // Simple Auto-scroll
-                                            val viewportTop = lazyListState.layoutInfo.viewportStartOffset
-                                            val viewportBottom = lazyListState.layoutInfo.viewportEndOffset
-                                            coroutineScope.launch {
-                                                if (centerY > viewportBottom - 200) {
-                                                    lazyListState.scrollBy(15f)
-                                                } else if (centerY < viewportTop + 200) {
-                                                    lazyListState.scrollBy(-15f)
-                                                }
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            if (draggedIndex != null && hoverIndex != null) {
-                                                val dropIdx = hoverIndex!!
-                                                
-                                                // Posição visual do card no momento de largar (relativa ao viewport)
-                                                val targetViewportY = (initialDraggedItemOffset + draggedOffset).toInt()
-                                                
-                                                if (draggedIndex != dropIdx) {
-                                                    viewModel.moveExercise(draggedIndex!!, dropIdx)
-                                                }
-                                                
-                                                coroutineScope.launch {
-                                                    // Aguardar que o layout estabilize completamente:
-                                                    // o tamanho tem de ser igual em dois frames
-                                                    // consecutivos (expansão concluída).
-                                                    var prevSize = -1
-                                                    while (true) {
-                                                        val currentSize = lazyListState.layoutInfo
-                                                            .visibleItemsInfo
-                                                            .find { info -> info.index == dropIdx }?.size ?: 0
-                                                        if (currentSize > shiftPixels.toInt() && currentSize == prevSize) break
-                                                        prevSize = currentSize
-                                                        kotlinx.coroutines.delay(16) // ~1 frame @ 60fps
-                                                    }
-                                                    // Calcular delta entre posição atual do card
-                                                    // e a posição visual onde estava ao ser largado.
-                                                    val currentOffset = lazyListState.layoutInfo
-                                                        .visibleItemsInfo
-                                                        .find { info -> info.index == dropIdx }?.offset?.toFloat() ?: 0f
-                                                    val delta = currentOffset - targetViewportY
-                                                    if (delta != 0f) lazyListState.animateScrollBy(delta)
-                                                }
-                                            }
-                                            draggedIndex = null
-                                            hoverIndex = null
-                                            draggedOffset = 0f
-                                            initialDraggedItemOffset = 0f
-                                        },
-                                        onDragCancel = {
-                                            draggedIndex = null
-                                            hoverIndex = null
-                                            draggedOffset = 0f
-                                            initialDraggedItemOffset = 0f
-                                        }
-                                    )
-                                }
-                        
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp)
-                                .zIndex(if (isDragged) 1f else 0f)
-                                .graphicsLayer {
-                                    if (isDragged) {
-                                        val currentItem = lazyListState.layoutInfo.visibleItemsInfo.find { it.index == index }
-                                        val currentItemOffset = currentItem?.offset?.toFloat() ?: 0f
-                                        translationY = initialDraggedItemOffset + draggedOffset - currentItemOffset
-                                        shadowElevation = elevation
-                                        shape = RoundedCornerShape(12.dp)
-                                        ambientShadowColor = androidx.compose.ui.graphics.Color.Black
-                                        spotShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)
-                                    } else {
-                                        translationY = shiftAmount
-                                    }
-                                }
-                                .shadow(elevation.dp, RoundedCornerShape(12.dp), ambientColor = androidx.compose.ui.graphics.Color.Black, spotColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f))
-                        ) {
-                            ExerciseCard(
-                                exerciseModel = exerciseModel,
-                                draftWeights = viewModel.draftWeights,
-                                draftReps = viewModel.draftReps,
-                                onUpdateDraftWeight = { exId, setNum, v -> viewModel.updateDraftWeight(exId, setNum, v) },
-                                onUpdateDraftReps = { exId, setNum, v -> viewModel.updateDraftReps(exId, setNum, v) },
-                                onAddSet = { viewModel.addSetToExercise(exerciseModel.exercise.id) },
-                                onRemoveLastSet = { viewModel.removeLastSet(exerciseModel.exercise.id) },
-                                onDeleteExercise = { viewModel.deleteExercise(exerciseModel.exercise.id) },
-                                onEditExercise = { name, eq, mg -> viewModel.updateExercise(exerciseModel.exercise.id, name, eq, mg) },
-                                onLogSet = { setNumber, weight, reps, isCompleted, existingId ->
-                                    viewModel.logSet(
-                                        exerciseId = exerciseModel.exercise.id,
-                                        setNumber = setNumber,
-                                        weight = weight,
-                                        reps = reps,
-                                        isCompleted = isCompleted,
-                                        existingSetId = existingId
-                                    )
-                                },
-                                isDragging = isDragged,
-                                isAnyDragging = isAnyDragging,
-                                dragModifier = dragModifier
-                            )
+                    Text(stringResource(com.example.baselift.R.string.workout_list_error), color = MediumGrey)
+                    TextButton(onClick = viewModel::retryWorkouts) {
+                        Text(stringResource(com.example.baselift.R.string.workout_selection_retry), color = NeonGreen)
+                    }
+                }
+            } else if (selectedWorkout != null && uiState.isSelectionLoading && !hasRetainedSnapshot) {
+                Column(Modifier.fillMaxWidth().weight(1f)) {
+                    if (uiState.loadingExerciseHeaders.isNotEmpty()) {
+                        Text(stringResource(com.example.baselift.R.string.workout_preparing_sets),
+                            color = MediumGrey, fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                    }
+                    WorkoutLoadingContent(uiState.loadingExerciseHeaders, Modifier.weight(1f))
+                }
+            } else if (selectedWorkout != null && uiState.selectionLoadFailed && !hasRetainedSnapshot) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(stringResource(com.example.baselift.R.string.workout_selection_error), color = MediumGrey)
+                    TextButton(onClick = { viewModel.retryWorkoutSelection(selectedWorkout.id) }) {
+                        Text(stringResource(com.example.baselift.R.string.workout_selection_retry), color = NeonGreen)
+                    }
+                }
+            } else if (selectedWorkout != null) {
+                if (uiState.workoutsLoadFailed) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(stringResource(com.example.baselift.R.string.workout_list_error),
+                            color = MediumGrey, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        TextButton(onClick = viewModel::retryWorkouts) {
+                            Text(stringResource(com.example.baselift.R.string.workout_selection_retry), color = NeonGreen)
                         }
                     }
-
-                    item {
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = draggedIndex == null,
-                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
-                            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
-                        ) {
-                            Column {
-                                // botão para adicionar exercício
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color.Transparent)
-                                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                        .clickable { showAddExerciseDialog = true }
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Box(
-                                            modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Default.Add, contentDescription = "Add Exercise", tint = CrystalWhite)
-                                        }
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(stringResource(com.example.baselift.R.string.workout_add_exercise_session), color = CrystalWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                    }
-                                }
-                                
-                                Spacer(modifier = Modifier.height(32.dp))
-                                
-                                // temporizador de descanso
-                                RestTimerWidget(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    initialTimerSeconds = uiState.selectedWorkout?.defaultRestTimer ?: 105,
-                                    onTimerSaved = { seconds ->
-                                        viewModel.updateWorkoutRestTimer(seconds)
-                                    }
-                                )
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                // botão para finalizar treino
-                                if (uiState.exercises.isNotEmpty()) {
-                                    val hasCompletedSets = uiState.exercises.any { ex -> ex.sets.any { set -> set.isCompleted } }
-                                    
-                                    Button(
-                                        onClick = { 
-                                            showConfetti = true
-                                            coroutineScope.launch {
-                                                kotlinx.coroutines.delay(2000)
-                                                showConfetti = false
-                                                viewModel.finalizeWorkout()
-                                            }
-                                        },
-                                        enabled = hasCompletedSets,
-                                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = NeonGreen,
-                                            disabledContainerColor = Color(0xFF222222),
-                                            contentColor = PureBlack,
-                                            disabledContentColor = Color(0xFF555555)
-                                        ),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Text(stringResource(com.example.baselift.R.string.workout_finalize), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-                                    }
-                                }
-                            }
-                        }
+                }
+                // Reserve this slim status strip so the cards never jump when validation starts.
+                Box(modifier = Modifier.fillMaxWidth().height(20.dp)) {
+                    if (rowsRefreshing && !uiState.workoutsLoadFailed) {
+                        Text(stringResource(com.example.baselift.R.string.workout_refreshing),
+                            color = MediumGrey, fontSize = 11.sp,
+                            modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp))
                     }
+                }
+                key(selectedWorkout.id) {
+                    WorkoutExerciseList(
+                        workoutId = selectedWorkout.id,
+                        uiState = uiState,
+                        draftWeights = viewModel.draftWeights,
+                        draftReps = viewModel.draftReps,
+                        writesBlocked = writesBlocked,
+                        modifier = Modifier.weight(1f),
+                        onMoveExercise = viewModel::moveExercise,
+                        onUpdateDraftWeight = viewModel::updateDraftWeight,
+                        onUpdateDraftReps = viewModel::updateDraftReps,
+                        onAddSet = viewModel::addSetToExercise,
+                        onRemoveLastSet = viewModel::removeLastSet,
+                        onDeleteExercise = viewModel::deleteExercise,
+                        onEditExercise = viewModel::beginExerciseEdit,
+                        onLogSet = { exerciseId, setNumber, weight, reps, completed, sessionId ->
+                            viewModel.logSet(exerciseId, setNumber, weight, reps, completed, sessionId)
+                        },
+                        onAddExercise = { showAddExerciseDialog = true },
+                        onUpdateWorkoutRestTimer = viewModel::updateWorkoutRestTimer,
+                        onFinalizeWorkout = viewModel::finalizeWorkout
+                    )
                 }
             }
         }
@@ -428,7 +332,7 @@ fun WorkoutScreen(
                 .padding(16.dp)
         ) {
             // botão flutuante principal
-            FloatingActionButton(
+            if (!uiState.isLoading && !uiState.workoutsLoadFailed) FloatingActionButton(
                 onClick = { showAddWorkoutDialog = true },
                 modifier = Modifier.align(Alignment.BottomEnd).size(56.dp),
                 containerColor = NeonGreen,
@@ -451,7 +355,9 @@ fun WorkoutScreen(
                         spread = 45,
                         colors = listOf(0xCCFF00.toInt(), 0x00E5FF.toInt(), 0xFFFF6B6B.toInt()),
                         emitter = Emitter(duration = 100, TimeUnit.MILLISECONDS).max(100),
-                        position = Position.Relative(0.0, 1.0)
+                        position
+
+                        = Position.Relative(0.0, 1.0)
                     ),
                     Party(
                         speed = 30f,
@@ -474,6 +380,7 @@ fun WorkoutScreen(
         Dialog(onDismissRequest = { showAddWorkoutDialog = false }) {
             GenericInputDialog(
                 title = stringResource(com.example.baselift.R.string.workout_new_routine),
+                confirmEnabled = !uiState.isLoading && !uiState.workoutsLoadFailed,
                 content = {
                     BasicTextField(
                         value = newWorkoutName,
@@ -483,7 +390,7 @@ fun WorkoutScreen(
                     )
                 },
                 onConfirm = {
-                    if (newWorkoutName.isNotBlank()) {
+                    if (newWorkoutName.isNotBlank() && !uiState.isLoading && !uiState.workoutsLoadFailed) {
                         viewModel.createWorkout(newWorkoutName)
                         showAddWorkoutDialog = false
                     }
@@ -501,6 +408,8 @@ fun WorkoutScreen(
         Dialog(onDismissRequest = { showAddExerciseDialog = false }) {
             GenericInputDialog(
                 title = stringResource(com.example.baselift.R.string.workout_add_exercise),
+                confirmEnabled = !uiState.isLoading && !uiState.workoutsLoadFailed &&
+                    !uiState.isSelectionLoading && !uiState.selectionLoadFailed,
                 content = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(com.example.baselift.R.string.workout_ex_name), color = MediumGrey, fontSize = 12.sp)
@@ -527,7 +436,8 @@ fun WorkoutScreen(
                     }
                 },
                 onConfirm = {
-                    if (exName.isNotBlank()) {
+                    if (exName.isNotBlank() && !uiState.isLoading && !uiState.workoutsLoadFailed &&
+                        !uiState.isSelectionLoading && !uiState.selectionLoadFailed) {
                         viewModel.createExercise(exName, exEquipment, exMuscles)
                         showAddExerciseDialog = false
                     }

@@ -8,6 +8,7 @@ import com.example.baselift.Model.repository.IWorkoutRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 
 class FakeWorkoutRepository : IWorkoutRepository {
     private val workoutsFlow = MutableStateFlow<List<WorkoutEntity>>(emptyList())
@@ -33,6 +34,12 @@ class FakeWorkoutRepository : IWorkoutRepository {
         val workout = WorkoutEntity(id = id, name = name, orderIndex = orderIndex)
         workoutsFlow.value = workoutsFlow.value + workout
         return id
+    }
+
+    override suspend fun updateWorkout(workout: WorkoutEntity) {
+        workoutsFlow.value = workoutsFlow.value.map {
+            if (it.id == workout.id) workout else it
+        }
     }
 
     override suspend fun deleteWorkout(workout: WorkoutEntity) {
@@ -64,12 +71,24 @@ class FakeWorkoutRepository : IWorkoutRepository {
     }
 
     override suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String) {
-        val updated = exercise.copy(name = name, equipment = equipment, muscleGroups = muscleGroups)
-        val index = exercisesFlow.value.indexOfFirst { it.id == exercise.id }
-        if (index != -1) {
-            val newList = exercisesFlow.value.toMutableList()
-            newList[index] = updated
-            exercisesFlow.value = newList
+        exercisesFlow.update { exercises ->
+            exercises.map { current ->
+                if (current.id == exercise.id) current.copy(name = name, equipment = equipment, muscleGroups = muscleGroups)
+                else current
+            }
+        }
+    }
+
+    // Fixture helper; production commands use targeted updates.
+    suspend fun updateExercises(exercises: List<ExerciseEntity>) {
+        val updatesById = exercises.associateBy { it.id }
+        exercisesFlow.value = exercisesFlow.value.map { updatesById[it.id] ?: it }
+    }
+
+    override suspend fun reorderExercises(exercises: List<ExerciseEntity>) {
+        val orderById = exercises.associate { it.id to it.orderIndex }
+        exercisesFlow.update { current ->
+            current.map { exercise -> orderById[exercise.id]?.let { exercise.copy(orderIndex = it) } ?: exercise }
         }
     }
 
@@ -78,8 +97,12 @@ class FakeWorkoutRepository : IWorkoutRepository {
         setLogsFlow.value = setLogsFlow.value.filter { it.exerciseId != exercise.id }
     }
 
-    override suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int) {
-        val newCount = maxOf(1, exercise.setCount - 1)
+    override suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int): Boolean {
+        val current = exercisesFlow.value.find { it.id == exercise.id } ?: return false
+        val session = sessionsFlow.value.find { it.id == sessionId } ?: return false
+        if (current.setCount <= 1 || current.setCount != exercise.setCount ||
+            session.isCompleted || session.workoutId != current.workoutId) return false
+        val newCount = current.setCount - 1
         val setNumberToRemove = exercise.setCount
         
         // Remove from set logs
@@ -91,17 +114,17 @@ class FakeWorkoutRepository : IWorkoutRepository {
         val index = exercisesFlow.value.indexOfFirst { it.id == exercise.id }
         if (index != -1) {
             val newList = exercisesFlow.value.toMutableList()
-            newList[index] = exercise.copy(setCount = newCount)
+            newList[index] = current.copy(setCount = newCount)
             exercisesFlow.value = newList
         }
+        return true
     }
 
     override suspend fun addSet(exercise: ExerciseEntity) {
-        val index = exercisesFlow.value.indexOfFirst { it.id == exercise.id }
-        if (index != -1) {
-            val newList = exercisesFlow.value.toMutableList()
-            newList[index] = exercise.copy(setCount = exercise.setCount + 1)
-            exercisesFlow.value = newList
+        exercisesFlow.update { exercises ->
+            exercises.map { current ->
+                if (current.id == exercise.id) current.copy(setCount = current.setCount + 1) else current
+            }
         }
     }
 
@@ -146,6 +169,20 @@ class FakeWorkoutRepository : IWorkoutRepository {
             return setLogsFlow.value.find { it.sessionId == previousSessionId && it.exerciseId == exerciseId && it.setNumber == setNumber }
         }
         return null
+    }
+
+    override suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity> {
+        val exerciseIds = exercisesFlow.value.filter { it.workoutId == workoutId }.map { it.id }.toSet()
+        val completedSessions = sessionsFlow.value.filter { it.isCompleted }.associateBy { it.id }
+        return setLogsFlow.value
+            .filter { it.exerciseId in exerciseIds && it.isCompleted && it.sessionId in completedSessions }
+            .sortedWith(
+                compareByDescending<SetLogEntity> { completedSessions.getValue(it.sessionId).timestamp }
+                    .thenByDescending { it.sessionId }
+                    .thenByDescending { it.id }
+            )
+            .distinctBy { it.exerciseId to it.setNumber }
+            .sortedWith(compareBy({ it.exerciseId }, { it.setNumber }))
     }
 
     override suspend fun checkPR(exerciseId: Int, weight: Float, reps: Int): String {

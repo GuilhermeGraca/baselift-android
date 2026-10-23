@@ -1,81 +1,53 @@
 package com.example.baselift.repository
 
 import com.example.baselift.Model.local.dao.NutritionDao
+import com.example.baselift.Model.repository.NutritionDay
 import com.example.baselift.Model.repository.NutritionRepository
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Before
+import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.util.Calendar
+import java.time.Instant
+import java.util.TimeZone
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class NutritionRepositoryTest {
+    private val dao = mockk<NutritionDao>(relaxed = true)
+    private fun instant(value: String) = Instant.parse(value).toEpochMilli()
 
-    private lateinit var nutritionDao: NutritionDao
-    private lateinit var repository: NutritionRepository
-
-    @Before
-    fun setup() {
-        nutritionDao = mockk(relaxed = true)
-        repository = NutritionRepository(nutritionDao)
+    @Test fun `explicit day query uses supplied inclusive bounds without sampling a second clock`() {
+        val repository = NutritionRepository(dao, { error("must not sample clock") }, { error("must not sample zone") })
+        val day = NutritionDay.at(instant("2026-10-17T12:00:00Z"), TimeZone.getTimeZone("UTC"))
+        repository.getLogsForDay(day)
+        verify(exactly = 1) { dao.getLogsForTimeRange(instant("2026-10-17T00:00:00Z"), instant("2026-10-18T00:00:00Z") - 1) }
     }
 
-    @Test
-    fun `resetTodayLogs calls deleteLogsInTimeRange with correct start and end of day`() = runTest {
+    @Test fun `reset samples clock and zone once so crossing midnight cannot combine two dates`() = runTest {
+        var clocks = 0; var zones = 0
+        val repository = NutritionRepository(dao, {
+            clocks++; if (clocks == 1) instant("2026-10-17T23:59:59.999Z") else instant("2026-10-18T00:00:00Z")
+        }, { zones++; TimeZone.getTimeZone("UTC") })
         repository.resetTodayLogs()
-        
-        // Calculate expected range
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        val expectedStart = calendar.timeInMillis
-        
-        calendar.set(Calendar.HOUR_OF_DAY, 23)
-        calendar.set(Calendar.MINUTE, 59)
-        calendar.set(Calendar.SECOND, 59)
-        calendar.set(Calendar.MILLISECOND, 999)
-        val expectedEnd = calendar.timeInMillis
-        
-        // We use a small tolerance in case the clock ticked between repo call and our calculation
-        val tolerance = 100L // 100 ms
-        
-        coVerify(exactly = 1) { 
-            nutritionDao.deleteLogsInTimeRange(
-                match { it >= expectedStart - tolerance && it <= expectedStart + tolerance },
-                match { it >= expectedEnd - tolerance && it <= expectedEnd + tolerance }
-            ) 
-        }
+        assertEquals(1, clocks); assertEquals(1, zones)
+        coVerify(exactly = 1) { dao.deleteLogsInTimeRange(instant("2026-10-17T00:00:00Z"), instant("2026-10-18T00:00:00Z") - 1) }
     }
 
-    @Test
-    fun `getTodayLogs calls getLogsForTimeRange with correct start and end of day`() {
-        repository.getTodayLogs()
-        
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        val expectedStart = calendar.timeInMillis
-        
-        calendar.set(Calendar.HOUR_OF_DAY, 23)
-        calendar.set(Calendar.MINUTE, 59)
-        calendar.set(Calendar.SECOND, 59)
-        calendar.set(Calendar.MILLISECOND, 999)
-        val expectedEnd = calendar.timeInMillis
-        
-        val tolerance = 100L
-        
-        verify(exactly = 1) {
-            nutritionDao.getLogsForTimeRange(
-                match { it >= expectedStart - tolerance && it <= expectedStart + tolerance },
-                match { it >= expectedEnd - tolerance && it <= expectedEnd + tolerance }
-            )
-        }
+    @Test fun `reset uses the current local date rather than a previous display snapshot`() = runTest {
+        var now = instant("2026-10-17T23:59:59Z")
+        val repository = NutritionRepository(dao, { now }, { TimeZone.getTimeZone("UTC") })
+        repository.getLogsForDay(NutritionDay.at(now, TimeZone.getTimeZone("UTC")))
+        now = instant("2026-10-18T00:00:00Z")
+        repository.resetTodayLogs()
+        coVerify(exactly = 1) { dao.deleteLogsInTimeRange(now, instant("2026-10-19T00:00:00Z") - 1) }
+    }
+
+    @Test fun `read and reset preserve a short DST day with exact millisecond cutoffs`() = runTest {
+        val now = instant("2026-03-29T12:00:00Z")
+        val zone = TimeZone.getTimeZone("Europe/Lisbon")
+        val repository = NutritionRepository(dao, { now }, { zone })
+        repository.getLogsForDay(NutritionDay.at(now, zone)); repository.resetTodayLogs()
+        verify(exactly = 1) { dao.getLogsForTimeRange(instant("2026-03-29T00:00:00Z"), instant("2026-03-29T23:00:00Z") - 1) }
+        coVerify(exactly = 1) { dao.deleteLogsInTimeRange(instant("2026-03-29T00:00:00Z"), instant("2026-03-29T23:00:00Z") - 1) }
     }
 }

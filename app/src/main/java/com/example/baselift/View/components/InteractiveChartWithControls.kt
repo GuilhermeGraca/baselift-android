@@ -94,19 +94,17 @@ fun InteractiveChartWithControls(
                 .clip(RoundedCornerShape(12.dp))
                 .background(DarkSurface)
         ) {
-            val now = System.currentTimeMillis()
-            val filteredPoints = if (showTimeFilters) {
-                when (selectedFilter) {
-                    "7D" -> dataPoints.filter { now - it.xValue <= 7L * 24 * 60 * 60 * 1000 }
-                    "30D" -> dataPoints.filter { now - it.xValue <= 30L * 24 * 60 * 60 * 1000 }
-                    "1Y" -> dataPoints.filter { now - it.xValue <= 365L * 24 * 60 * 60 * 1000 }
-                    else -> dataPoints
-                }
-            } else {
-                dataPoints
+            val rangeDays = if (showTimeFilters) when (selectedFilter) {
+                "7D" -> 7
+                "30D" -> 30
+                "1Y" -> 365
+                else -> null
+            } else null
+            val filteredPoints = rememberChartRange(dataPoints, rangeDays)
+            val rawPoints = remember(filteredPoints, dataPoints) {
+                if (filteredPoints.isEmpty()) dataPoints.takeLast(1) else filteredPoints
             }
-            val rawPoints = if (filteredPoints.isEmpty()) dataPoints.takeLast(1) else filteredPoints
-            val validPoints = downsampleLTTB(rawPoints, 20)
+            val validPoints = remember(rawPoints) { downsampleLTTB(rawPoints, 20) }
 
             CustomCanvasChart(
                 validPoints = validPoints,
@@ -293,13 +291,14 @@ fun CustomCanvasChart(
         }
     }
 
-    var selectedIndex by remember { mutableStateOf<Int?>(null) }
-    var selectedOffset by remember { mutableStateOf(Offset.Zero) }
+    // A previous index/offset is meaningful only for these points and this geometry.
+    var selectedIndex by remember(validPoints, isChronologicalScale, targetValue) { mutableStateOf<Int?>(null) }
+    var selectedOffset by remember(validPoints, isChronologicalScale, targetValue) { mutableStateOf(Offset.Zero) }
 
     Spacer(modifier = Modifier
         .fillMaxSize()
         .padding(top = 16.dp, bottom = 16.dp, end = 24.dp, start = 8.dp)
-        .pointerInput(validPoints, isChronologicalScale) {
+        .pointerInput(validPoints, isChronologicalScale, targetValue) {
             detectTapGestures { tapOffset ->
                 val width = size.width
                 val height = size.height

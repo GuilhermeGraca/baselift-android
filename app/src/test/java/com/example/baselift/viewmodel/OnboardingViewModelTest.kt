@@ -34,30 +34,20 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `init without user sets hasUser to false and isLoaded to true`() = runTest {
-        viewModel.isLoaded.test {
-            assertTrue(awaitItem()) // should be true because flow initializes with false then goes to true very quickly
-            // if we missed the false, we just check it is true now
-            cancelAndIgnoreRemainingEvents()
-        }
-        assertFalse(viewModel.hasUser.value)
+    fun `init without user confirms absence in loaded profile`() = runTest {
+        assertFalse(viewModel.profileLoadState.value.isLoading)
+        assertNotNull(viewModel.profileLoadState.value.profile)
+        assertNull(viewModel.profileLoadState.value.profile!!.user)
     }
 
     @Test
-    fun `init with user sets hasUser to true`() = runTest {
+    fun `init with user publishes the loaded profile`() = runTest {
         userRepository.saveUser(UserEntity(id = 1, name = "Test"))
         
         val newViewModel = OnboardingViewModel(userRepository, progressRepository)
         
-        newViewModel.hasUser.test {
-            val value = awaitItem()
-            if (!value) {
-                assertTrue(awaitItem()) // It might emit false first then true
-            } else {
-                assertTrue(value)
-            }
-            cancelAndIgnoreRemainingEvents()
-        }
+        assertFalse(newViewModel.profileLoadState.value.isLoading)
+        assertEquals("Test", newViewModel.profileLoadState.value.profile!!.user!!.name)
     }
 
     @Test

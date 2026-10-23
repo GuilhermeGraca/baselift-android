@@ -27,15 +27,16 @@ interface IWorkoutRepository {
     fun getExercisesForWorkout(workoutId: Int): Flow<List<ExerciseEntity>>
     suspend fun createExercise(workoutId: Int, name: String, equipment: String, muscleGroups: String, orderIndex: Int = 0)
     suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String)
-    suspend fun updateExercises(exercises: List<ExerciseEntity>)
+    suspend fun reorderExercises(exercises: List<ExerciseEntity>)
     suspend fun deleteExercise(exercise: ExerciseEntity)
-    suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int)
+    suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int): Boolean
     suspend fun addSet(exercise: ExerciseEntity)
     fun getActiveSessionFlow(workoutId: Int): Flow<WorkoutSessionEntity?>
     suspend fun startOrGetSession(workoutId: Int): WorkoutSessionEntity
     suspend fun finalizeSession(session: WorkoutSessionEntity)
     fun getSetsForSession(sessionId: Int): Flow<List<SetLogEntity>>
     suspend fun getPreviousSet(exerciseId: Int, setNumber: Int): SetLogEntity?
+    suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity>
     suspend fun checkPR(exerciseId: Int, weight: Float, reps: Int): String
     suspend fun logSet(sessionId: Int, exerciseId: Int, setNumber: Int, weight: Float, reps: Int, isCompleted: Boolean, existingSetId: Int = 0)
     fun getAllCompletedSessions(): Flow<List<WorkoutSessionEntity>>
@@ -90,11 +91,11 @@ class WorkoutRepository(
     }
 
     override suspend fun updateExercise(exercise: ExerciseEntity, name: String, equipment: String, muscleGroups: String) {
-        workoutDao.updateExercise(exercise.copy(name = name, equipment = equipment, muscleGroups = muscleGroups))
+        workoutDao.updateExerciseMetadata(exercise.id, name, equipment, muscleGroups)
     }
 
-    override suspend fun updateExercises(exercises: List<ExerciseEntity>) {
-        workoutDao.updateExercises(exercises)
+    override suspend fun reorderExercises(exercises: List<ExerciseEntity>) {
+        workoutDao.reorderExercises(exercises)
     }
 
     override suspend fun deleteExercise(exercise: ExerciseEntity) {
@@ -102,16 +103,13 @@ class WorkoutRepository(
     }
 
     /** decrementa o número de séries e apaga o registo na sessão atual */
-    override suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int) {
-        val newCount = maxOf(1, exercise.setCount - 1)
-        val setNumberToRemove = exercise.setCount
-        workoutDao.deleteSetByNumber(exercise.id, sessionId, setNumberToRemove)
-        workoutDao.updateExercise(exercise.copy(setCount = newCount))
+    override suspend fun removeLastSet(exercise: ExerciseEntity, sessionId: Int): Boolean {
+        return workoutDao.removeLastSet(exercise.id, sessionId, exercise.setCount)
     }
 
     /** incrementa o número de séries */
     override suspend fun addSet(exercise: ExerciseEntity) {
-        workoutDao.updateExercise(exercise.copy(setCount = exercise.setCount + 1))
+        workoutDao.incrementSetCount(exercise.id)
     }
 
     // --- SESSIONS ---
@@ -124,15 +122,7 @@ class WorkoutRepository(
     }
 
     override suspend fun startOrGetSession(workoutId: Int): WorkoutSessionEntity {
-        var session = workoutDao.getActiveSession(workoutId)
-        if (session == null) {
-            val newSession = WorkoutSessionEntity(
-                workoutId = workoutId,
-                timestamp = System.currentTimeMillis()
-            )
-            val id = workoutDao.insertSession(newSession)
-            session = newSession.copy(id = id.toInt())
-        }
+        val session = workoutDao.getOrCreateActiveSession(workoutId)
         
         // Agendar notificação para daqui a 5 horas
         val data = workDataOf("SESSION_ID" to session.id)
@@ -170,14 +160,19 @@ class WorkoutRepository(
         return workoutDao.getPreviousSet(exerciseId, setNumber)
     }
 
+    override suspend fun getPreviousSetsForWorkout(workoutId: Int): List<SetLogEntity> {
+        return workoutDao.getPreviousSetsForWorkout(workoutId)
+    }
+
     /**
      * verifica se uma série é PR e retorna o tipo de recorde
      * usa um pequeno valor para evitar falsos positivos
      * o troféu só é dado quando o novo valor é maior que o anterior
      */
     override suspend fun checkPR(exerciseId: Int, weight: Float, reps: Int): String {
-        val maxWeight = workoutDao.getMaxWeightForExercise(exerciseId) ?: 0f
-        val max1RM = workoutDao.getMax1RMForExercise(exerciseId) ?: 0f
+        val history = workoutDao.getExercisePrMaxima(exerciseId)
+        val maxWeight = history.maxWeight ?: 0f
+        val max1RM = history.max1RM ?: 0f
 
         val current1RM = weight * (1.0f + (reps / 30.0f))
         val epsilon = 0.01f

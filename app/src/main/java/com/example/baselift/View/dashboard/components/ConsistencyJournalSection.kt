@@ -26,6 +26,9 @@ import java.util.Calendar
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.clickable
+import com.example.baselift.View.components.SkeletonBlock
+import com.example.baselift.View.components.rememberSkeletonOpacity
+import androidx.compose.ui.platform.testTag
 
 // secção do consistency journal no dashboard
 @Composable
@@ -38,8 +41,12 @@ fun ConsistencyJournalSection(
     historicalCalendarData: Map<String, com.example.baselift.View.components.DayMarkerState>,
     restDays: Int,
     nutritionRestDays: Int,
+    nutritionLoading: Boolean = false,
+    workoutLoading: Boolean = false,
+    calendarLoading: Boolean = false,
     onSetRestDays: (Int) -> Unit = {},
-    onSetNutritionRestDays: (Int) -> Unit = {}
+    onSetNutritionRestDays: (Int) -> Unit = {},
+    onCalendarMonthChanged: (Long?) -> Unit = {}
 ) {
     Text(
         stringResource(com.example.baselift.R.string.dash_consistency_journal),
@@ -67,16 +74,18 @@ fun ConsistencyJournalSection(
         StreakCard(
             icon = Icons.Default.Restaurant,
             value = nutritionStreak,
+            isLoading = nutritionLoading,
             label = stringResource(com.example.baselift.R.string.dash_nutrition_streak),
             accentColor = ElectricBlue,
-            modifier = Modifier.weight(1f).clickable { showNutritionRestDaysDialog = true }
+            modifier = Modifier.weight(1f).then(if (nutritionLoading) Modifier else Modifier.clickable { showNutritionRestDaysDialog = true })
         )
         StreakCard(
             icon = Icons.Default.FitnessCenter,
             value = workoutStreak,
+            isLoading = workoutLoading,
             label = stringResource(com.example.baselift.R.string.dash_workout_streak),
             accentColor = NeonGreen,
-            modifier = Modifier.weight(1f).clickable { showRestDaysDialog = true }
+            modifier = Modifier.weight(1f).then(if (workoutLoading) Modifier else Modifier.clickable { showRestDaysDialog = true })
         )
     }
 
@@ -98,6 +107,7 @@ fun ConsistencyJournalSection(
             isActiveDay = { it in nutritionDaysThisWeek.keys },
             icon = Icons.Default.Restaurant,
             activeColor = ElectricBlue,
+            isLoading = nutritionLoading,
             tooltipContent = { day ->
                 val nut = nutritionDaysThisWeek[day]
                 if (nut != null) {
@@ -143,6 +153,8 @@ fun ConsistencyJournalSection(
             isActiveDay = { it in workoutDaysThisWeek.keys },
             icon = Icons.Default.FitnessCenter,
             activeColor = NeonGreen,
+            isLoading = workoutLoading,
+            loadingRightLabel = workoutLoading,
             tooltipContent = { day ->
                 val workouts = workoutDaysThisWeek[day] ?: emptyList()
                 Column(
@@ -172,6 +184,10 @@ fun ConsistencyJournalSection(
     }
 
     if (showCalendarDialog) {
+        val onMonthChanged by androidx.compose.runtime.rememberUpdatedState(onCalendarMonthChanged)
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            onDispose { onMonthChanged(null) }
+        }
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { showCalendarDialog = false },
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
@@ -188,6 +204,8 @@ fun ConsistencyJournalSection(
                     mode = com.example.baselift.View.components.CalendarMode.VIEW,
                     maxDate = System.currentTimeMillis(),
                     markedDays = historicalCalendarData,
+                    markersLoading = calendarLoading,
+                    onVisibleMonthChanged = { onMonthChanged(it) },
                     onDayClickInViewMode = { _, marker ->
                         if (marker.hasWorkout || marker.hasNutrition) {
                             clickedMarker = marker
@@ -367,10 +385,12 @@ fun ConsistencyJournalSection(
 private fun StreakCard(
     icon: ImageVector,
     value: Int,
+    isLoading: Boolean,
     label: String,
     accentColor: Color,
     modifier: Modifier = Modifier
 ) {
+    val opacity = if (isLoading) rememberSkeletonOpacity() else null
     val isGlowing = value >= 7
     val glowShadow = if (isGlowing) androidx.compose.ui.graphics.Shadow(color = accentColor, blurRadius = 25f) else null
 
@@ -417,13 +437,17 @@ private fun StreakCard(
                 )
             }
             Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                "$value",
-                color = accentColor,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                style = androidx.compose.ui.text.TextStyle(shadow = glowShadow)
-            )
+            if (isLoading && opacity != null) {
+                SkeletonBlock(Modifier.width(30.dp).height(28.dp).testTag("dashboard-streak-skeleton"), opacity)
+            } else {
+                Text(
+                    "$value",
+                    color = accentColor,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    style = androidx.compose.ui.text.TextStyle(shadow = glowShadow)
+                )
+            }
         }
         Spacer(modifier = Modifier.height(2.dp))
         Text(
@@ -443,9 +467,12 @@ private fun WeekCalendarRow(
     rightLabel: String,
     icon: ImageVector,
     activeColor: Color,
+    isLoading: Boolean = false,
+    loadingRightLabel: Boolean = false,
     isActiveDay: (Int) -> Boolean,
     tooltipContent: @Composable (Int) -> Unit
 ) {
+    val opacity = if (isLoading) rememberSkeletonOpacity() else null
     val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
 
     // determinar o dia atual da semana (1=Seg..7=Dom)
@@ -465,12 +492,11 @@ private fun WeekCalendarRow(
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold
         )
-        Text(
-            rightLabel,
-            color = MediumGrey,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold
-        )
+        if (loadingRightLabel && opacity != null) {
+            SkeletonBlock(Modifier.width(54.dp).height(10.dp), opacity)
+        } else {
+            Text(rightLabel, color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
     }
 
     Spacer(modifier = Modifier.height(12.dp))
@@ -506,16 +532,20 @@ private fun WeekCalendarRow(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = when {
-                            isActive -> activeColor
-                            isFuture -> MediumGrey.copy(alpha = 0.3f)
-                            else -> MediumGrey.copy(alpha = 0.5f)
-                        },
-                        modifier = Modifier.size(18.dp)
-                    )
+                    if (isLoading && !isFuture && opacity != null) {
+                        SkeletonBlock(Modifier.size(18.dp), opacity, RoundedCornerShape(4.dp))
+                    } else {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = when {
+                                isActive -> activeColor
+                                isFuture -> MediumGrey.copy(alpha = 0.3f)
+                                else -> MediumGrey.copy(alpha = 0.5f)
+                            },
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(

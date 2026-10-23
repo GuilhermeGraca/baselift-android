@@ -167,13 +167,10 @@ Cada DAO define as queries SQL para a sua tabela. As queries que devolvem dados 
 
 Exemplos de queries relevantes no `WorkoutDao`:
 ```sql
--- peso máximo de um exercício (para detetar PR de peso)
-SELECT MAX(sl.weight) FROM set_logs sl
-INNER JOIN workout_sessions ws ON sl.sessionId = ws.id
-WHERE sl.exerciseId = :exerciseId AND ws.isCompleted = 1 AND sl.isCompleted = 1
-
--- 1RM máximo estimado (para detetar PR de volume)
-SELECT MAX(sl.weight * (1.0 + (sl.reps / 30.0))) FROM set_logs sl
+-- ambos os máximos históricos para PR, numa única consulta
+SELECT MAX(sl.weight) AS maxWeight,
+       MAX(sl.weight * (1.0 + (sl.reps / 30.0))) AS max1RM
+FROM set_logs sl
 INNER JOIN workout_sessions ws ON sl.sessionId = ws.id
 WHERE sl.exerciseId = :exerciseId AND ws.isCompleted = 1 AND sl.isCompleted = 1
 ```
@@ -258,16 +255,28 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 - As séries têm estado sequencial: só se pode completar a próxima se a anterior estiver concluída
 - É possível adicionar/remover séries durante a sessão
 - Os rascunhos de peso/reps são mantidos em `mutableStateMapOf` (sobrevivem a recomposições)
+- A conclusão/desmarcação marca imediatamente a série como pendente no `WorkoutViewModel`. O bloqueio por exercício permanece até a escrita terminar e o estado persistido chegar à UI, impedindo toques repetidos e alterações sequenciais prematuras; exercícios diferentes podem guardar em paralelo.
+- A UI mostra um indicador de gravação e bloqueia os controlos envolvidos e a finalização da sessão enquanto há séries pendentes. Falhas libertam o bloqueio, preservam os rascunhos e apresentam uma mensagem para repetir o toque. Os comandos validam a sessão e a série atuais e resolvem o ID persistido no ViewModel.
+- Adicionar uma série executa um único `UPDATE exercises SET setCount = setCount + 1 WHERE id = ...`, usando o valor atual da base de dados. Toques rápidos não reutilizam a contagem antiga da UI nem reescrevem nome, equipamento, grupos musculares ou ordem. Falhas apresentam uma mensagem para repetir a adição; os rascunhos e séries registadas são preservados.
+- Remover a última série confirma o seu número e a sessão ativa numa transação: decrementa apenas a contagem correspondente e elimina apenas os logs desse número na sessão atual. Confirmações antigas não removem uma série diferente; sessões concluídas e a contagem mínima de uma série são protegidas. O bloqueio permanece até a escrita e as duas atualizações da UI (exercício e logs) estarem concluídas. Os rascunhos só são limpos após sucesso; falhas preservam os dados e permitem repetir a operação.
+- A reordenação usa `reorderExercises()` com atualizações apenas de `orderIndex`, agrupadas numa transação. Editar nome/equipamento/grupos musculares atualiza apenas esses campos, preservando alterações concorrentes à contagem ou ordem. A reordenação continua a atualizar visualmente a lista de imediato.
+- O `WorkoutViewModel` mantém um worker de reordenação por rotina: a gravação em curso termina e os pedidos intermédios ainda não iniciados são substituídos pela ordem mais recente. Essa ordem é aplicada aos modelos frescos recebidos do Room até a gravação e o respetivo snapshot confirmarem os índices, preservando séries, metadados e exercícios adicionados/removidos. Uma falha do pedido mais recente retira a ordem provisória, apresenta os modelos observados da base de dados e mostra uma mensagem apenas na rotina afetada; arrastar novamente permite repetir. Cancelar o ViewModel não é apresentado como erro. Não há consultas adicionais de histórico nem um novo schema.
+- Tocar novamente na rotina já selecionada reutiliza a seleção ativa (incluindo carregamento em curso), sem limpar os exercícios, repetir a consulta de histórico ou recuperar/reagendar a mesma sessão. Finalizar força uma nova seleção, para abrir a próxima sessão e atualizar o histórico. Cada tentativa tem uma identidade; resultados e erros de tentativas canceladas não substituem a seleção atual. Falhas de sessão/histórico/observação apresentam uma ação para repetir, preservando os rascunhos e dados gravados. As linhas só ficam disponíveis após os dados da tentativa estarem prontos. Alterações aos metadados da rotina não reiniciam a seleção; uma gravação tardia do temporizador não troca a rotina visível.
+- A edição de nome/equipamento/grupos musculares mantém os três campos no ViewModel e só fecha automaticamente depois da gravação e da confirmação pelo modelo observado. O estado de gravação bloqueia submissões repetidas e alterações aos campos; uma falha mantém as entradas e apresenta uma mensagem para repetir. «Close» durante uma gravação esconde o diálogo sem cancelar o comando aceite; a falha pode ser retomada ao abrir a edição desse exercício. «Cancel» fora da gravação descarta o formulário. A escrita continua a atualizar apenas os campos de metadados, sem alterar contagem, ordem, séries ou rascunhos de peso/repetições.
+- Depois de largar um exercício, o ajuste visual segue o ID do exercício, espera dois frames com posição e tamanho estáveis e abandona a espera ao fim de 500ms ou se o item sair da vista. Não depende de uma altura mínima de 120dp. Um novo drag cancela o ajuste anterior; mudar de rotina ou sair do ecrã cancela o scope de apresentação, sem cancelar a gravação da ordem no ViewModel.
 
 **Personal Records (PRs)**:
 - **PR de Peso**: o peso desta série supera o máximo histórico do exercício
 - **PR de Volume (1RM estimado)**: `peso × (1 + reps/30)` supera o 1RM histórico
 - Deteção automática ao completar uma série, guardada no campo `prType` do `SetLogEntity`
+- `checkPR()` lê os dois máximos independentes através de `getExercisePrMaxima()`, evitando duas consultas ao mesmo histórico. Mantém o epsilon de 0,01, a prioridade de PR de peso e a exclusão de séries/sessões incompletas; a escrita continua com o comportamento anterior.
 
 **Rest Timer**: temporizador de descanso integrado com controlos rápidos (+30s, -10s, Skip)
 
 
 **Sessões**: quando o utilizador inicia um treino, é criada uma `WorkoutSessionEntity` com `isCompleted = false`. Ao terminar o treino, a sessão fica marcada como completa e os rascunhos são limpos.
+
+`startOrGetSession()` usa `WorkoutDao.getOrCreateActiveSession()` para consultar/criar a sessão numa única transação. Pedidos concorrentes para o mesmo treino reutilizam o mesmo registo; recuperar uma sessão conserva o timestamp e as séries já registadas. A notificação continua a ser agendada fora da transação, para cinco horas após cada chamada, com `ExistingWorkPolicy.REPLACE`.
 
 **Cache de queries**: o `WorkoutViewModel` mantém um cache local `previousSetsCache` para evitar N+1 queries à base de dados ao reconstruir o estado da UI.
 
@@ -283,11 +292,13 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 - Tooltips interativos ao tocar num ponto (peso + data)
 - Exibe data de início, média e data de fim no topo; valor médio no eixo Y
 - Filtros temporais: 7D, 30D, 1Y, ALL
+- Preparação reutilizada enquanto os dados não mudam: rótulos de peso/volume semanal, downsampling de linhas (20 pontos) e agregação de barras (35). Os filtros rolling são recalculados na recomposição quando um ponto ultrapassa o limite inclusivo ou o relógio recua; alterações nos pontos, escala ou objetivo limpam seleções que já não correspondem à geometria do gráfico.
 
 **Technical History Ledger**:
 - Lista os registos de peso mais recentes
 - Inicialmente mostra 4 registos com fade-out no último
 - Botão "LOAD MORE DATA" para expandir / "LOAD LESS DATA" para colapsar
+- Cada registo é um item com chave estável na `LazyColumn` do ecrã; a expansão compõe apenas as linhas necessárias ao viewport. A ordenação é reutilizada enquanto o histórico não muda e o delta usa diretamente o registo seguinte, sem procurar na lista inteira por linha.
 - Long-press: animação de preenchimento gradual vermelho de 0% a 100% → abre diálogo de confirmação glassmorphic
 
 **Delta inteligente**: o indicador de diferença (+/- KG) usa Verde Néon ou Coral Suave consoante a direção é favorável ou desfavorável ao objetivo do utilizador (perder vs ganhar peso). Recalculado automaticamente em recalibrações.
@@ -302,7 +313,8 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 - Seleção em lote (batch upload): múltiplas fotos com a mesma data
 - Ordenação cronológica da esquerda (mais antiga) para a direita (mais recente, marcada como `LATEST`)
 - Gradientes de scroll dinâmicos nas extremidades
-- Detalhe ao tocar: zoom gestual (pinch-to-zoom), arrasto, duplo toque para reset, cruzamento automático com o peso registado nesse dia
+- Detalhe ao tocar: zoom gestual (pinch-to-zoom), arrasto, reposição ao soltar o gesto, cruzamento automático com o peso registado nesse dia
+- O diário e o detalhe partilham um índice por dia local, reutilizado até os pesos ou o fuso horário mudarem. Mantém o primeiro peso desse dia na ordem fornecida pelo DAO (cronológica), incluindo empates. O zoom/arrasto lê o estado apenas em `graphicsLayer {}` e nos gestos; não recompõe o diálogo a cada movimento. A imagem volta a 1× ao soltar o gesto e a transformação reinicia ao trocar de foto.
 
 ---
 
@@ -311,9 +323,9 @@ O ecrã de treinos é unificado — gere rotinas e regista cargas na mesma view.
 O Dashboard agrega dados de nutrição e treino para dar uma visão geral da consistência do utilizador.
 
 **Consistency Journal** (streaks):
-- **Nutrition Streak**: conta dias com registo de nutrição em semanas consecutivas que cumpriram a meta (configurável: 0-7 dias de descanso por semana)
-- **Workout Streak**: conta dias com treino em semanas consecutivas que cumpriram a meta
-- A semana atual nunca quebra a streak (mesmo que incompleta)
+- **Nutrition Streak** e **Workout Streak**: contam dias únicos com atividade, percorrendo o calendário para trás até exceder os dias de descanso permitidos numa semana de segunda a domingo (configurável: 0–7).
+- Com 0, um dia anterior sem atividade quebra a streak. Com 1–6, os dias sem atividade consomem a tolerância da respetiva semana; a tolerância reinicia ao entrar noutra semana. Aumentar os dias de descanso nunca diminui a streak.
+- Hoje pode estar incompleto e vários registos no mesmo dia contam como um dia. Os dias de descanso não aumentam o contador. Com 7, contam-se todos os dias com atividade até hoje; registos futuros não contam.
 - Cartões com animação de glow quando a streak atinge 7 dias
 - **Calendário semanal**: mostra os 7 dias da semana (Seg–Dom) com marcadores visuais de nutrição e treino
 
@@ -329,7 +341,7 @@ O Dashboard agrega dados de nutrição e treino para dar uma visão geral da con
   - Cartão de PR de Volume Máximo (peso × reps)
   - Gráfico de Volume ao longo do tempo (verde néon)
   - Gráfico de Peso Máximo ao longo do tempo (azul elétrico)
-- Carregamento lazy: os dados de cada exercício só são carregados quando o submenu é expandido
+- Carregamento lazy: cada submenu expandido observa `getCompletedSetLogsForExercise()` via um flow frio, prepara os gráficos em `Dispatchers.Default` e cancela a coleção quando sai da composição. Mostra carregamento e permite repetir uma consulta que falhou; os gráficos por exercício não são preparados pelo resumo do Dashboard.
 
 **Calendário histórico**: registo global de todos os dias com nutrição e/ou treino, disponível no componente `CustomCalendar`.
 
@@ -416,18 +428,31 @@ Fase 6 → Dashboard + streaks + gráficos históricos
 
 Isto permitiu usar a app a sério durante o desenvolvimento, o que revelou problemas reais de UX. Por exemplo, depois da Fase 5 detetou-se que os logs não faziam reset correto ao mudar de dia, o que levou à criação do `refreshTrigger` no `NutritionViewModel`.
 
-**Refinamentos finais**: após todas as fases, houve uma fase de polimento focada em performance e UX, motivada por lentidão na navegação entre tabs. O crossfade da `NavHost` foi removido, foi adicionado Deferred Rendering no Dashboard e Workout (50ms de delay nas listas), e o gráfico de peso foi substituído do Vico por Canvas personalizado para controlo total sobre o aspeto visual.
+**Refinamentos finais**: após todas as fases, houve uma fase de polimento focada em performance e UX, motivada por lentidão na navegação entre tabs. O crossfade da `NavHost` foi removido e o gráfico de peso foi substituído do Vico por Canvas personalizado para controlo total sobre o aspeto visual. A revisão de performance posterior removeu os atrasos artificiais de 50ms no Dashboard e Workout: o conteúdo disponível entra na composição sem esperar por um temporizador, mantendo as listas lazy e o carregamento real dos dados.
 
 ---
 
 ## 12. Otimizações de Performance
 
+- **Release otimizada e dependências**: R8 e remoção de recursos não utilizados ativos apenas em `release`; dependências Vico removidas após confirmar que os gráficos usam Canvas. O injetor local opcional de dados de demonstração fica excluído da compilação release. O modo `debug` e a execução normal pelo Android Studio mantêm-se. O cruncher de PNGs está desativado em release devido à falha do AAPT neste caminho Windows com espaços; a remoção de recursos continua ativa.
+
+- **Dashboard conforme o conteúdo aberto**: os detalhes do calendário são preparados apenas para o mês visível e libertados ao fechar; a preparação diária dos gráficos de rotinas só ocorre enquanto há cartões expandidos, produzindo séries apenas para essas rotinas. Streaks, resumos semanais, volume total e filtros ALL mantêm o histórico completo. Expansão/filtros guardam o estado por ID, e os formatadores de datas dos gráficos são reutilizados.
+
+- **Regresso ao treino**: depois de confirmar que a rotina ainda existe, os exercícios já carregados mantêm-se visíveis enquanto chegam os registos atuais, com indicador de atualização e ações sobre séries/ordem/finalização bloqueadas até à nova emissão. Selecionar outra rotina, renovar a sessão após finalizar e recuperar erros continuam a respeitar a identidade da sessão e os contratos de gravação existentes.
+
+- **Volume semanal correto na passagem de ano**: os registos são agrupados pelo timestamp da segunda-feira local, em vez de combinar ano civil com número da semana ISO. Isto impede juntar semanas distintas de janeiro/dezembro ou dividir uma semana entre dois anos, mantendo ordenação cronológica, volume total e semanas de segunda a domingo mesmo com mudanças de hora e locale. Não altera registos persistidos nem streaks.
+
+- **Arranque e perfil coerentes**: a navegação e o cabeçalho usam uma única emissão confirmada do perfil, distinguindo uma leitura pendente de ausência real do utilizador. Falhas de leitura têm retry explícito e preservam o último perfil e o grafo já composto; reler o mesmo perfil não substitui o draft de recalibração. O destino inicial é guardado, sem reconstruir o grafo ao editar/criar o perfil, e as tabs usam Insights como âncora após concluir onboarding. A recuperação de leituras não altera os contratos de gravação do perfil.
+
 - **Remoção do crossfade** na `NavHost` entre tabs para evitar sobreposição de ecrãs
-- **Deferred Rendering** no Dashboard e Workout: os cabeçalhos são renderizados de imediato, as listas pesadas são desenhadas com 50ms de delay para eliminar sensação de bloqueio
+- **Conteúdo disponível sem atraso artificial** no Dashboard e Workout: as listas lazy compõem os itens necessários à vista sem um temporizador de 50ms; os dados e gráficos continuam a respeitar os seus fluxos de carregamento
 - **Índices na base de dados** (migração v9→v10): em `timestamp`, `isCompleted`, etc., para acelerar queries históricas
 - **Cache de queries** no `WorkoutViewModel` (`previousSetsCache`) para evitar N+1 queries ao reconstruir o estado dos exercícios
 - **`flowOn(Dispatchers.IO / Default)`** em todos os flows pesados para não bloquear a Main Thread
-- **`SharingStarted.Lazily`** nos `StateFlow` para não calcular estado quando não há observadores
+- **Subscrições ligadas à apresentação**: Dashboard, históricos de peso/fotos do Insights e estado de apresentação da Nutrition usam `WhileSubscribed(1_000)` para parar o trabalho a montante após um segundo sem observadores, mantendo o último estado. O perfil partilhado continua disponível para o cabeçalho e navegação. Na Nutrition, registos, templates e metas voltam a ser observados ao regressar; a consulta diária é reconstruída e os comandos de registo/eliminação mantêm o seu próprio scope. No Workout, a mesma política controla a lista de rotinas, as queries de exercícios/séries e a reconstrução dos modelos. Recuperação inicial da seleção/sessão e leitura do histórico só começam quando o ecrã é observado. Regressar valida primeiro a lista atual de rotinas, depois lê as linhas sem repetir uma recuperação de sessão/histórico já concluída. Inputs e comandos aceites sobrevivem à saída; confirmações já persistidas deixam de aguardar modelos quando a observação termina. As linhas retidas não ficam disponíveis para novos comandos antes das emissões atuais; falhas da lista têm retry. A renovação de sessão após uma finalização concluída fora do ecrã aguarda o regresso. A política do reminder mantém cinco horas com `REPLACE` por chamada real de recuperação/criação; o arranque inicial passa a acontecer ao abrir Workout, não ao criar a navegação, e regressos normais não reagendam. `Lazily`, ainda usado noutros fluxos, adia o primeiro arranque mas não cancela a coleção quando os observadores saem.
+- **Atualização diária da Nutrition**: o estado observa um intervalo imutável de dia local/fuso, calculado a partir de uma amostra de tempo. Eventos de resume/data/hora/fuso rearmam a espera até à próxima meia-noite; se o intervalo não mudou, mantêm a query atual. A meia-noite atualiza registos e totais sem reiniciar metas/templates. O temporizador termina com as subscrições após o grace period de um segundo. Leitura e reset usam os mesmos limites de dia, incluindo dias DST curtos/longos e meias-noites inexistentes/repetidas; o SQL inclusivo termina no milissegundo anterior ao dia seguinte. O reset calcula o dia atual ao executar, sem reutilizar o snapshot de apresentação.
+- **Permissões de fotos fora da Main Thread**: importação individual/múltipla e foto de perfil fazem acesso ao resolver e retenção da permissão em `Dispatchers.IO`, usando o contexto da aplicação. As seleções múltiplas são copiadas ao aceitar o comando; as permissões continuam sequenciais, preservando a data, ordem e duplicados da seleção. Cancelamento na preparação impede novas tentativas e a entrada na gravação; um pedido de perfil mais recente descarta o resultado de permissões de um pedido antigo antes de gravar. O perfil é lido depois do acesso ao provider para preservar campos atualizados durante essa espera.
+- **Importação de fotos em lote**: as fotos com permissão de leitura são gravadas numa única transação Room. O diário recebe o lote completo e executa o scroll final existente uma vez, em vez de recompor/scrollar após cada foto. Falhas de permissão permitem gravar o subconjunto legível; uma falha de persistência reverte todo esse subconjunto. Estado de importação bloqueia submissões duplicadas, mostra progresso e disponibiliza contagens/retry apenas das fotos não gravadas. Antes do commit, cancelamento não grava o lote; depois de aceite a gravação, a transação finita e o seu resultado terminam mesmo com cancelamento do ViewModel, evitando apresentar fotos já gravadas como falhadas/repetíveis. Não há migração de schema nem revogação automática de permissões partilhadas.
 - **Limpeza de `systemBarsPadding()`** globais para eliminar espaços em branco desnecessários no Dashboard e Insights
 
 ---

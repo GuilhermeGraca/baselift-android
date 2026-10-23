@@ -9,24 +9,22 @@ import androidx.compose.ui.unit.dp
 import com.example.baselift.View.dashboard.components.ConsistencyJournalSection
 import com.example.baselift.View.dashboard.components.TotalTrainingVolumeSection
 import com.example.baselift.View.dashboard.components.RoutinesSection
+import com.example.baselift.View.dashboard.components.DashboardVolumeSkeleton
 import com.example.baselift.View.theme.PureBlack
 import com.example.baselift.ViewModel.dashboard.DashboardUiState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import com.example.baselift.ViewModel.dashboard.ExerciseCharts
+import kotlinx.coroutines.flow.Flow
 
 // ecrã principal do dashboard
 @Composable
 fun DashboardScreen(
     uiState: DashboardUiState,
     onSetRestDays: (Int) -> Unit = {},
-    onSetNutritionRestDays: (Int) -> Unit = {}
+    onSetNutritionRestDays: (Int) -> Unit = {},
+    exerciseCharts: (Int) -> Flow<ExerciseCharts>,
+    onRoutineExpansionChanged: (Int, Boolean) -> Unit = { _, _ -> },
+    onCalendarMonthChanged: (Long?) -> Unit = {}
 ) {
-    var isContentReady by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(50)
-        isContentReady = true
-    }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -44,26 +42,35 @@ fun DashboardScreen(
                 historicalCalendarData = uiState.historicalCalendarData,
                 restDays = uiState.restDays,
                 nutritionRestDays = uiState.nutritionRestDays,
+                nutritionLoading = !uiState.nutritionLoaded,
+                workoutLoading = !uiState.sessionsLoaded,
+                calendarLoading = uiState.calendarLoading,
                 onSetRestDays = onSetRestDays,
-                onSetNutritionRestDays = onSetNutritionRestDays
+                onSetNutritionRestDays = onSetNutritionRestDays,
+                onCalendarMonthChanged = onCalendarMonthChanged
             )
             Spacer(modifier = Modifier.height(32.dp))
         }
 
         item {
             // secção de volume total de treino
-            TotalTrainingVolumeSection(weeklyVolumes = uiState.weeklyVolumes)
+            if (uiState.volumeLoaded) {
+                TotalTrainingVolumeSection(weeklyVolumes = uiState.weeklyVolumes)
+            } else {
+                DashboardVolumeSkeleton()
+            }
         }
 
         // secção de rotinas (carregada lazy)
-        if (isContentReady) {
-            RoutinesSection(
-                workouts = uiState.workouts,
-                exercisesMap = uiState.exercises,
-                workoutVolumeTrends = uiState.workoutVolumeTrends,
-                exerciseVolumeTrends = uiState.exerciseVolumeTrends,
-                exerciseMaxWeightTrends = uiState.exerciseMaxWeightTrends
-            )
-        }
+        RoutinesSection(
+            workouts = uiState.workouts,
+            isLoading = !uiState.routinesLoaded,
+            exercisesMap = uiState.exercises,
+            workoutVolumeTrends = uiState.workoutVolumeTrends,
+            preparedRoutineTrends = uiState.preparedRoutineTrends,
+            requestedRoutineTrends = uiState.requestedRoutineTrends,
+            exerciseCharts = exerciseCharts,
+            onRoutineExpansionChanged = onRoutineExpansionChanged
+        )
     }
 }

@@ -35,6 +35,13 @@ class FakeProgressRepository : IProgressRepository {
         photoLogs.value = currentList
     }
 
+    override suspend fun insertPhotoLogs(photoUris: List<String>, timestamp: Long) {
+        if (photoUris.isEmpty()) return
+        photoLogs.value = photoLogs.value + photoUris.map {
+            PhotoLogEntity(id = nextPhotoId++, photoUri = it, timestamp = timestamp)
+        }
+    }
+
     override suspend fun deleteWeightLog(weightLog: WeightLogEntity) {
         weightLogs.value = weightLogs.value.filter { it.id != weightLog.id }
     }

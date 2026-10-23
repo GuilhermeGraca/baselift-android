@@ -16,20 +16,58 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.onEach
+
+data class PhotoImportResult(val id: Long, val savedCount: Int, val failedCount: Int, val wasCancelled: Boolean = false)
+data class PhotoImportState(val isImporting: Boolean = false, val result: PhotoImportResult? = null)
 
 class ProgressViewModel(
     private val progressRepository: IProgressRepository,
-    private val userRepository: IUserRepository
+    private val userRepository: IUserRepository,
+    private val photoIoDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
+
+    private var profilePhotoRequest: Any = Any()
+    private val _photoImport = MutableStateFlow(PhotoImportState())
+    val photoImport: StateFlow<PhotoImportState> = _photoImport.asStateFlow()
+    private data class PhotoImportRetry(val resultId: Long, val uris: List<Uri>, val timestamp: Long?)
+    private var photoImportRetry: PhotoImportRetry? = null
+    private var nextPhotoImportId = 1L
+
+    private suspend fun retainPhotoReadPermission(context: Context, uri: Uri) {
+        withContext(photoIoDispatcher) {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
 
     val user: StateFlow<UserEntity?> = userRepository.getUser()
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
+    // A real empty history is different from the StateFlow's pre-query empty value.
+    // These flags are updated by the existing subscriptions, so no extra Room observers start.
+    private val _weightLogsReady = MutableStateFlow(false)
+    val weightLogsReady: StateFlow<Boolean> = _weightLogsReady.asStateFlow()
+    private val _photoLogsReady = MutableStateFlow(false)
+    val photoLogsReady: StateFlow<Boolean> = _photoLogsReady.asStateFlow()
+
+    // Keep the last snapshots for return navigation; inactive Insights stops history queries.
     val weightLogs: StateFlow<List<WeightLogEntity>> = progressRepository.allWeightLogs
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .onEach { _weightLogsReady.value = true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000), emptyList())
 
     val photoLogs: StateFlow<List<PhotoLogEntity>> = progressRepository.allPhotoLogs
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .onEach { _photoLogsReady.value = true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000), emptyList())
 
     fun addWeightLog(weight: Float, timestamp: Long) {
         viewModelScope.launch {
@@ -60,35 +98,66 @@ class ProgressViewModel(
         }
     }
 
-    fun addPhotoLog(context: Context, uri: Uri) {
-        viewModelScope.launch {
-            try {
-                // pedir permissão persistente para ler a imagem depois do reinício
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                progressRepository.insertPhotoLog(uri.toString(), System.currentTimeMillis())
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+    fun addPhotoLog(context: Context, uri: Uri): Boolean = startPhotoImport(context, listOf(uri), null)
+
+    fun addPhotoLogs(context: Context, uris: List<Uri>, timestamp: Long): Boolean =
+        startPhotoImport(context, uris, timestamp)
+
+    fun retryPhotoImport(context: Context, resultId: Long) {
+        val retry = photoImportRetry ?: return
+        if (retry.resultId == resultId) startPhotoImport(context, retry.uris, retry.timestamp)
     }
 
-    fun addPhotoLogs(context: Context, uris: List<Uri>, timestamp: Long) {
+    fun dismissPhotoImportResult(resultId: Long) {
+        if (_photoImport.value.result?.id != resultId) return
+        photoImportRetry = null
+        _photoImport.update { it.copy(result = null) }
+    }
+
+    private fun startPhotoImport(context: Context, uris: List<Uri>, timestamp: Long?): Boolean {
+        if (uris.isEmpty() || _photoImport.value.isImporting) return false
+        val applicationContext = context.applicationContext
+        val selectedUris = uris.toList()
+        val requestId = nextPhotoImportId++
+        photoImportRetry = null
+        _photoImport.value = PhotoImportState(isImporting = true)
         viewModelScope.launch {
-            uris.forEach { uri ->
-                try {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                    progressRepository.insertPhotoLog(uri.toString(), timestamp)
-                } catch (e: Exception) {
-                    e.printStackTrace()
+            val readable = mutableListOf<Uri>()
+            val rejected = mutableListOf<Uri>()
+            fun finish(saved: Int, failed: List<Uri>, cancelled: Boolean = false) {
+                photoImportRetry = failed.takeIf { it.isNotEmpty() }?.let { PhotoImportRetry(requestId, it.toList(), timestamp) }
+                _photoImport.value = PhotoImportState(result = PhotoImportResult(requestId, saved, failed.size, cancelled))
+            }
+            try {
+                for (uri in selectedUris) {
+                    currentCoroutineContext().ensureActive()
+                    try {
+                        retainPhotoReadPermission(applicationContext, uri)
+                        readable += uri
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        rejected += uri
+                    }
                 }
+                currentCoroutineContext().ensureActive()
+                // Once commit begins, finish this finite atomic write and record its outcome even
+                // if the ViewModel is disposed. Cancellation before this point writes no rows.
+                withContext(NonCancellable) {
+                    if (readable.isNotEmpty()) {
+                        progressRepository.insertPhotoLogs(readable.map { it.toString() }, timestamp ?: System.currentTimeMillis())
+                    }
+                    finish(readable.size, rejected)
+                }
+            } catch (cancelled: CancellationException) {
+                finish(0, selectedUris, cancelled = true)
+                throw cancelled
+            } catch (_: Exception) {
+                // The repository's batch contract rolls back every eligible row on write failure.
+                finish(0, selectedUris)
             }
         }
+        return true
     }
 
     fun setTargetWeight(target: Float?) {
@@ -122,23 +191,27 @@ class ProgressViewModel(
     }
 
     fun updateProfilePhoto(context: Context, uri: Uri?) {
+        val applicationContext = context.applicationContext
+        val request = Any()
+        profilePhotoRequest = request
         viewModelScope.launch {
-            val currentUser = userRepository.getUser().firstOrNull()
-            if (currentUser != null) {
-                if (uri != null) {
-                    try {
-                        context.contentResolver.takePersistableUriPermission(
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                    userRepository.saveUser(currentUser.copy(profilePhotoUri = uri.toString()))
-                } else {
-                    userRepository.saveUser(currentUser.copy(profilePhotoUri = null))
+            if (profilePhotoRequest !== request) return@launch
+            if (uri != null) {
+                try {
+                    retainPhotoReadPermission(applicationContext, uri)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    // Preserve the existing best-effort profile permission policy.
+                    e.printStackTrace()
                 }
             }
+            currentCoroutineContext().ensureActive()
+            if (profilePhotoRequest !== request) return@launch
+            // Provider work may be slow. Read current profile fields after it completes.
+            val currentUser = userRepository.getUser().firstOrNull() ?: return@launch
+            if (profilePhotoRequest !== request) return@launch
+            userRepository.saveUser(currentUser.copy(profilePhotoUri = uri?.toString()))
         }
     }
 
