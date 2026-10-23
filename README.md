@@ -103,7 +103,7 @@ Visualize weight trends and track physique evolution with a private photo diary.
 </div>
 
 ### Nutrition Tracking
-Effortless logging. Track detailed macros or use the Quick Add feature. Targets automatically recalibrate as your body weight changes.
+Effortless logging. Enter whole-number calories and macros per serving or per 100 g, then specify the grams consumed to calculate the daily totals. Save frequent foods as per-100-g meal templates: those ask only for the consumed quantity, while regular templates retain one-tap logging. Targets automatically recalibrate as your body weight changes.
 
 <div align="center">
   <table>
@@ -262,7 +262,7 @@ Follow these steps to run a local copy of BaseLift on your machine.
 
 * **Onboarding**: Create your user profile by entering your age, gender, height, weight, activity level, and fitness goal to calculate daily calories and macros.
 * **Workout Logging**: Create custom routines, add exercises, and record sets, repetitions, and weight during your training session.
-* **Nutrition Tracking**: Log meals manually or use pre-configured meal templates to track daily calories and macronutrient intake.
+* **Nutrition Tracking**: Log calories and macros per serving or per 100 g. Reuse meal templates with one-tap logging for regular meals or a quantity prompt for per-100-g foods.
 * **Progress Insights**: Check the Insights screen to review your weight progression chart and photo journal over time.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -25,6 +27,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.baselift.View.nutrition.components.DailyProgressSection
 import com.example.baselift.View.nutrition.components.QuickLogSection
+import com.example.baselift.View.nutrition.components.MealQuantityDialog
 import com.example.baselift.View.components.rememberSkeletonOpacity
 import com.example.baselift.View.theme.PureBlack
 import androidx.compose.ui.res.stringResource
@@ -38,6 +41,9 @@ fun NutritionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mealTemplateDeletion by viewModel.mealTemplateDeletion.collectAsStateWithLifecycle()
+    val quickLogSubmission by viewModel.quickLogSubmission.collectAsStateWithLifecycle()
+    val mealTemplateSave by viewModel.mealTemplateSave.collectAsStateWithLifecycle()
+    val mealLogSubmission by viewModel.mealLogSubmission.collectAsStateWithLifecycle()
     val loadingOpacity = if (uiState.isLoading) rememberSkeletonOpacity() else null
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current.applicationContext
@@ -65,6 +71,24 @@ fun NutritionScreen(
     }
 
     var showConfigureMealDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var selectedTemplateId by rememberSaveable { androidx.compose.runtime.mutableStateOf<Int?>(null) }
+    val selectedTemplate = uiState.mealTemplates.firstOrNull { it.id == selectedTemplateId }
+
+    LaunchedEffect(viewModel, context) {
+        viewModel.mealLogResults.collect { result ->
+            val message = context.getString(
+                if (result.succeeded) com.example.baselift.R.string.nutrition_meal_log_added
+                else com.example.baselift.R.string.nutrition_meal_log_failed,
+                result.templateName
+            )
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    LaunchedEffect(selectedTemplateId, uiState.isLoading, uiState.mealTemplates) {
+        if (!uiState.isLoading && selectedTemplateId != null && selectedTemplate == null) {
+            selectedTemplateId = null
+        }
+    }
 
     mealTemplateDeletion.failedTemplate?.let { template ->
         androidx.compose.material3.AlertDialog(
@@ -82,7 +106,16 @@ fun NutritionScreen(
     if (showConfigureMealDialog) {
         com.example.baselift.View.nutrition.components.ConfigureMealDialog(
             onDismiss = { showConfigureMealDialog = false },
-            onSave = { template -> viewModel.saveMealTemplate(template) }
+            onSave = viewModel::saveMealTemplate,
+            saveState = mealTemplateSave
+        )
+    }
+    selectedTemplate?.let { template ->
+        MealQuantityDialog(
+            template = template,
+            submissionState = mealLogSubmission,
+            onDismiss = { selectedTemplateId = null },
+            onLog = { selected, grams -> viewModel.logMealTemplate(selected, grams) }
         )
     }
 
@@ -139,8 +172,12 @@ fun NutritionScreen(
         item {
             // secção de registo rápido
             QuickLogSection(
-                onAddEntry = { kcal, p, c, f, isCaloriesOnly ->
-                    viewModel.addQuickLog(kcal, p, c, f, isCaloriesOnly)
+                submissionState = quickLogSubmission,
+                onAddEntry = { values, isCaloriesOnly, isPer100g, grams ->
+                    viewModel.addQuickLog(
+                        values.calories, values.protein, values.carbs, values.fats,
+                        isCaloriesOnly = isCaloriesOnly, isPer100g = isPer100g, grams = grams
+                    )
                 },
                 modifier = Modifier.testTag("nutrition_quick_log")
             )
@@ -155,10 +192,11 @@ fun NutritionScreen(
             } else {
                 com.example.baselift.View.nutrition.components.QuickAddMealsSection(
                     templates = uiState.mealTemplates,
-                    onLogMeal = { template -> viewModel.logMealTemplate(template) },
+                    onLogMeal = { template -> viewModel.logMealTemplate(template); Unit },
                     onDeleteTemplate = { template -> viewModel.deleteMealTemplate(template) },
                     onConfigureClick = { showConfigureMealDialog = true },
-                    deletingTemplateIds = mealTemplateDeletion.pendingTemplateIds
+                    deletingTemplateIds = mealTemplateDeletion.pendingTemplateIds,
+                    onRequestAmount = { template -> selectedTemplateId = template.id }
                 )
             }
 

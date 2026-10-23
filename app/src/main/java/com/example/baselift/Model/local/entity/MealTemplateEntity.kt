@@ -1,6 +1,7 @@
 package com.example.baselift.Model.local.entity
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.PrimaryKey
 
 // entidade para os templates de refeições configuradas
@@ -13,5 +14,7 @@ data class MealTemplateEntity(
     val calories: Int,
     val protein: Int,
     val carbs: Int,
-    val fats: Int
+    val fats: Int,
+    @ColumnInfo(defaultValue = "0")
+    val isPer100g: Boolean = false
 )

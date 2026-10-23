@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
@@ -61,7 +62,8 @@ fun QuickAddMealsSection(
     onDeleteTemplate: (MealTemplateEntity) -> Unit,
     onConfigureClick: () -> Unit,
     modifier: Modifier = Modifier,
-    deletingTemplateIds: Set<Int> = emptySet()
+    deletingTemplateIds: Set<Int> = emptySet(),
+    onRequestAmount: (MealTemplateEntity) -> Unit = {}
 ) {
     var showAllLogs by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<MealTemplateEntity?>(null) }
@@ -186,7 +188,6 @@ fun QuickAddMealsSection(
                         }
                         
                         // Foreground content
-                        val context = androidx.compose.ui.platform.LocalContext.current
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -194,8 +195,7 @@ fun QuickAddMealsSection(
                                 .background(PureBlack)
                                 .clickable(enabled = !isDeleted) {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    onLogMeal(template)
-                                    android.widget.Toast.makeText(context, "${template.name} added", android.widget.Toast.LENGTH_SHORT).show()
+                                    if (template.isPer100g) onRequestAmount(template) else onLogMeal(template)
                                 }
                                 .pointerInput(Unit) {
                                     detectHorizontalDragGestures(
@@ -251,14 +251,33 @@ fun QuickAddMealsSection(
                                     Spacer(modifier = Modifier.width(16.dp))
 
                                     Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = template.name,
+                                                color = Color.White,
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            )
+                                            if (template.isPer100g) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = stringResource(com.example.baselift.R.string.nutrition_per_100g_badge),
+                                                    color = NeonGreen,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(Color(0xFF242910))
+                                                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                                                )
+                                            }
+                                        }
                                         Text(
-                                            text = template.name,
-                                            color = Color.White,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = stringResource(com.example.baselift.R.string.nutrition_tap_to_log),
+                                            text = stringResource(if (template.isPer100g) com.example.baselift.R.string.nutrition_tap_to_enter_amount else com.example.baselift.R.string.nutrition_tap_to_log),
                                             color = MediumGrey,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Medium,
@@ -266,21 +285,18 @@ fun QuickAddMealsSection(
                                         )
                                     }
 
-                                    Row(verticalAlignment = Alignment.Bottom) {
-                                        Text(
-                                            text = "${template.calories}",
-                                            color = Color.White,
-                                            fontSize = 18.sp,
-                                            fontWeight = FontWeight.ExtraBold
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = stringResource(com.example.baselift.R.string.nutrition_kcal_lower),
-                                            color = MediumGrey,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(bottom = 2.dp)
-                                        )
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Row(verticalAlignment = Alignment.Bottom) {
+                                            Text("${template.calories}", color = Color.White,
+                                                fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(stringResource(com.example.baselift.R.string.nutrition_kcal_lower),
+                                                color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(bottom = 2.dp))
+                                        }
+                                        if (template.isPer100g) {
+                                            Text("/ 100 g", color = MediumGrey, fontSize = 10.sp)
+                                        }
                                     }
                                 }
                             }
