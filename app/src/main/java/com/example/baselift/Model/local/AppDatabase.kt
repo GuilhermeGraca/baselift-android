@@ -43,10 +43,9 @@ import com.example.baselift.Model.local.dao.NutritionDao
     ], // lista de entidades que a base de dados vai ter
                    // cada entidade é uma data class anotada com @Entity
 
-    version = 11, // versão 11 com a adição de defaultRestTimer em workouts
+    version = 12, // versão 12 identifica templates definidos por 100 g
 
-    exportSchema = false // false porque não precisamos exportar o esquema para JSON
-                         // e assim evitamos configurar a pasta de destino
+    exportSchema = true // guardar os esquemas para validar futuras migrações
 )
 
 // abstrata porque o Room gera automaticamente
@@ -102,6 +101,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE meal_templates ADD COLUMN isPer100g INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -112,7 +117,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "baselift_database"
                 )
-                .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance

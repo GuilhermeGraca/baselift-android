@@ -1,6 +1,6 @@
 # Nutrition por 100 g — plano de implementação
 
-Estado: **apenas planeado; sem código implementado**.
+Estado: **N1 e N2 implementados e validados**.
 Data: 23 de outubro de 2026.
 Branch: `feature/nutrition-per-100g`, criado a partir de `master` em `e72d84a`.
 Processo: implementar um checkpoint de cada vez; apresentar a build e os resultados dos testes; aguardar validação do utilizador; só depois fazer o respetivo commit.
@@ -44,7 +44,7 @@ Esta alteração não deve bloquear o Quick Log enquanto o histórico ou os temp
 
 ### 2. Configuração de uma meal
 
-1. Acrescentar a mesma checkbox após o nome/ícone, desligada inicialmente.
+1. Acrescentar após o nome/ícone um seletor **Serving / 100G** no cartão “Values per 100 g”, começando em Serving. Este visual substitui a checkbox inicialmente proposta, conforme o protótipo validado para o N2.
 2. Com a opção ativa, guardar os valores como referência por 100 g e identificar essa base junto dos inputs e das calorias. **Não pedir quantidade consumida nesta fase.**
 3. Manter nome, ícones, kcal editáveis, macros, botões de ajuste e Recalculate. O recálculo continua a ser uma ação explícita: kcal podem diferir do resultado 4/4/9, pelo que não se deve impor uma igualdade ou substituir o valor manual.
 4. Guardar `isPer100g` com o template. Templates normais continuam a representar o valor total de uma utilização.
@@ -55,7 +55,7 @@ Esta alteração não deve bloquear o Quick Log enquanto o histórico ou os temp
 | Tipo de template | Apresentação | Ação do toque |
 |---|---|---|
 | Total / normal | Sem badge; kcal do consumo completo; indicação atual de toque para registar. | Registar diretamente, como hoje, sem pedir quantidade. |
-| Por 100 g | Badge textual **“PER 100 G”**; calorias identificadas como referência por 100 g; indicação **“TAP TO ENTER AMOUNT”**. | Abrir diálogo de quantidade, sem qualquer escrita nesta fase. |
+| Por 100 g | Badge discreto **“/ 100g”** junto ao nome; calorias identificadas como referência por 100 g; indicação **“TAP TO ENTER AMOUNT”**. | Abrir diálogo de quantidade, sem qualquer escrita nesta fase. |
 
 O diálogo de quantidade apresenta o nome da meal, a referência por 100 g, um campo de gramas inteiras, os totais a registar e as ações Cancel/Add Entry. A quantidade começa vazia em cada novo consumo; dar foco ao campo numérico para permitir introduzir e confirmar rapidamente. Não guardar a última quantidade como default nesta primeira versão.
 
@@ -100,7 +100,7 @@ Usar estado pequeno de pending/resultado/erro nos comandos afetados, seguindo o 
 
 Uma escrita aceite continua em `viewModelScope` se o utilizador sair da aba. Capturar os valores e o instante do registo ao aceitar a confirmação; abrir um diálogo antes da meia-noite e confirmar depois regista no novo dia. Sucesso significa que a inserção terminou; totais e logs continuam a chegar pelo fluxo Room existente. Propagar cancelamento de coroutines normalmente e apresentar falhas de escrita recuperáveis.
 
-Não acrescentar spinner de ecrã inteiro ou duração mínima de loading. Se uma operação persistente precisar de indicador, reutilizar o feedback local já existente e o respetivo limiar de apresentação. Checkbox, cálculo e abertura do diálogo devem responder imediatamente.
+Não acrescentar spinner de ecrã inteiro ou duração mínima de loading. Se uma operação persistente precisar de indicador, reutilizar o feedback local já existente e o respetivo limiar de apresentação. Seletor, cálculo e abertura do diálogo devem responder imediatamente.
 
 ### Persistência e migração
 
@@ -143,7 +143,7 @@ Existe atualmente `fallbackToDestructiveMigrationOnDowngrade()`. **Depois de mig
 **Implementar pela seguinte ordem dentro do checkpoint:**
 
 1. Exportar o schema 11, acrescentar o flag/default e a migração 11→12; validar preservação dos dados antes de instalar no telemóvel.
-2. Adicionar a checkbox à criação de templates e persistir a escolha, mantendo nome, ícone, kcal manuais e recálculo explícito.
+2. Adicionar o seletor Serving/100G à criação de templates e persistir a escolha, mantendo nome, ícone, kcal manuais e recálculo explícito.
 3. Distinguir os itens da lista com badge/rótulo e encaminhar o toque conforme o tipo. Criar `MealQuantityDialog.kt` com quantidade, preview, cancelar e confirmar, usando o cálculo de N1.
 4. Adaptar `saveMealTemplate` e `logMealTemplate` para validar o modo e confirmar resultados da escrita; nunca registar um template por 100 g sem quantidade. Mover o feedback de sucesso prematuro para o resultado da operação.
 5. Concluir strings, acessibilidade, teclado e disposição em ecrãs pequenos. Atualizar README/REPORT para descrever o comportamento final; retirar “Planned” do selling point apenas quando o checkpoint estiver validado.
@@ -180,6 +180,6 @@ Ficam fora do âmbito: valores decimais, mililitros/conversão de densidade, lei
 | Checkpoint | Implementação | Testes | Validação manual | Commit |
 |---|---|---|---|---|
 | N1 — Quick Log | Implementado | Unitários, Compose, regressão e lint passaram | Validado no telemóvel | Incluído no commit N1 |
-| N2 — Templates | Por iniciar | Por executar | Pendente | — |
+| N2 — Templates | Implementado | Migração, unitários, testes Android relevantes, lint e release passaram | Validado no telemóvel | Incluído no commit N2 |
 
-O checkpoint N1 mantém os valores inteiros e não altera a base de dados. O N2 só será comitado depois da validação manual. O rascunho de selling points continua ignorado pelo Git.
+O checkpoint N1 mantém os valores inteiros e não altera a base de dados. O N2 foi validado no telemóvel antes do commit. O rascunho de selling points continua ignorado pelo Git.

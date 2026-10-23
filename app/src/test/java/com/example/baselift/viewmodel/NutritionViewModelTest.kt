@@ -80,6 +80,28 @@ class NutritionViewModelTest {
         }
     }
 
+    private class ControlledTemplateRepository(
+        private val source: INutritionRepository
+    ) : INutritionRepository by source {
+        val startedTemplates = mutableListOf<MealTemplateEntity>()
+        val release = CompletableDeferred<Unit>()
+        var failure: Exception? = null
+
+        override suspend fun insertMealTemplate(template: MealTemplateEntity) {
+            startedTemplates += template
+            release.await()
+            failure?.let { throw it }
+            source.insertMealTemplate(template)
+        }
+    }
+
+    private fun useControlledTemplateSave(): ControlledTemplateRepository {
+        val controlled = ControlledTemplateRepository(nutritionRepository)
+        viewModel = NutritionViewModel(controlled, userRepository)
+        viewModelStore.put("nutrition", viewModel)
+        return controlled
+    }
+
     private fun useControlledInsert(clock: () -> Long = System::currentTimeMillis): ControlledInsertRepository {
         val controlled = ControlledInsertRepository(nutritionRepository)
         viewModel = NutritionViewModel(controlled, userRepository, clock)
@@ -293,6 +315,107 @@ class NutritionViewModelTest {
         assertEquals("Chicken Rice", logs[0].name)
         assertEquals(600, viewModel.uiState.value.consumedCalories)
         job.cancel()
+    }
+
+    @Test
+    fun `per 100 g template needs grams and produces independent proportional logs`() = runTest {
+        val template = meal(1).copy(calories = 200, protein = 10, carbs = 20, fats = 5, isPer100g = true)
+        val saveRequest = viewModel.saveMealTemplate(template)
+        runCurrent()
+        assertEquals(saveRequest, viewModel.mealTemplateSave.value.completedRequestId)
+        assertNull(viewModel.logMealTemplate(template))
+        assertNull(viewModel.logMealTemplate(template, 0))
+        assertNull(viewModel.logMealTemplate(template, Int.MAX_VALUE))
+        runCurrent()
+        assertTrue(nutritionRepository.getAllNutritionLogs().first().isEmpty())
+
+        val firstRequest = viewModel.logMealTemplate(template, 50)
+        runCurrent()
+        assertEquals(firstRequest, viewModel.mealLogSubmission.value.completedRequestId)
+        val secondRequest = viewModel.logMealTemplate(template, 150)
+        runCurrent()
+        assertEquals(secondRequest, viewModel.mealLogSubmission.value.completedRequestId)
+        val logs = nutritionRepository.getAllNutritionLogs().first()
+        assertEquals(2, logs.size)
+        assertTrue(logs.any { listOf(it.calories, it.protein, it.carbs, it.fats) == listOf(100, 5, 10, 3) })
+        assertTrue(logs.any { listOf(it.calories, it.protein, it.carbs, it.fats) == listOf(300, 15, 30, 8) })
+        assertEquals(template, nutritionRepository.getAllMealTemplates().first().single())
+    }
+
+    @Test
+    fun `per 100 g meal log failure leaves no entry and retry succeeds`() = runTest {
+        val controlled = useControlledInsert()
+        val template = meal(1).copy(isPer100g = true)
+        val firstRequest = viewModel.logMealTemplate(template, 150)
+        runCurrent()
+        assertEquals(1, controlled.startedLogs.size)
+        controlled.failure = IllegalStateException("Database unavailable")
+        controlled.release.complete(Unit)
+        runCurrent()
+        assertEquals(firstRequest, viewModel.mealLogSubmission.value.failedRequestId)
+        assertTrue(nutritionRepository.getAllNutritionLogs().first().isEmpty())
+
+        controlled.failure = null
+        val retry = viewModel.logMealTemplate(template, 150)
+        runCurrent()
+        assertEquals(retry, viewModel.mealLogSubmission.value.completedRequestId)
+        assertEquals(2, controlled.startedLogs.size)
+        assertEquals(1, nutritionRepository.getAllNutritionLogs().first().size)
+    }
+
+    @Test
+    fun `per 100 g meal accepts one pending request and keeps its original time offscreen`() = runTest {
+        var now = 1_000L
+        val controlled = useControlledInsert { now }
+        val template = meal(1).copy(isPer100g = true)
+        val subscription = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+        val request = viewModel.logMealTemplate(template, 150)
+        runCurrent()
+        assertEquals(request, viewModel.logMealTemplate(template, 150))
+        runCurrent()
+        assertEquals(1, controlled.startedLogs.size)
+        subscription.cancel()
+        now = 100_000L
+        controlled.release.complete(Unit)
+        runCurrent()
+        assertEquals(1_000L, nutritionRepository.getAllNutritionLogs().first().single().timestamp)
+        assertEquals(request, viewModel.mealLogSubmission.value.completedRequestId)
+    }
+
+    @Test
+    fun `deleting a per 100 g template leaves its logged totals intact`() = runTest {
+        val template = meal(1).copy(isPer100g = true)
+        nutritionRepository.insertMealTemplate(template)
+        viewModel.logMealTemplate(template, 150)
+        runCurrent()
+        val log = nutritionRepository.getAllNutritionLogs().first().single()
+        viewModel.deleteMealTemplate(template)
+        runCurrent()
+        assertTrue(nutritionRepository.getAllMealTemplates().first().isEmpty())
+        assertEquals(log, nutritionRepository.getAllNutritionLogs().first().single())
+    }
+
+    @Test
+    fun `failed template save preserves reference for retry`() = runTest {
+        val controlled = useControlledTemplateSave()
+        val template = meal(1).copy(isPer100g = true)
+        val firstRequest = viewModel.saveMealTemplate(template)
+        runCurrent()
+        assertEquals(firstRequest, viewModel.mealTemplateSave.value.pendingRequestId)
+        controlled.failure = IllegalStateException("Database unavailable")
+        controlled.release.complete(Unit)
+        runCurrent()
+        assertEquals(firstRequest, viewModel.mealTemplateSave.value.failedRequestId)
+        assertTrue(nutritionRepository.getAllMealTemplates().first().isEmpty())
+
+        controlled.failure = null
+        val retry = viewModel.saveMealTemplate(template)
+        runCurrent()
+        assertEquals(retry, viewModel.mealTemplateSave.value.completedRequestId)
+        assertEquals(listOf(template, template), controlled.startedTemplates)
+        assertEquals(template, nutritionRepository.getAllMealTemplates().first().single())
     }
 
     @Test

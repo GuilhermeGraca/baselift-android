@@ -160,6 +160,8 @@ O esquema evoluiu ao longo do desenvolvimento com migrações incrementais:
 - **v7→v8**: coluna `setCount` adicionada à tabela `exercises`
 - **v8→v9**: criação das tabelas `nutrition_logs` e `meal_templates`
 - **v9→v10**: criação de índices em `timestamp`, `isCompleted`, para melhorar a performance das queries
+- **v10→v11**: coluna `defaultRestTimer` adicionada a `workouts`
+- **v11→v12**: coluna `isPer100g` em `meal_templates`, com default 0 para preservar o comportamento dos templates existentes; os esquemas 11 e 12 são exportados e a migração é testada em Android
 
 ### DAOs
 
@@ -225,8 +227,9 @@ O ecrã de nutrição é composto por 5 componentes independentes:
 **QuickLogSection**: registo rápido com dois modos:
 - *Calories Only*: apenas calorias
 - *Detailed Macros*: calorias + proteína + hidratos + gordura
+- Em ambos, a base pode ser *Serving* ou *100G*. Neste último caso, o utilizador introduz gramas inteiras consumidas e vê os totais antes de guardar. A mesma função de cálculo valida o preview e o registo; arredonda cada valor ao inteiro mais próximo e rejeita overflow.
 
-**QuickAddMealsSection**: templates de refeições pré-configuradas. Toque único para registar. Botão de configuração para criar/editar templates com nome, ícone e macros (as calorias são calculadas automaticamente).
+**QuickAddMealsSection**: templates de refeições pré-configuradas. Os normais registam com um toque; os identificados com */ 100g* junto ao nome abrem um diálogo para indicar a quantidade consumida e só registam após confirmação. A configuração cria templates com nome, ícone, kcal editáveis, macros e seletor Serving/100G; o recálculo de kcal a partir dos macros é explícito. O histórico guarda apenas totais por consumo e continua preservado quando se elimina um template.
 
 **TodaysLogsSection**: tabela com os registos do dia. Inclui botão "Reset Logs" para apagar todos. Long-press num registo ativa uma animação a vermelho e abre diálogo de confirmação de eliminação.
 

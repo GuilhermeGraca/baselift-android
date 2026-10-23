@@ -177,6 +177,23 @@
     <string name="nutrition_meal_name">Meal Name</string>
     <string name="nutrition_estimated_total">ESTIMATED TOTAL</string>
     <string name="nutrition_confirm_template">CONFIRM TEMPLATE</string>
+    <string name="nutrition_template_per_100g">VALUES PER 100 G</string>
+    <string name="nutrition_template_per_100g_hint">Ask for grams when logging this meal</string>
+    <string name="nutrition_template_values_error">Use whole numbers and at least one value above zero for a 100 g meal.</string>
+    <string name="nutrition_template_save_error">Could not save this meal. Please try again.</string>
+    <string name="nutrition_per_100g_badge">/ 100g</string>
+    <string name="nutrition_tap_to_enter_amount">TAP TO ENTER AMOUNT</string>
+    <string name="nutrition_per_100g_kcal">%1$d kcal / 100 g</string>
+    <string name="nutrition_amount_dialog_title">LOG MEAL</string>
+    <string name="nutrition_amount_dialog_reference_macros">P %1$d g · C %2$d g · F %3$d g / 100 g</string>
+    <string name="nutrition_amount_dialog_preview_label">TO BE LOGGED</string>
+    <string name="nutrition_amount_dialog_preview_hint">Enter grams to see the total</string>
+    <string name="nutrition_amount_dialog_preview_calories">%1$d kcal</string>
+    <string name="nutrition_amount_dialog_preview_macros">P %1$d g · C %2$d g · F %3$d g</string>
+    <string name="nutrition_amount_dialog_cancel">CANCEL</string>
+    <string name="nutrition_amount_dialog_error">Could not log this meal. Please try again.</string>
+    <string name="nutrition_meal_log_failed">Could not log %1$s. Please try again.</string>
+    <string name="nutrition_meal_log_added">%1$s added</string>
     <!-- Insights -->
     <string name="insights_no_name">NO NAME</string>
     <string name="insights_edit_name">EDIT NAME</string>
