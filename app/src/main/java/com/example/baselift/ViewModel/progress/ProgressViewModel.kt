@@ -26,6 +26,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.onEach
 
 data class PhotoImportResult(val id: Long, val savedCount: Int, val failedCount: Int, val wasCancelled: Boolean = false)
 data class PhotoImportState(val isImporting: Boolean = false, val result: PhotoImportResult? = null)
@@ -52,11 +53,20 @@ class ProgressViewModel(
     val user: StateFlow<UserEntity?> = userRepository.getUser()
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
+    // A real empty history is different from the StateFlow's pre-query empty value.
+    // These flags are updated by the existing subscriptions, so no extra Room observers start.
+    private val _weightLogsReady = MutableStateFlow(false)
+    val weightLogsReady: StateFlow<Boolean> = _weightLogsReady.asStateFlow()
+    private val _photoLogsReady = MutableStateFlow(false)
+    val photoLogsReady: StateFlow<Boolean> = _photoLogsReady.asStateFlow()
+
     // Keep the last snapshots for return navigation; inactive Insights stops history queries.
     val weightLogs: StateFlow<List<WeightLogEntity>> = progressRepository.allWeightLogs
+        .onEach { _weightLogsReady.value = true }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000), emptyList())
 
     val photoLogs: StateFlow<List<PhotoLogEntity>> = progressRepository.allPhotoLogs
+        .onEach { _photoLogsReady.value = true }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 1_000), emptyList())
 
     fun addWeightLog(weight: Float, timestamp: Long) {

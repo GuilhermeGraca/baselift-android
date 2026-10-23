@@ -61,6 +61,43 @@ class ProgressSubscriptionsTest {
         assertEquals(0, photos.starts)
     }
 
+    @Test fun `history readiness is independent and a confirmed empty result stays ready`() = runTest {
+        repository.insertWeightLog(80f, 1L)
+        val releaseWeights = CompletableDeferred<Unit>()
+        val releasePhotos = CompletableDeferred<Unit>()
+        val delayed = object : IProgressRepository by tracked {
+            override val allWeightLogs: Flow<List<com.example.baselift.Model.local.entity.WeightLogEntity>> = flow {
+                releaseWeights.await()
+                emitAll(tracked.allWeightLogs)
+            }
+            override val allPhotoLogs: Flow<List<com.example.baselift.Model.local.entity.PhotoLogEntity>> = flow {
+                releasePhotos.await()
+                emitAll(tracked.allPhotoLogs)
+            }
+        }
+        initialize(delayed)
+        assertFalse(vm.weightLogsReady.value)
+        assertFalse(vm.photoLogsReady.value)
+        val subscriptions = watchHistories(); runCurrent()
+        assertFalse(vm.weightLogsReady.value)
+        assertFalse(vm.photoLogsReady.value)
+
+        releasePhotos.complete(Unit); runCurrent()
+        assertTrue(vm.photoLogsReady.value)
+        assertTrue(vm.photoLogs.value.isEmpty())
+        assertFalse(vm.weightLogsReady.value)
+
+        releaseWeights.complete(Unit); runCurrent()
+        assertTrue(vm.weightLogsReady.value)
+        assertEquals(80f, vm.weightLogs.value.single().weightValue, 0f)
+        subscriptions.forEach { it.cancel() }; runCurrent()
+        advanceTimeBy(1_000); runCurrent()
+        assertTrue(vm.weightLogsReady.value)
+        assertTrue(vm.photoLogsReady.value)
+        assertEquals(0, weights.active)
+        assertEquals(0, photos.active)
+    }
+
     @Test fun `last subscriber stops after one second and snapshots remain cached`() = runTest {
         repository.insertWeightLog(80f, 1L)
         repository.insertPhotoLog("photo-a", 1L)

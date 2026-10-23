@@ -1,6 +1,8 @@
 package com.example.baselift.View.insights.components
 import com.example.baselift.View.components.ChartDataPoint
 import com.example.baselift.View.components.InteractiveChartWithControls
+import com.example.baselift.View.components.DelayedPendingSpinner
+import com.example.baselift.View.components.rememberSkeletonOpacity
 
 import android.app.DatePickerDialog
 import android.net.Uri
@@ -242,12 +244,14 @@ fun VisualDiarySection(
     photoWeights: PhotoWeightIndex,
     onPhotoClick: (PhotoLogEntity) -> Unit,
     onAddPhoto: () -> Unit,
-    isImporting: Boolean = false
+    isImporting: Boolean = false,
+    isLoading: Boolean = false
 ) {
     val zone = TimeZone.getDefault()
     val dateFormat = remember(zone.id) { SimpleDateFormat("MMM dd", Locale.US).apply { timeZone = zone } }
     val sortedPhotos = remember(photoLogs) { photoLogs.sortedBy { it.timestamp } } // mais antigas à esquerda e recentes à direita
     val lazyListState = rememberLazyListState()
+    val photoLoadingOpacity = if (isLoading) rememberSkeletonOpacity() else null
 
     // A batch reaches this list only after its atomic commit: one final scroll, no per-row restarts.
     LaunchedEffect(sortedPhotos) {
@@ -260,7 +264,12 @@ fun VisualDiarySection(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(com.example.baselift.R.string.insights_visual_diary), color = CrystalWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             if (isImporting) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = NeonGreen, strokeWidth = 2.dp)
+                DelayedPendingSpinner(
+                    color = NeonGreen,
+                    modifier = Modifier.size(24.dp),
+                    spinnerSize = 16.dp,
+                    placeholder = { Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MediumGrey) }
+                )
             } else {
                 Icon(Icons.Default.CameraAlt, contentDescription = "Add Photo", tint = NeonGreen, modifier = Modifier.clickable { onAddPhoto() })
             }
@@ -269,7 +278,9 @@ fun VisualDiarySection(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (sortedPhotos.isEmpty()) {
+        if (photoLoadingOpacity != null) {
+            InsightsPhotoGallerySkeleton(photoLoadingOpacity)
+        } else if (sortedPhotos.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(12.dp)).background(DarkSurface),
                 contentAlignment = Alignment.Center

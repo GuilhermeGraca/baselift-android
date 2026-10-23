@@ -83,6 +83,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
 import com.example.baselift.View.insights.components.*
+import com.example.baselift.View.components.rememberSkeletonOpacity
 
 @Composable
 fun InsightsScreen(
@@ -93,6 +94,9 @@ fun InsightsScreen(
     val uiState by onboardingViewModel.uiState.collectAsStateWithLifecycle()
     val weightLogs by progressViewModel.weightLogs.collectAsStateWithLifecycle()
     val photoLogs by progressViewModel.photoLogs.collectAsStateWithLifecycle()
+    val weightLogsReady by progressViewModel.weightLogsReady.collectAsStateWithLifecycle()
+    val photoLogsReady by progressViewModel.photoLogsReady.collectAsStateWithLifecycle()
+    val weightLoadingOpacity = if (!weightLogsReady) rememberSkeletonOpacity() else null
     val profileLoadState by onboardingViewModel.profileLoadState.collectAsStateWithLifecycle()
     val user = profileLoadState.profile?.user
     val photoImport by progressViewModel.photoImport.collectAsStateWithLifecycle()
@@ -376,11 +380,15 @@ fun InsightsScreen(
 
         item {
             // tendência de peso
-            WeightTrendSection(
-                weightLogs = weightLogs, 
-                targetWeight = user?.targetWeight,
-                onSetTargetWeight = { progressViewModel.setTargetWeight(it) }
-            )
+            if (weightLoadingOpacity != null) {
+                InsightsWeightChartSkeleton(weightLoadingOpacity)
+            } else {
+                WeightTrendSection(
+                    weightLogs = weightLogs,
+                    targetWeight = user?.targetWeight,
+                    onSetTargetWeight = { progressViewModel.setTargetWeight(it) }
+                )
+            }
             Spacer(modifier = Modifier.height(24.dp))
         }
 
@@ -392,13 +400,17 @@ fun InsightsScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        TechnicalHistoryLedger(
-            sortedLogs = sortedWeightLogs,
-            isGainGoal = user?.goal?.contains("Gain", ignoreCase = true) ?: false,
-            expanded = weightHistoryExpanded,
-            onToggleExpanded = { weightHistoryExpanded = !weightHistoryExpanded },
-            onRequestDelete = { weightLogToDeleteId = it.id }
-        )
+        if (weightLoadingOpacity != null) {
+            item(key = "weight-history-loading") { InsightsWeightLedgerSkeleton(weightLoadingOpacity) }
+        } else {
+            TechnicalHistoryLedger(
+                sortedLogs = sortedWeightLogs,
+                isGainGoal = user?.goal?.contains("Gain", ignoreCase = true) ?: false,
+                expanded = weightHistoryExpanded,
+                onToggleExpanded = { weightHistoryExpanded = !weightHistoryExpanded },
+                onRequestDelete = { weightLogToDeleteId = it.id }
+            )
+        }
 
         item(key = "insights-visual-diary") {
             // diário visual
@@ -407,7 +419,8 @@ fun InsightsScreen(
                 photoWeights = photoWeights,
                 onPhotoClick = { clickedPhoto = it },
                 onAddPhoto = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                isImporting = photoImport.isImporting
+                isImporting = photoImport.isImporting,
+                isLoading = !photoLogsReady
             )
             Spacer(modifier = Modifier.height(100.dp)) // espaço para navegação inferior
         }
