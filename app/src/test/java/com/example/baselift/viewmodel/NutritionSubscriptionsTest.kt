@@ -34,7 +34,7 @@ class NutritionSubscriptionsTest {
     private val releaseDelete = CompletableDeferred<Unit>()
     private var deleteFailure: Exception? = null
     private var deleteCalls = 0
-    private val meal = MealTemplateEntity(1, "Lunch", "restaurant", 600, 40, 70, 10)
+    private val meal = MealTemplateEntity(1, "Lunch", "restaurant", 600, 40.0, 70.0, 10.0)
 
     private fun <T> tracked(source: Flow<T>, counter: Counter): Flow<T> = flow {
         counter.starts++; counter.active++

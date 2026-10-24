@@ -1,5 +1,10 @@
 package com.example.baselift.View.nutrition.components
 
+import com.example.baselift.Model.nutrition.parseNutritionDecimal
+import com.example.baselift.Model.nutrition.formatNutritionDecimal
+import com.example.baselift.Model.nutrition.caloriesFromMacros
+import com.example.baselift.Model.nutrition.NutritionValues
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -84,11 +89,13 @@ fun ConfigureMealDialog(
     }
 
     val parsedCalories = parseNutritionWholeNumber(calories)
-    val parsedProtein = parseNutritionWholeNumber(protein)
-    val parsedCarbs = parseNutritionWholeNumber(carbs)
-    val parsedFats = parseNutritionWholeNumber(fats)
-    val valuesValid = listOf(parsedCalories, parsedProtein, parsedCarbs, parsedFats).all { it != null } &&
-        (!isPer100g || listOf(parsedCalories, parsedProtein, parsedCarbs, parsedFats).any { it != 0 })
+    val parsedProtein = parseNutritionDecimal(protein)
+    val parsedCarbs = parseNutritionDecimal(carbs)
+    val parsedFats = parseNutritionDecimal(fats)
+    val values = if (parsedCalories != null && parsedProtein != null && parsedCarbs != null && parsedFats != null) {
+        NutritionValues(parsedCalories, parsedProtein, parsedCarbs, parsedFats)
+    } else null
+    val valuesValid = values != null && values.isValid() && (!isPer100g || !values.isEmpty())
     val hasEnteredValues = listOf(calories, protein, carbs, fats).any { it.isNotEmpty() }
     val canSave = name.isNotBlank() && valuesValid && !isSaving
 
@@ -103,11 +110,11 @@ fun ConfigureMealDialog(
     val currentIconOption = iconOptions[selectedIconIndex]
 
     fun recalculateCalories() {
-        val p = parseNutritionWholeNumber(protein) ?: return
-        val c = parseNutritionWholeNumber(carbs) ?: return
-        val f = parseNutritionWholeNumber(fats) ?: return
-        val result = p.toLong() * 4 + c.toLong() * 4 + f.toLong() * 9
-        if (result <= Int.MAX_VALUE) calories = result.toString()
+        val p = parseNutritionDecimal(protein) ?: return
+        val c = parseNutritionDecimal(carbs) ?: return
+        val f = parseNutritionDecimal(fats) ?: return
+        val result = caloriesFromMacros(p, c, f) ?: return
+        calories = result.toString()
     }
 
     Dialog(
@@ -355,8 +362,8 @@ fun MealMacroAdjustBox(
     inputTestTag: String? = null
 ) {
     fun adjust(delta: Int) {
-        val current = value.toIntOrNull() ?: 0
-        onValueChange((current.toLong() + delta).coerceIn(0L, Int.MAX_VALUE.toLong()).toString())
+        val current = parseNutritionDecimal(value) ?: return
+        onValueChange(formatNutritionDecimal((current + delta).coerceIn(0.0, Int.MAX_VALUE.toDouble())))
     }
 
     Row(
@@ -387,7 +394,7 @@ fun MealMacroAdjustBox(
                 Text("-", color = MediumGrey, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
             
-            Box(modifier = Modifier.width(60.dp), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.width(82.dp), contentAlignment = Alignment.Center) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     BasicTextField(
                         value = value,
@@ -395,15 +402,15 @@ fun MealMacroAdjustBox(
                         enabled = enabled,
                         singleLine = true,
                         textStyle = TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = androidx.compose.ui.text.input.ImeAction.Next),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = androidx.compose.ui.text.input.ImeAction.Next),
                         cursorBrush = SolidColor(Color.White),
-                        modifier = Modifier.width(36.dp).then(if (inputTestTag != null) Modifier.testTag(inputTestTag) else Modifier)
+                        modifier = Modifier.width(64.dp).then(if (inputTestTag != null) Modifier.testTag(inputTestTag) else Modifier)
                     )
                     Text("g", color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
                 }
                 if (value.isEmpty()) {
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text("0", color = MediumGrey.copy(alpha = 0.5f), fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
+                        Text("0", color = MediumGrey.copy(alpha = 0.5f), fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.width(64.dp))
                         Text("g", color = MediumGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
                     }
                 }

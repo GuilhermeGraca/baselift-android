@@ -12,9 +12,9 @@ data class MealTemplateEntity(
     val name: String,
     val iconName: String, // nome do ícone para apresentar na interface
     val calories: Int,
-    val protein: Int,
-    val carbs: Int,
-    val fats: Int,
+    val protein: Double,
+    val carbs: Double,
+    val fats: Double,
     @ColumnInfo(defaultValue = "0")
     val isPer100g: Boolean = false
 )

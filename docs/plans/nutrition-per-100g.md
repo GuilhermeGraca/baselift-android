@@ -5,6 +5,8 @@ Data: 23 de outubro de 2026.
 Branch: `feature/nutrition-per-100g`, criado a partir de `master` em `e72d84a`.
 Processo: implementar um checkpoint de cada vez; apresentar a build e os resultados dos testes; aguardar validação do utilizador; só depois fazer o respetivo commit.
 
+> Atualização de 24/10/2026: o utilizador reviu a decisão de usar apenas inteiros. O seguimento [Macros e quantidades decimais](nutrition-decimal-inputs.md) substitui essa restrição: macros e gramas até duas casas decimais, kcal inteiras. Este documento conserva o plano e a validação históricos de N1/N2.
+
 ## Objetivo e decisão de simplificação
 
 Permitir introduzir os valores nutricionais por 100 g e a quantidade consumida em gramas, deixando a aplicação calcular o que deve acrescentar ao dia. Os mesmos alimentos podem ser guardados como templates para reutilizar os valores nutricionais e pedir apenas a quantidade em cada consumo.

@@ -62,11 +62,11 @@ class NutritionSubscriptionsTest {
         database = db
         val real = NutritionRepository(db.nutritionDao())
         val users = UserRepository(db.userDao())
-        val meal = MealTemplateEntity(1, "Lunch", "restaurant", 600, 40, 70, 10)
+        val meal = MealTemplateEntity(1, "Lunch", "restaurant", 600, 40.0, 70.0, 10.0)
         runBlocking {
             users.saveUser(UserEntity(dailyCaloriesGoal = 2500))
             real.insertNutritionLog(NutritionLogEntity(name = "Breakfast", calories = 100,
-                protein = 10, carbs = 10, fats = 2, timestamp = System.currentTimeMillis()))
+                protein = 10.0, carbs = 10.0, fats = 2.0, timestamp = System.currentTimeMillis()))
             real.insertMealTemplate(meal)
         }
         fun <T> tracked(rows: Flow<T>, active: AtomicInteger): Flow<T> = flow {

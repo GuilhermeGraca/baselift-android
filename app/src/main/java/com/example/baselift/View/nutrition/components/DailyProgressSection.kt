@@ -1,5 +1,7 @@
 package com.example.baselift.View.nutrition.components
 
+import com.example.baselift.Model.nutrition.formatNutritionDecimal
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -34,9 +36,9 @@ fun DailyProgressSection(
     targetCarbs: Int,
     targetFats: Int,
     consumedCalories: Int,
-    consumedProtein: Int,
-    consumedCarbs: Int,
-    consumedFats: Int,
+    consumedProtein: Double,
+    consumedCarbs: Double,
+    consumedFats: Double,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -213,7 +215,7 @@ fun DailyProgressSection(
 @Composable
 fun MacroBar(
     label: String,
-    consumed: Int,
+    consumed: Double,
     target: Int,
     color: Color,
     overColor: Color
@@ -226,13 +228,13 @@ fun MacroBar(
         ) {
             androidx.compose.material3.Text(text = label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.Bottom) {
-                androidx.compose.material3.Text(text = consumed.toString(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                androidx.compose.material3.Text(text = formatNutritionDecimal(consumed), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 androidx.compose.material3.Text(text = stringResource(com.example.baselift.R.string.nutrition_grams, target), color = MediumGrey, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
         Spacer(modifier = Modifier.height(6.dp))
         Box(modifier = Modifier.fillMaxWidth().height(16.dp)) {
-            val maxVal = maxOf(target, consumed)
+            val maxVal = maxOf(target.toFloat(), consumed.toFloat())
             val scaleMax = if (maxVal > 0) maxVal / 0.95f else 1f
             val targetFraction = if (scaleMax > 0) target.toFloat() / scaleMax else 0f
             val consumedFraction = if (scaleMax > 0) consumed.toFloat() / scaleMax else 0f
@@ -240,7 +242,9 @@ fun MacroBar(
             // background track
             Box(modifier = Modifier.fillMaxWidth().height(8.dp).align(Alignment.CenterStart).background(Color(0xFF2A2A2A), RoundedCornerShape(4.dp)))
             
-            val overLimit = consumed > target
+            // Compare the drawn fractions: Double sums can be marginally above the target
+            // while both Float fractions coincide, which would otherwise create a zero weight.
+            val overLimit = consumedFraction > targetFraction
             
             // filled track
             if (consumedFraction > 0) {

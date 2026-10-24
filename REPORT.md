@@ -162,6 +162,7 @@ O esquema evoluiu ao longo do desenvolvimento com migrações incrementais:
 - **v9→v10**: criação de índices em `timestamp`, `isCompleted`, para melhorar a performance das queries
 - **v10→v11**: coluna `defaultRestTimer` adicionada a `workouts`
 - **v11→v12**: coluna `isPer100g` em `meal_templates`, com default 0 para preservar o comportamento dos templates existentes; os esquemas 11 e 12 são exportados e a migração é testada em Android
+- **v12→v13**: macros de `nutrition_logs` e `meal_templates` passam de INTEGER para REAL (`Double`); a migração preserva IDs, nomes, calorias, timestamps, base Serving/100G e o índice por timestamp. As calorias e os objetivos continuam inteiros.
 
 ### DAOs
 
@@ -227,7 +228,7 @@ O ecrã de nutrição é composto por 5 componentes independentes:
 **QuickLogSection**: registo rápido com dois modos:
 - *Calories Only*: apenas calorias
 - *Detailed Macros*: calorias + proteína + hidratos + gordura
-- Em ambos, a base pode ser *Serving* ou *100G*. Neste último caso, o utilizador introduz gramas inteiras consumidas e vê os totais antes de guardar. A mesma função de cálculo valida o preview e o registo; arredonda cada valor ao inteiro mais próximo e rejeita overflow.
+- Em ambos, a base pode ser *Serving* ou *100G*. Macros e gramas consumidas aceitam até duas casas decimais, com vírgula ou ponto; kcal continuam inteiras. A mesma função de cálculo valida o preview e o registo: usa `BigDecimal` e arredonda uma única vez o resultado final (kcal ao inteiro, macros a 0,01 g, metade para cima), rejeitando negativos, valores não finitos e overflow. O histórico, os totais do dia e o Dashboard preservam as frações; a apresentação omite zeros decimais desnecessários.
 
 **QuickAddMealsSection**: templates de refeições pré-configuradas. Os normais registam com um toque; os identificados com */ 100g* junto ao nome abrem um diálogo para indicar a quantidade consumida e só registam após confirmação. A configuração cria templates com nome, ícone, kcal editáveis, macros e seletor Serving/100G; o recálculo de kcal a partir dos macros é explícito. O histórico guarda apenas totais por consumo e continua preservado quando se elimina um template.
 

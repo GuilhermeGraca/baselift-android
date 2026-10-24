@@ -1,5 +1,8 @@
 package com.example.baselift.View.nutrition.components
 
+import com.example.baselift.Model.nutrition.parseNutritionDecimal
+import com.example.baselift.Model.nutrition.formatNutritionDecimal
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,7 +66,7 @@ private val QuietColor = Color(0xFF696970)
 @Composable
 fun QuickLogSection(
     submissionState: QuickLogSubmissionState,
-    onAddEntry: (values: NutritionValues, isCaloriesOnly: Boolean, isPer100g: Boolean, grams: Int?) -> Long?,
+    onAddEntry: (values: NutritionValues, isCaloriesOnly: Boolean, isPer100g: Boolean, grams: Double?) -> Long?,
     modifier: Modifier = Modifier
 ) {
     var isCaloriesOnly by rememberSaveable { mutableStateOf(true) }
@@ -102,10 +105,10 @@ fun QuickLogSection(
 
     val isSubmitting = activeRequestId != null
     val calories = parseNutritionWholeNumber(kcalInput)
-    val protein = if (isCaloriesOnly) 0 else parseNutritionWholeNumber(proteinInput)
-    val carbs = if (isCaloriesOnly) 0 else parseNutritionWholeNumber(carbsInput)
-    val fats = if (isCaloriesOnly) 0 else parseNutritionWholeNumber(fatsInput)
-    val grams = if (isPer100g) parseNutritionWholeNumber(gramsInput) else null
+    val protein = if (isCaloriesOnly) 0.0 else parseNutritionDecimal(proteinInput)
+    val carbs = if (isCaloriesOnly) 0.0 else parseNutritionDecimal(carbsInput)
+    val fats = if (isCaloriesOnly) 0.0 else parseNutritionDecimal(fatsInput)
+    val grams = if (isPer100g) parseNutritionDecimal(gramsInput) else null
     val hasInvalidInput = calories == null || protein == null || carbs == null || fats == null ||
         (isPer100g && grams == null && gramsInput.isNotEmpty())
     val sourceValues = if (!hasInvalidInput) NutritionValues(calories!!, protein!!, carbs!!, fats!!) else null
@@ -218,7 +221,7 @@ fun QuickLogSection(
                     label = stringResource(R.string.nutrition_kcal_label), value = kcalInput,
                     per100g = isPer100g, enabled = !isSubmitting,
                     onValueChange = { kcalInput = it; showSaveError = false },
-                    inputTestTag = "nutrition_calories_input", modifier = Modifier.weight(1f)
+                    inputTestTag = "nutrition_calories_input", keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f)
                 )
                 NutrientTile(
                     label = stringResource(R.string.nutrition_protein_g), value = proteinInput,
@@ -258,7 +261,7 @@ fun QuickLogSection(
                         stringResource(R.string.nutrition_total_to_log_calories, totals.calories)
                     } else {
                         stringResource(R.string.nutrition_total_to_log_macros,
-                            totals.calories, totals.protein, totals.carbs, totals.fats)
+                            totals.calories, formatNutritionDecimal(totals.protein), formatNutritionDecimal(totals.carbs), formatNutritionDecimal(totals.fats))
                     },
                     color = NeonGreen,
                     fontSize = 11.sp,
@@ -269,14 +272,14 @@ fun QuickLogSection(
             } else if (gramsInput.isNotEmpty() || hasInvalidInput) {
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    text = stringResource(if (hasInvalidInput) R.string.nutrition_whole_numbers_only else R.string.nutrition_enter_valid_amount),
+                    text = stringResource(if (hasInvalidInput) R.string.nutrition_invalid_values else R.string.nutrition_enter_valid_amount),
                     color = LabelColor,
                     fontSize = 11.sp
                 )
             }
         } else if (hasInvalidInput) {
             Spacer(Modifier.height(10.dp))
-            Text(stringResource(R.string.nutrition_whole_numbers_only), color = LabelColor, fontSize = 11.sp)
+            Text(stringResource(R.string.nutrition_invalid_values), color = LabelColor, fontSize = 11.sp)
         }
 
         if (showSaveError) {
@@ -413,6 +416,7 @@ private fun NutrientTile(
     enabled: Boolean,
     onValueChange: (String) -> Unit,
     inputTestTag: String,
+    keyboardType: KeyboardType = KeyboardType.Decimal,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -437,7 +441,7 @@ private fun NutrientTile(
             )
         }
         Spacer(Modifier.height(10.dp))
-        NumericInput(value, onValueChange, enabled, inputTestTag, fontSize = 26)
+        NumericInput(value, onValueChange, enabled, inputTestTag, fontSize = 26, keyboardType = keyboardType)
     }
 }
 
@@ -457,7 +461,7 @@ private fun AmountTile(value: String, enabled: Boolean, onValueChange: (String) 
                 fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(8.dp))
-        NumericInput(value, onValueChange, enabled, "nutrition_amount_grams", fontSize = 26)
+        NumericInput(value, onValueChange, enabled, "nutrition_amount_grams", fontSize = 26, keyboardType = KeyboardType.Decimal)
     }
 }
 
@@ -469,7 +473,8 @@ private fun NumericInput(
     testTag: String,
     modifier: Modifier = Modifier,
     fontSize: Int,
-    textAlign: TextAlign = TextAlign.Start
+    textAlign: TextAlign = TextAlign.Start,
+    keyboardType: KeyboardType = KeyboardType.Number
 ) {
     Box(modifier = modifier, contentAlignment = if (textAlign == TextAlign.Center) Alignment.Center else Alignment.CenterStart) {
         if (value.isEmpty()) {
@@ -482,7 +487,7 @@ private fun NumericInput(
             singleLine = true,
             textStyle = TextStyle(color = if (enabled) Color.White else LabelColor,
                 fontSize = fontSize.sp, fontWeight = FontWeight.Bold, textAlign = textAlign),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             cursorBrush = SolidColor(NeonGreen),
             modifier = Modifier.fillMaxWidth().testTag(testTag)
         )

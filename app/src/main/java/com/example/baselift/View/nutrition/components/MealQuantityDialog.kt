@@ -1,5 +1,7 @@
 package com.example.baselift.View.nutrition.components
 
+import com.example.baselift.Model.nutrition.formatNutritionDecimal
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.rememberScrollState
@@ -47,7 +49,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.baselift.Model.local.entity.MealTemplateEntity
 import com.example.baselift.Model.nutrition.NutritionPortionCalculator
 import com.example.baselift.Model.nutrition.NutritionValues
-import com.example.baselift.Model.nutrition.parseNutritionWholeNumber
+import com.example.baselift.Model.nutrition.parseNutritionDecimal
 import com.example.baselift.R
 import com.example.baselift.View.theme.MediumGrey
 import com.example.baselift.View.theme.NeonGreen
@@ -60,13 +62,13 @@ fun MealQuantityDialog(
     template: MealTemplateEntity,
     submissionState: MealWriteState,
     onDismiss: () -> Unit,
-    onLog: (MealTemplateEntity, Int) -> Long?
+    onLog: (MealTemplateEntity, Double) -> Long?
 ) {
     var amount by rememberSaveable(template.id) { mutableStateOf("") }
     var activeRequestId by rememberSaveable(template.id) { mutableStateOf<Long?>(null) }
     var showSaveError by rememberSaveable(template.id) { mutableStateOf(false) }
     val isSubmitting = activeRequestId != null
-    val grams = parseNutritionWholeNumber(amount)
+    val grams = parseNutritionDecimal(amount)
     val totals = NutritionPortionCalculator.calculate(
         NutritionValues(template.calories, template.protein, template.carbs, template.fats),
         per100g = true, grams = grams
@@ -104,7 +106,7 @@ fun MealQuantityDialog(
             Text(stringResource(R.string.nutrition_per_100g_kcal, template.calories),
                 color = MediumGrey, fontSize = 12.sp)
             Text(stringResource(R.string.nutrition_amount_dialog_reference_macros,
-                template.protein, template.carbs, template.fats),
+                formatNutritionDecimal(template.protein), formatNutritionDecimal(template.carbs), formatNutritionDecimal(template.fats)),
                 color = MediumGrey, fontSize = 11.sp, lineHeight = 15.sp)
             Spacer(Modifier.height(18.dp))
             HorizontalDivider(color = Color(0xFF2A2A2F))
@@ -126,7 +128,7 @@ fun MealQuantityDialog(
                     enabled = !isSubmitting,
                     singleLine = true,
                     textStyle = TextStyle(color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     cursorBrush = SolidColor(NeonGreen),
                     modifier = Modifier.weight(1f).focusRequester(focusRequester).testTag("meal_amount_grams"),
                     decorationBox = { innerTextField ->
@@ -155,13 +157,13 @@ fun MealQuantityDialog(
                         color = NeonGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.testTag("meal_amount_preview_calories"))
                     Text(stringResource(R.string.nutrition_amount_dialog_preview_macros,
-                        totals.protein, totals.carbs, totals.fats),
+                        formatNutritionDecimal(totals.protein), formatNutritionDecimal(totals.carbs), formatNutritionDecimal(totals.fats)),
                         color = MediumGrey, fontSize = 11.sp, lineHeight = 15.sp,
                         modifier = Modifier.testTag("meal_amount_preview_macros"))
                 } else {
                     Text(stringResource(when {
                         amount.isEmpty() -> R.string.nutrition_amount_dialog_preview_hint
-                        grams == null -> R.string.nutrition_whole_numbers_only
+                        grams == null -> R.string.nutrition_decimal_input_error
                         else -> R.string.nutrition_enter_valid_amount
                     }), color = if (amount.isEmpty()) MediumGrey else SoftCoral,
                         fontSize = 12.sp)

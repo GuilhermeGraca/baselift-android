@@ -78,7 +78,7 @@ class NutritionDateRefreshTest {
                 Triple("Next", "2026-10-18T00:00:00.000Z", 400)
             ).forEach { (name, time, calories) ->
                 real.insertNutritionLog(NutritionLogEntity(name = name, calories = calories,
-                    protein = 0, carbs = 0, fats = 0, timestamp = instant(time)))
+                    protein = 0.0, carbs = 0.0, fats = 0.0, timestamp = instant(time)))
             }
         }
         val source = object : INutritionRepository by real {
@@ -130,7 +130,7 @@ class NutritionDateRefreshTest {
     @Test fun sqliteReadAndResetIncludeBothBoundaryMillisecondsAndPreserveAdjacentDaysAcrossDst() = runBlocking {
         val db = db()
         val dao = db.nutritionDao()
-        val meal = MealTemplateEntity(1, "Kept", "restaurant", 600, 40, 70, 10)
+        val meal = MealTemplateEntity(1, "Kept", "restaurant", 600, 40.0, 70.0, 10.0)
         dao.insertMealTemplate(meal)
         listOf(
             Triple("Europe/Lisbon", "2026-03-29T00:00:00.000Z", "2026-03-29T23:00:00.000Z"),
@@ -145,7 +145,7 @@ class NutritionDateRefreshTest {
             val repository = NutritionRepository(dao, { now }, { zone })
             listOf(start - 1, start, end - 1, end).forEachIndexed { index, time ->
                 dao.insertNutritionLog(NutritionLogEntity(id = index + 1, name = "Boundary $index", calories = 100,
-                    protein = 0, carbs = 0, fats = 0, timestamp = time))
+                    protein = 0.0, carbs = 0.0, fats = 0.0, timestamp = time))
             }
             val day = NutritionDay.at(now, zone)
             assertEquals(start, day.startMillis); assertEquals(end, day.endExclusiveMillis)

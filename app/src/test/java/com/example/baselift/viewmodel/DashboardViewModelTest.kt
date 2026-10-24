@@ -183,7 +183,7 @@ class DashboardViewModelTest {
 
     private inner class HistorySources(val now: Long) {
         val nutrition = ObservedHistory((0 until 1_095).map {
-            NutritionLogEntity(id = it + 1, calories = 100, protein = 0, carbs = 0, fats = 0, timestamp = now - it * 86_400_000L)
+            NutritionLogEntity(id = it + 1, calories = 100, protein = 0.0, carbs = 0.0, fats = 0.0, timestamp = now - it * 86_400_000L)
         })
         val sessions = ObservedHistory((0 until 200).map {
             WorkoutSessionEntity(id = it + 1, workoutId = if (it % 2 == 0) 1 else 2,
@@ -277,8 +277,8 @@ class DashboardViewModelTest {
         assertEquals(20, october.historicalCalendarData.size)
         assertTrue(october.historicalCalendarData.keys.all { it.startsWith("2026-10-") })
         assertEquals(100, october.historicalCalendarData.getValue("2026-10-20").nutritionCalories)
-        sources.nutritionFlow.value += NutritionLogEntity(id = 2_000, calories = 250, protein = 10,
-            carbs = 20, fats = 5, timestamp = now)
+        sources.nutritionFlow.value += NutritionLogEntity(id = 2_000, calories = 250, protein = 10.0,
+            carbs = 20.0, fats = 5.0, timestamp = now)
         runCurrent()
         assertEquals(350, dashboard.uiState.value.historicalCalendarData.getValue("2026-10-20").nutritionCalories)
         val september = Calendar.getInstance().apply { timeInMillis = now; add(Calendar.MONTH, -1) }.timeInMillis
@@ -304,7 +304,7 @@ class DashboardViewModelTest {
         sources.resetReads()
 
         sources.nutritionFlow.value = sources.nutritionFlow.value + NutritionLogEntity(
-            id = 2_000, calories = 500, protein = 0, carbs = 0, fats = 0, timestamp = sources.now
+            id = 2_000, calories = 500, protein = 0.0, carbs = 0.0, fats = 0.0, timestamp = sources.now
         )
         runCurrent()
         assertEquals(0, sources.sessions.reads)
@@ -450,7 +450,7 @@ class DashboardViewModelTest {
         workoutRepository.startOrGetSession(workoutId)
         ((1..9).toList() + listOf(11, 11)).forEachIndexed { i, day ->
             nutritionRepository.insertNutritionLog(NutritionLogEntity(
-                id = i + 1, calories = 100, protein = 0, carbs = 0, fats = 0, timestamp = october(day)
+                id = i + 1, calories = 100, protein = 0.0, carbs = 0.0, fats = 0.0, timestamp = october(day)
             ))
         }
         val dashboard = DashboardViewModel(workoutRepository, nutritionRepository,
@@ -581,7 +581,7 @@ class DashboardViewModelTest {
         val dashboard = createTrackedViewModel(tracker)
         val timestamp = System.currentTimeMillis()
         nutritionRepository.insertNutritionLog(
-            NutritionLogEntity(calories = 500, protein = 30, carbs = 50, fats = 10, timestamp = timestamp)
+            NutritionLogEntity(calories = 500, protein = 30.0, carbs = 50.0, fats = 10.0, timestamp = timestamp)
         )
         val first = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { dashboard.uiState.collect() }
         runCurrent()
@@ -595,7 +595,7 @@ class DashboardViewModelTest {
         assertEquals(0, tracker.activeCollectors)
 
         nutritionRepository.insertNutritionLog(
-            NutritionLogEntity(calories = 250, protein = 15, carbs = 25, fats = 5, timestamp = timestamp)
+            NutritionLogEntity(calories = 250, protein = 15.0, carbs = 25.0, fats = 5.0, timestamp = timestamp)
         )
         workoutRepository.createWorkout("Offscreen workout", 0)
         dashboard.setRestDays(2)
@@ -623,8 +623,8 @@ class DashboardViewModelTest {
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
         val logs = listOf(
-            NutritionLogEntity(id = 1, calories = 500, protein = 30, carbs = 50, fats = 10, timestamp = timestamp),
-            NutritionLogEntity(id = 2, calories = 250, protein = 15, carbs = 25, fats = 5, timestamp = timestamp)
+            NutritionLogEntity(id = 1, calories = 500, protein = 30.0, carbs = 50.0, fats = 10.0, timestamp = timestamp),
+            NutritionLogEntity(id = 2, calories = 250, protein = 15.0, carbs = 25.0, fats = 5.0, timestamp = timestamp)
         )
         val historyReadThreads = ConcurrentLinkedQueue<Thread>()
         // Observe consumption by the analytics transform, rather than Flow emission.
@@ -651,9 +651,9 @@ class DashboardViewModelTest {
                 val state = backgroundViewModel.uiState.first { !it.isLoading }
                 val summary = state.historicalCalendarData.values.single()
                 assertEquals(750, summary.nutritionCalories)
-                assertEquals(45, summary.nutritionProtein)
-                assertEquals(75, summary.nutritionCarbs)
-                assertEquals(15, summary.nutritionFats)
+                assertEquals(45.0, summary.nutritionProtein!!, 0.000001)
+                assertEquals(75.0, summary.nutritionCarbs!!, 0.000001)
+                assertEquals(15.0, summary.nutritionFats!!, 0.000001)
                 assertTrue(historyReadThreads.isNotEmpty())
                 assertTrue(historyReadThreads.all { it === analyticsThread.get() })
             } finally {
@@ -701,7 +701,7 @@ class DashboardViewModelTest {
         viewModel.setNutritionRestDays(0)
         
         // Log for today
-        nutritionRepository.insertNutritionLog(NutritionLogEntity(name = "A", calories = 100, protein = 10, carbs = 10, fats = 10, timestamp = getTimestampDaysAgo(0)))
+        nutritionRepository.insertNutritionLog(NutritionLogEntity(name = "A", calories = 100, protein = 10.0, carbs = 10.0, fats = 10.0, timestamp = getTimestampDaysAgo(0)))
         
         // If we only have today, streak is 1 (if requiredDays = 7, it counts the current active days)
         runCurrent()
@@ -772,7 +772,7 @@ class DashboardViewModelTest {
         
         val today = System.currentTimeMillis()
         
-        nutritionRepository.insertNutritionLog(NutritionLogEntity(name = "A", calories = 500, protein = 10, carbs = 10, fats = 10, timestamp = today))
+        nutritionRepository.insertNutritionLog(NutritionLogEntity(name = "A", calories = 500, protein = 10.0, carbs = 10.0, fats = 10.0, timestamp = today))
         
         val workoutId = workoutRepository.createWorkout("My Workout", 0)
         val session = workoutRepository.startOrGetSession(workoutId)

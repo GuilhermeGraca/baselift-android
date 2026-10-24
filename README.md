@@ -103,7 +103,7 @@ Visualize weight trends and track physique evolution with a private photo diary.
 </div>
 
 ### Nutrition Tracking
-Effortless logging. Enter whole-number calories and macros per serving or per 100 g, then specify the grams consumed to calculate the daily totals. Save frequent foods as per-100-g meal templates: those ask only for the consumed quantity, while regular templates retain one-tap logging. Targets automatically recalibrate as your body weight changes.
+Effortless logging. Enter whole-number calories and macros with up to two decimal places per serving or per 100 g, then specify the grams consumed (also accepting decimals) to calculate the daily totals. Both comma and dot decimal input are supported. Save frequent foods as per-100-g meal templates: those ask only for the consumed quantity, while regular templates retain one-tap logging. Targets automatically recalibrate as your body weight changes.
 
 <div align="center">
   <table>

@@ -43,9 +43,9 @@ data class WeeklyVolume(
 @Stable
 data class NutritionSummary(
     val calories: Int,
-    val protein: Int,
-    val carbs: Int,
-    val fats: Int
+    val protein: Double,
+    val carbs: Double,
+    val fats: Double
 )
 
 // estado da vista do dashboard

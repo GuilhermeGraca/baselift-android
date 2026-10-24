@@ -32,8 +32,27 @@ class DashboardAnalyticsTest {
         Calendar.getInstance().apply { clear(); set(year, month - 1, day, hour, minute) }.timeInMillis
 
     private fun meal(id: Int, time: Long) = NutritionLogEntity(
-        id = id, calories = 100, protein = 10, carbs = 20, fats = 5, timestamp = time
+        id = id, calories = 100, protein = 10.0, carbs = 20.0, fats = 5.0, timestamp = time
     )
+
+    @Test
+    fun `calendar and weekly nutrition preserve decimal macros`() {
+        val now = timestamp(2026, 10, 14)
+        val logs = listOf(
+            meal(1, now).copy(protein = 0.1, carbs = 2.5, fats = 0.04),
+            meal(2, now).copy(protein = 0.2, carbs = 3.25, fats = 0.01)
+        )
+        val history = DashboardAnalytics { now }.nutritionHistory(logs)
+        val calendar = history.calendar.getValue("2026-10-14")
+        val weekly = history.weeklyDays.getValue(3)
+        assertEquals(200, weekly.calories)
+        assertEquals(0.3, weekly.protein, 0.000001)
+        assertEquals(5.75, weekly.carbs, 0.000001)
+        assertEquals(0.05, weekly.fats, 0.000001)
+        assertEquals(weekly.protein, calendar.nutritionProtein!!, 0.0)
+        assertEquals(weekly.carbs, calendar.nutritionCarbs!!, 0.0)
+        assertEquals(weekly.fats, calendar.nutritionFats!!, 0.0)
+    }
 
     @Test
     fun `both streaks apply the same increasing rest allowance to activity days`() {
@@ -50,7 +69,7 @@ class DashboardAnalyticsTest {
         val expected = listOf(1, 4, 5, 5, 7, 8, 8, 8)
         assertEquals(expected, (0..7).map { analytics.streak(nutrition.calendar.keys, it) })
         assertEquals(expected, (0..7).map { analytics.streak(sessions.calendarWorkoutIds.keys, it) })
-        assertEquals(NutritionSummary(200, 20, 40, 10), nutrition.weeklyDays.getValue(3))
+        assertEquals(NutritionSummary(200, 20.0, 40.0, 10.0), nutrition.weeklyDays.getValue(3))
         assertEquals(3, sessions.weeklySessionCount)
         assertEquals(0, analytics.streak(emptySet(), 7))
     }

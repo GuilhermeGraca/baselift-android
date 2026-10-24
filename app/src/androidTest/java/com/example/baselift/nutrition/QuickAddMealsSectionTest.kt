@@ -28,7 +28,7 @@ class QuickAddMealsSectionTest {
 
     private val meal = MealTemplateEntity(
         id = 1, name = "Test meal", iconName = "restaurant",
-        calories = 600, protein = 40, carbs = 70, fats = 10
+        calories = 600, protein = 40.0, carbs = 70.0, fats = 10.0
     )
 
     private fun confirmDeletion() {

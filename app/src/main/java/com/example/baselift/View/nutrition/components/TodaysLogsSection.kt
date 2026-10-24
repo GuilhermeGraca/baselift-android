@@ -1,5 +1,7 @@
 package com.example.baselift.View.nutrition.components
 
+import com.example.baselift.Model.nutrition.formatNutritionDecimal
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -264,7 +266,7 @@ fun TodaysLogsSection(
 }
 
 @Composable
-fun MacroDotText(value: Int, unit: String, color: Color) {
+fun MacroDotText(value: Double, unit: String, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
@@ -274,7 +276,7 @@ fun MacroDotText(value: Int, unit: String, color: Color) {
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = "${value}g $unit",
+            text = "${formatNutritionDecimal(value)}g $unit",
             color = Color.White,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold

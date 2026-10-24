@@ -1,5 +1,7 @@
 package com.example.baselift.View.dashboard.components
 
+import com.example.baselift.Model.nutrition.formatNutritionDecimal
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -124,17 +126,17 @@ fun ConsistencyJournalSection(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.size(6.dp).clip(androidx.compose.foundation.shape.CircleShape).background(VibrantPurple))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("${nut.protein}g", color = CrystalWhite, fontSize = 10.sp)
+                                Text("${formatNutritionDecimal(nut.protein)}g", color = CrystalWhite, fontSize = 10.sp)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.size(6.dp).clip(androidx.compose.foundation.shape.CircleShape).background(SunYellow))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("${nut.carbs}g", color = CrystalWhite, fontSize = 10.sp)
+                                Text("${formatNutritionDecimal(nut.carbs)}g", color = CrystalWhite, fontSize = 10.sp)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.size(6.dp).clip(androidx.compose.foundation.shape.CircleShape).background(ElectricBlue))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("${nut.fats}g", color = CrystalWhite, fontSize = 10.sp)
+                                Text("${formatNutritionDecimal(nut.fats)}g", color = CrystalWhite, fontSize = 10.sp)
                             }
                         }
                     }
@@ -248,17 +250,17 @@ fun ConsistencyJournalSection(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(com.example.baselift.View.theme.VibrantPurple))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("${marker.nutritionProtein ?: 0}g", color = CrystalWhite, fontSize = 12.sp)
+                            Text("${formatNutritionDecimal(marker.nutritionProtein ?: 0.0)}g", color = CrystalWhite, fontSize = 12.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(com.example.baselift.View.theme.SunYellow))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("${marker.nutritionCarbs ?: 0}g", color = CrystalWhite, fontSize = 12.sp)
+                            Text("${formatNutritionDecimal(marker.nutritionCarbs ?: 0.0)}g", color = CrystalWhite, fontSize = 12.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(ElectricBlue))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("${marker.nutritionFats ?: 0}g", color = CrystalWhite, fontSize = 12.sp)
+                            Text("${formatNutritionDecimal(marker.nutritionFats ?: 0.0)}g", color = CrystalWhite, fontSize = 12.sp)
                         }
                     }
                 }

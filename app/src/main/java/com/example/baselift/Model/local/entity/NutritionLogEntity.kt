@@ -15,8 +15,8 @@ data class NutritionLogEntity(
     val id: Int = 0,
     val name: String? = null, // opcional para quando é apenas calorias ou macros detalhados sem nome
     val calories: Int,
-    val protein: Int,
-    val carbs: Int,
-    val fats: Int,
+    val protein: Double,
+    val carbs: Double,
+    val fats: Double,
     val timestamp: Long // data em que o registo foi inserido
 )

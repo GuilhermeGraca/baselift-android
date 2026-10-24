@@ -50,8 +50,8 @@ class NutritionDaoTest {
     fun insertLog_appearsInTimeRange() = runTest {
         val timestamp = 1000L
         val log = NutritionLogEntity(
-            name = "Almoço", calories = 500, protein = 30,
-            carbs = 50, fats = 15, timestamp = timestamp
+            name = "Almoço", calories = 500, protein = 30.0,
+            carbs = 50.0, fats = 15.0, timestamp = timestamp
         )
 
         nutritionDao.insertNutritionLog(log)
@@ -65,13 +65,13 @@ class NutritionDaoTest {
     @Test
     fun getLogsForTimeRange_excludesOutOfRange() = runTest {
         nutritionDao.insertNutritionLog(
-            NutritionLogEntity(calories = 300, protein = 20, carbs = 30, fats = 10, timestamp = 500L)
+            NutritionLogEntity(calories = 300, protein = 20.0, carbs = 30.0, fats = 10.0, timestamp = 500L)
         )
         nutritionDao.insertNutritionLog(
-            NutritionLogEntity(calories = 600, protein = 40, carbs = 60, fats = 20, timestamp = 1500L)
+            NutritionLogEntity(calories = 600, protein = 40.0, carbs = 60.0, fats = 20.0, timestamp = 1500L)
         )
         nutritionDao.insertNutritionLog(
-            NutritionLogEntity(calories = 400, protein = 25, carbs = 40, fats = 15, timestamp = 2500L)
+            NutritionLogEntity(calories = 400, protein = 25.0, carbs = 40.0, fats = 15.0, timestamp = 2500L)
         )
 
         // filtrar apenas o intervalo 1000-2000
@@ -84,7 +84,7 @@ class NutritionDaoTest {
     @Test
     fun deleteLog_removesSpecificEntry() = runTest {
         val log = NutritionLogEntity(
-            calories = 500, protein = 30, carbs = 50, fats = 15, timestamp = 1000L
+            calories = 500, protein = 30.0, carbs = 50.0, fats = 15.0, timestamp = 1000L
         )
         nutritionDao.insertNutritionLog(log)
 
@@ -98,10 +98,10 @@ class NutritionDaoTest {
     @Test
     fun deleteLogsInTimeRange_onlyDeletesTargetRange() = runTest {
         nutritionDao.insertNutritionLog(
-            NutritionLogEntity(calories = 300, protein = 0, carbs = 0, fats = 0, timestamp = 500L)
+            NutritionLogEntity(calories = 300, protein = 0.0, carbs = 0.0, fats = 0.0, timestamp = 500L)
         )
         nutritionDao.insertNutritionLog(
-            NutritionLogEntity(calories = 600, protein = 0, carbs = 0, fats = 0, timestamp = 1500L)
+            NutritionLogEntity(calories = 600, protein = 0.0, carbs = 0.0, fats = 0.0, timestamp = 1500L)
         )
 
         nutritionDao.deleteLogsInTimeRange(1000L, 2000L)
@@ -116,7 +116,7 @@ class NutritionDaoTest {
         repeat(5) { i ->
             nutritionDao.insertNutritionLog(
                 NutritionLogEntity(
-                    calories = 100 * (i + 1), protein = 10, carbs = 20, fats = 5,
+                    calories = 100 * (i + 1), protein = 10.0, carbs = 20.0, fats = 5.0,
                     timestamp = (i * 1000L)
                 )
             )
@@ -134,7 +134,7 @@ class NutritionDaoTest {
     fun insertMealTemplate_appearsInGetAll() = runTest {
         val template = MealTemplateEntity(
             name = "Batido Proteico", iconName = "shake",
-            calories = 350, protein = 40, carbs = 20, fats = 10
+            calories = 350, protein = 40.0, carbs = 20.0, fats = 10.0
         )
 
         nutritionDao.insertMealTemplate(template)
@@ -142,14 +142,14 @@ class NutritionDaoTest {
 
         assertEquals(1, results.size)
         assertEquals("Batido Proteico", results[0].name)
-        assertEquals(40, results[0].protein)
+        assertEquals(40.0, results[0].protein, 0.000001)
     }
 
     @Test
     fun deleteMealTemplate_removesEntry() = runTest {
         val template = MealTemplateEntity(
             name = "Aveia", iconName = "bowl",
-            calories = 300, protein = 10, carbs = 50, fats = 8
+            calories = 300, protein = 10.0, carbs = 50.0, fats = 8.0
         )
         nutritionDao.insertMealTemplate(template)
 
@@ -168,7 +168,7 @@ class NutritionDaoTest {
     fun clearNutritionLogsTable_removesAllLogs() = runTest {
         repeat(3) {
             nutritionDao.insertNutritionLog(
-                NutritionLogEntity(calories = 100, protein = 0, carbs = 0, fats = 0, timestamp = 1000L)
+                NutritionLogEntity(calories = 100, protein = 0.0, carbs = 0.0, fats = 0.0, timestamp = 1000L)
             )
         }
 
@@ -181,10 +181,10 @@ class NutritionDaoTest {
     @Test
     fun clearMealTemplatesTable_removesAllTemplates() = runTest {
         nutritionDao.insertMealTemplate(
-            MealTemplateEntity(name = "A", iconName = "a", calories = 100, protein = 0, carbs = 0, fats = 0)
+            MealTemplateEntity(name = "A", iconName = "a", calories = 100, protein = 0.0, carbs = 0.0, fats = 0.0)
         )
         nutritionDao.insertMealTemplate(
-            MealTemplateEntity(name = "B", iconName = "b", calories = 200, protein = 0, carbs = 0, fats = 0)
+            MealTemplateEntity(name = "B", iconName = "b", calories = 200, protein = 0.0, carbs = 0.0, fats = 0.0)
         )
 
         nutritionDao.clearMealTemplatesTable()
