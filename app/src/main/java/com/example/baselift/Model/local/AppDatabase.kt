@@ -43,7 +43,7 @@ import com.example.baselift.Model.local.dao.NutritionDao
     ], // lista de entidades que a base de dados vai ter
                    // cada entidade é uma data class anotada com @Entity
 
-    version = 12, // versão 12 identifica templates definidos por 100 g
+    version = 13, // versão 13 preserva macros com casas decimais
 
     exportSchema = true // guardar os esquemas para validar futuras migrações
 )
@@ -107,6 +107,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // SQLite requires rebuilding tables to change the macro columns' affinity to REAL.
+                // IDs, timestamps, manual calories and portion basis retain their original values.
+                database.execSQL("CREATE TABLE nutrition_logs_decimal (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT, `calories` INTEGER NOT NULL, `protein` REAL NOT NULL, `carbs` REAL NOT NULL, `fats` REAL NOT NULL, `timestamp` INTEGER NOT NULL)")
+                database.execSQL("INSERT INTO nutrition_logs_decimal SELECT id, name, calories, CAST(protein AS REAL), CAST(carbs AS REAL), CAST(fats AS REAL), timestamp FROM nutrition_logs")
+                database.execSQL("DROP TABLE nutrition_logs")
+                database.execSQL("ALTER TABLE nutrition_logs_decimal RENAME TO nutrition_logs")
+                database.execSQL("CREATE INDEX index_nutrition_logs_timestamp ON nutrition_logs(timestamp)")
+                database.execSQL("CREATE TABLE meal_templates_decimal (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `iconName` TEXT NOT NULL, `calories` INTEGER NOT NULL, `protein` REAL NOT NULL, `carbs` REAL NOT NULL, `fats` REAL NOT NULL, `isPer100g` INTEGER NOT NULL DEFAULT 0)")
+                database.execSQL("INSERT INTO meal_templates_decimal SELECT id, name, iconName, calories, CAST(protein AS REAL), CAST(carbs AS REAL), CAST(fats AS REAL), isPer100g FROM meal_templates")
+                database.execSQL("DROP TABLE meal_templates")
+                database.execSQL("ALTER TABLE meal_templates_decimal RENAME TO meal_templates")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -117,7 +133,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "baselift_database"
                 )
-                .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance

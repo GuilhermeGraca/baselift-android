@@ -1,37 +1,63 @@
 package com.example.baselift.Model.nutrition
 
+import java.math.BigDecimal
+import java.math.RoundingMode
+
 data class NutritionValues(
     val calories: Int,
-    val protein: Int,
-    val carbs: Int,
-    val fats: Int
-)
+    val protein: Double,
+    val carbs: Double,
+    val fats: Double
+) {
+    fun isValid(): Boolean = calories >= 0 &&
+        listOf(protein, carbs, fats).all(::isValidNutritionDecimal)
 
-/** Converts integer label values to the integer totals stored in a nutrition log. */
+    fun isEmpty(): Boolean = calories == 0 && protein == 0.0 && carbs == 0.0 && fats == 0.0
+}
+
+/** Preview and persistence share one conversion: whole kcal and macros rounded once to 0.01 g. */
 object NutritionPortionCalculator {
-    fun calculate(values: NutritionValues, per100g: Boolean, grams: Int?): NutritionValues? {
-        if (values.calories < 0 || values.protein < 0 || values.carbs < 0 || values.fats < 0) {
-            return null
-        }
-        if (per100g && (grams == null || grams <= 0)) return null
+    fun calculate(values: NutritionValues, per100g: Boolean, grams: Double?): NutritionValues? {
+        if (!values.isValid()) return null
+        if (per100g && (grams == null || !isValidNutritionDecimal(grams) || grams <= 0)) return null
+        val factor = if (per100g) BigDecimal.valueOf(grams!!).movePointLeft(2) else BigDecimal.ONE
 
-        fun scale(value: Int): Int? {
-            if (!per100g) return value
-            // Int × Int fits in Long. Add half the divisor before dividing to round .5 up.
-            val total = (value.toLong() * grams!!.toLong() + 50L) / 100L
-            return total.takeIf { it <= Int.MAX_VALUE }?.toInt()
+        fun scale(value: Double, decimals: Int): BigDecimal? {
+            val total = BigDecimal.valueOf(value).multiply(factor).setScale(decimals, RoundingMode.HALF_UP)
+            return total.takeIf { it <= BigDecimal.valueOf(Int.MAX_VALUE.toLong()) }
         }
 
         val result = NutritionValues(
-            calories = scale(values.calories) ?: return null,
-            protein = scale(values.protein) ?: return null,
-            carbs = scale(values.carbs) ?: return null,
-            fats = scale(values.fats) ?: return null
+            calories = scale(values.calories.toDouble(), 0)?.toInt() ?: return null,
+            protein = scale(values.protein, 2)?.toDouble() ?: return null,
+            carbs = scale(values.carbs, 2)?.toDouble() ?: return null,
+            fats = scale(values.fats, 2)?.toDouble() ?: return null
         )
-        return result.takeIf {
-            it.calories > 0 || it.protein > 0 || it.carbs > 0 || it.fats > 0
-        }
+        return result.takeUnless { it.isEmpty() }
     }
+}
+
+private val decimalInput = Regex("(?:[0-9]+(?:[.,][0-9]{0,2})?|[.,][0-9]{1,2})")
+
+fun isValidNutritionDecimal(value: Double): Boolean = value.isFinite() && value in 0.0..Int.MAX_VALUE.toDouble()
+
+/** Accept either decimal separator, without grouping, signs or exponent notation. Empty means zero. */
+fun parseNutritionDecimal(text: String): Double? = when {
+    text.isEmpty() -> 0.0
+    !decimalInput.matches(text) -> null
+    else -> text.replace(',', '.').toDoubleOrNull()?.takeIf(::isValidNutritionDecimal)
+}
+
+/** Keep whole values compact and hide binary floating point artefacts in sums and +/- edits. */
+fun formatNutritionDecimal(value: Double): String =
+    BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+
+/** Explicit recalculation only; manually entered label calories remain independent of macros. */
+fun caloriesFromMacros(protein: Double, carbs: Double, fats: Double): Int? {
+    if (!listOf(protein, carbs, fats).all(::isValidNutritionDecimal)) return null
+    val total = BigDecimal.valueOf(protein).add(BigDecimal.valueOf(carbs)).multiply(BigDecimal.valueOf(4))
+        .add(BigDecimal.valueOf(fats).multiply(BigDecimal.valueOf(9))).setScale(0, RoundingMode.HALF_UP)
+    return total.takeIf { it <= BigDecimal.valueOf(Int.MAX_VALUE.toLong()) }?.toInt()
 }
 
 /** Empty nutrition fields mean zero; all other input must be an unsigned whole number. */

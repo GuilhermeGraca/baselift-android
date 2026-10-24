@@ -60,14 +60,14 @@ internal class DashboardAnalytics(private val clockMillis: () -> Long) {
                 calendar[ymd] = previous.copy(
                     hasNutrition = true,
                     nutritionCalories = (previous.nutritionCalories ?: 0) + log.calories,
-                    nutritionProtein = (previous.nutritionProtein ?: 0) + log.protein,
-                    nutritionCarbs = (previous.nutritionCarbs ?: 0) + log.carbs,
-                    nutritionFats = (previous.nutritionFats ?: 0) + log.fats
+                    nutritionProtein = (previous.nutritionProtein ?: 0.0) + log.protein,
+                    nutritionCarbs = (previous.nutritionCarbs ?: 0.0) + log.carbs,
+                    nutritionFats = (previous.nutritionFats ?: 0.0) + log.fats
                 )
             }
             if (log.timestamp in weekStart until weekEnd) {
                 val day = dayOfWeek(cal)
-                val current = weeklyDays[day] ?: NutritionSummary(0, 0, 0, 0)
+                val current = weeklyDays[day] ?: NutritionSummary(0, 0.0, 0.0, 0.0)
                 weeklyDays[day] = NutritionSummary(
                     current.calories + log.calories, current.protein + log.protein,
                     current.carbs + log.carbs, current.fats + log.fats

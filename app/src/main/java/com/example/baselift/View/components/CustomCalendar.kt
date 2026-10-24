@@ -40,9 +40,9 @@ data class DayMarkerState(
     val hasNutrition: Boolean = false,
     val workoutNames: List<String> = emptyList(),
     val nutritionCalories: Int? = null,
-    val nutritionProtein: Int? = null,
-    val nutritionCarbs: Int? = null,
-    val nutritionFats: Int? = null
+    val nutritionProtein: Double? = null,
+    val nutritionCarbs: Double? = null,
+    val nutritionFats: Double? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

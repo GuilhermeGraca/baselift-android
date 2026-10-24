@@ -41,9 +41,9 @@ data class NutritionUiState(
     val targetFats: Int = 0,
 
     val consumedCalories: Int = 0,
-    val consumedProtein: Int = 0,
-    val consumedCarbs: Int = 0,
-    val consumedFats: Int = 0,
+    val consumedProtein: Double = 0.0,
+    val consumedCarbs: Double = 0.0,
+    val consumedFats: Double = 0.0,
 
     val todayLogs: List<NutritionLogEntity> = emptyList(),
     val mealTemplates: List<MealTemplateEntity> = emptyList(),
@@ -144,16 +144,16 @@ class NutritionViewModel(
     // adiciona um registo rápido
     fun addQuickLog(
         calories: Int,
-        protein: Int = 0,
-        carbs: Int = 0,
-        fats: Int = 0,
+        protein: Double = 0.0,
+        carbs: Double = 0.0,
+        fats: Double = 0.0,
         isCaloriesOnly: Boolean,
         isPer100g: Boolean = false,
-        grams: Int? = null
+        grams: Double? = null
     ): Long? {
         val totals = NutritionPortionCalculator.calculate(
-            NutritionValues(calories, if (isCaloriesOnly) 0 else protein,
-                if (isCaloriesOnly) 0 else carbs, if (isCaloriesOnly) 0 else fats),
+            NutritionValues(calories, if (isCaloriesOnly) 0.0 else protein,
+                if (isCaloriesOnly) 0.0 else carbs, if (isCaloriesOnly) 0.0 else fats),
             per100g = isPer100g,
             grams = grams
         ) ?: return null
@@ -208,10 +208,9 @@ class NutritionViewModel(
     // adicionar ou atualizar um template
     fun saveMealTemplate(template: MealTemplateEntity): Long? {
         _mealTemplateSave.value.pendingRequestId?.let { return it }
-        if (template.name.isBlank() || listOf(template.calories, template.protein,
-                template.carbs, template.fats).any { it < 0 }) return null
-        if (template.isPer100g && listOf(template.calories, template.protein,
-                template.carbs, template.fats).all { it == 0 }) return null
+        val values = NutritionValues(template.calories, template.protein, template.carbs, template.fats)
+        if (template.name.isBlank() || !values.isValid()) return null
+        if (template.isPer100g && values.isEmpty()) return null
         val requestId = ++nextMealSaveRequestId
         _mealTemplateSave.value = MealWriteState(pendingRequestId = requestId)
         viewModelScope.launch {
@@ -256,7 +255,7 @@ class NutritionViewModel(
     }
 
     // usar um template para registar (Quick Add Meal)
-    fun logMealTemplate(template: MealTemplateEntity, grams: Int? = null): Long? {
+    fun logMealTemplate(template: MealTemplateEntity, grams: Double? = null): Long? {
         if (template.isPer100g) _mealLogSubmission.value.pendingRequestId?.let { return it }
         val totals = if (template.isPer100g) {
             NutritionPortionCalculator.calculate(
@@ -265,7 +264,7 @@ class NutritionViewModel(
             ) ?: return null
         } else {
             NutritionValues(template.calories, template.protein, template.carbs, template.fats)
-                .takeIf { it.calories >= 0 && it.protein >= 0 && it.carbs >= 0 && it.fats >= 0 }
+                .takeIf { it.isValid() }
                 ?: return null
         }
         val acceptedAt = clockMillis()

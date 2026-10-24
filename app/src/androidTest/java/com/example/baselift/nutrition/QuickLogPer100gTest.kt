@@ -30,7 +30,7 @@ class QuickLogPer100gTest {
         val values: NutritionValues,
         val caloriesOnly: Boolean,
         val per100g: Boolean,
-        val grams: Int?
+        val grams: Double?
     )
 
     @Test fun caloriesOnlyScalesAndClearsOnlyAfterConfirmedSave() {
@@ -53,7 +53,7 @@ class QuickLogPer100gTest {
         compose.onNodeWithTag("nutrition_portion_preview").assertTextEquals("TO BE LOGGED: 300 kcal")
         compose.onNodeWithText("+ ADD ENTRY").performClick()
         compose.runOnIdle {
-            assertEquals(listOf(Submission(NutritionValues(200, 0, 0, 0), true, true, 150)), submitted)
+            assertEquals(listOf(Submission(NutritionValues(200, 0.0, 0.0, 0.0), true, true, 150.0)), submitted)
         }
         compose.onNodeWithTag("nutrition_calories_input").assertTextEquals("200")
         compose.onNodeWithText("SAVING…").assertIsNotEnabled()
@@ -65,7 +65,7 @@ class QuickLogPer100gTest {
         compose.onNodeWithTag("nutrition_per_100g_toggle").assertExists()
     }
 
-    @Test fun detailedPreviewRejectsDecimalPasteAndZeroAmount() {
+    @Test fun detailedPreviewAcceptsDecimalMacrosAndQuantityButRejectsInvalidInput() {
         val submitted = mutableListOf<Submission>()
         compose.setContent {
             MaterialTheme {
@@ -78,8 +78,8 @@ class QuickLogPer100gTest {
         compose.onNodeWithText("DETAILED").performClick()
         compose.onNodeWithTag("nutrition_per_100g_toggle").performClick()
         compose.onNodeWithTag("nutrition_calories_input").performTextInput("200")
-        compose.onNodeWithTag("nutrition_protein_input").performTextInput("10")
-        compose.onNodeWithTag("nutrition_carbs_input").performTextInput("20")
+        compose.onNodeWithTag("nutrition_protein_input").performTextInput("10,5")
+        compose.onNodeWithTag("nutrition_carbs_input").performTextInput("20.25")
         compose.onNodeWithTag("nutrition_fats_input").performTextInput("5")
 
         compose.onNodeWithText("+ ADD ENTRY").assertIsNotEnabled()
@@ -88,16 +88,43 @@ class QuickLogPer100gTest {
         compose.onNodeWithTag("nutrition_amount_grams").performTextClearance()
         compose.onNodeWithTag("nutrition_amount_grams").performTextInput("12,5")
         compose.onNodeWithTag("nutrition_amount_grams").assertTextEquals("12,5")
-        compose.onNodeWithText("Enter whole numbers only.").assertExists()
+        compose.onNodeWithTag("nutrition_portion_preview")
+            .assertTextEquals("TO BE LOGGED: 25 kcal · P 1.31 g · C 2.53 g · F 0.63 g")
+        compose.onNodeWithText("+ ADD ENTRY").assertIsEnabled()
+        compose.onNodeWithTag("nutrition_amount_grams").performTextInput("67")
         compose.onNodeWithText("+ ADD ENTRY").assertIsNotEnabled()
 
         compose.onNodeWithTag("nutrition_amount_grams").performTextClearance()
         compose.onNodeWithTag("nutrition_amount_grams").performTextInput("150")
         compose.onNodeWithTag("nutrition_portion_preview")
-            .assertTextEquals("TO BE LOGGED: 300 kcal · P 15 g · C 30 g · F 8 g")
+            .assertTextEquals("TO BE LOGGED: 300 kcal · P 15.75 g · C 30.38 g · F 7.5 g")
         compose.onNodeWithText("+ ADD ENTRY").assertIsEnabled().performClick()
         compose.runOnIdle {
-            assertEquals(listOf(Submission(NutritionValues(200, 10, 20, 5), false, true, 150)), submitted)
+            assertEquals(listOf(Submission(NutritionValues(200, 10.5, 20.25, 5.0), false, true, 150.0)), submitted)
+        }
+    }
+
+    @Test fun servingKeepsDecimalsButCaloriesStillRequireWholeNumbers() {
+        val submitted = mutableListOf<Submission>()
+        compose.setContent {
+            MaterialTheme {
+                QuickLogSection(QuickLogSubmissionState(), { values, caloriesOnly, per100g, grams ->
+                    submitted += Submission(values, caloriesOnly, per100g, grams)
+                    1
+                })
+            }
+        }
+        compose.onNodeWithText("DETAILED").performClick()
+        compose.onNodeWithTag("nutrition_calories_input").performTextInput("95,5")
+        compose.onNodeWithTag("nutrition_protein_input").performTextInput("2,5")
+        compose.onNodeWithTag("nutrition_carbs_input").performTextInput("4.12")
+        compose.onNodeWithTag("nutrition_fats_input").performTextInput("0,04")
+        compose.onNodeWithText("+ ADD ENTRY").assertIsNotEnabled()
+        compose.onNodeWithTag("nutrition_calories_input").performTextClearance()
+        compose.onNodeWithTag("nutrition_calories_input").performTextInput("95")
+        compose.onNodeWithText("+ ADD ENTRY").assertIsEnabled().performClick()
+        compose.runOnIdle {
+            assertEquals(listOf(Submission(NutritionValues(95, 2.5, 4.12, 0.04), false, false, null)), submitted)
         }
     }
 

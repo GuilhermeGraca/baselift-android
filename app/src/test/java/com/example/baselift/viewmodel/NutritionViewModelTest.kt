@@ -118,7 +118,7 @@ class NutritionViewModelTest {
 
     private fun meal(id: Int) = MealTemplateEntity(
         id = id, name = "Meal $id", iconName = "restaurant",
-        calories = 600, protein = 40, carbs = 70, fats = 10
+        calories = 600, protein = 40.0, carbs = 70.0, fats = 10.0
     )
 
     @Test
@@ -144,9 +144,9 @@ class NutritionViewModelTest {
         assertEquals(80, state.targetFats)
         
         assertEquals(0, state.consumedCalories)
-        assertEquals(0, state.consumedProtein)
-        assertEquals(0, state.consumedCarbs)
-        assertEquals(0, state.consumedFats)
+        assertEquals(0.0, state.consumedProtein, 0.000001)
+        assertEquals(0.0, state.consumedCarbs, 0.000001)
+        assertEquals(0.0, state.consumedFats, 0.000001)
         
         assertTrue(state.todayLogs.isEmpty())
         assertTrue(state.mealTemplates.isEmpty())
@@ -157,7 +157,7 @@ class NutritionViewModelTest {
     @Test
     fun `addQuickLog inserts valid log into repository and updates state`() = runTest {
         val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
-        viewModel.addQuickLog(calories = 500, protein = 30, carbs = 50, fats = 20, isCaloriesOnly = false)
+        viewModel.addQuickLog(calories = 500, protein = 30.0, carbs = 50.0, fats = 20.0, isCaloriesOnly = false)
         
         runCurrent()
         
@@ -168,15 +168,15 @@ class NutritionViewModelTest {
         
         val state = viewModel.uiState.value
         assertEquals(500, state.consumedCalories)
-        assertEquals(30, state.consumedProtein)
-        assertEquals(50, state.consumedCarbs)
-        assertEquals(20, state.consumedFats)
+        assertEquals(30.0, state.consumedProtein, 0.000001)
+        assertEquals(50.0, state.consumedCarbs, 0.000001)
+        assertEquals(20.0, state.consumedFats, 0.000001)
         job.cancel()
     }
 
     @Test
     fun `addQuickLog with zero macros does nothing`() = runTest {
-        viewModel.addQuickLog(calories = 0, protein = 0, carbs = 0, fats = 0, isCaloriesOnly = true)
+        viewModel.addQuickLog(calories = 0, protein = 0.0, carbs = 0.0, fats = 0.0, isCaloriesOnly = true)
         
         runCurrent()
         
@@ -186,28 +186,28 @@ class NutritionViewModelTest {
 
     @Test
     fun `quick log scales by consumed grams and ignores hidden macros in calories only mode`() = runTest {
-        val detailedId = viewModel.addQuickLog(200, 10, 20, 5,
-            isCaloriesOnly = false, isPer100g = true, grams = 150)
+        val detailedId = viewModel.addQuickLog(200, 10.0, 20.0, 5.0,
+            isCaloriesOnly = false, isPer100g = true, grams = 150.0)
         runCurrent()
         assertEquals(detailedId, viewModel.quickLogSubmission.value.completedRequestId)
         val detailed = nutritionRepository.getAllNutritionLogs().first().single()
-        assertEquals(listOf(300, 15, 30, 8),
+        assertEquals(listOf(300, 15.0, 30.0, 7.5),
             listOf(detailed.calories, detailed.protein, detailed.carbs, detailed.fats))
 
-        viewModel.addQuickLog(200, 99, 99, 99,
-            isCaloriesOnly = true, isPer100g = true, grams = 125)
+        viewModel.addQuickLog(200, 99.0, 99.0, 99.0,
+            isCaloriesOnly = true, isPer100g = true, grams = 125.0)
         runCurrent()
         val caloriesOnly = nutritionRepository.getAllNutritionLogs().first().single { it.name == "Quick Add" }
-        assertEquals(listOf(250, 0, 0, 0),
+        assertEquals(listOf(250, 0.0, 0.0, 0.0),
             listOf(caloriesOnly.calories, caloriesOnly.protein, caloriesOnly.carbs, caloriesOnly.fats))
     }
 
     @Test
     fun `quick log rejects missing amount, rounded zero and overflow before inserting`() = runTest {
         assertNull(viewModel.addQuickLog(200, isCaloriesOnly = true, isPer100g = true))
-        assertNull(viewModel.addQuickLog(200, isCaloriesOnly = true, isPer100g = true, grams = 0))
-        assertNull(viewModel.addQuickLog(1, isCaloriesOnly = true, isPer100g = true, grams = 1))
-        assertNull(viewModel.addQuickLog(Int.MAX_VALUE, isCaloriesOnly = true, isPer100g = true, grams = 101))
+        assertNull(viewModel.addQuickLog(200, isCaloriesOnly = true, isPer100g = true, grams = 0.0))
+        assertNull(viewModel.addQuickLog(1, isCaloriesOnly = true, isPer100g = true, grams = 1.0))
+        assertNull(viewModel.addQuickLog(Int.MAX_VALUE, isCaloriesOnly = true, isPer100g = true, grams = 101.0))
         runCurrent()
         assertTrue(nutritionRepository.getAllNutritionLogs().first().isEmpty())
         assertNull(viewModel.quickLogSubmission.value.pendingRequestId)
@@ -216,8 +216,8 @@ class NutritionViewModelTest {
     @Test
     fun `quick log reports failure and retries the same values without a phantom entry`() = runTest {
         val controlled = useControlledInsert()
-        val firstRequest = viewModel.addQuickLog(200, 10, 20, 5,
-            isCaloriesOnly = false, isPer100g = true, grams = 150)
+        val firstRequest = viewModel.addQuickLog(200, 10.0, 20.0, 5.0,
+            isCaloriesOnly = false, isPer100g = true, grams = 150.0)
         assertEquals(firstRequest, viewModel.quickLogSubmission.value.pendingRequestId)
         runCurrent()
         assertEquals(1, controlled.startedLogs.size)
@@ -228,8 +228,8 @@ class NutritionViewModelTest {
         assertTrue(nutritionRepository.getAllNutritionLogs().first().isEmpty())
 
         controlled.failure = null
-        val retryRequest = viewModel.addQuickLog(200, 10, 20, 5,
-            isCaloriesOnly = false, isPer100g = true, grams = 150)
+        val retryRequest = viewModel.addQuickLog(200, 10.0, 20.0, 5.0,
+            isCaloriesOnly = false, isPer100g = true, grams = 150.0)
         runCurrent()
         assertEquals(retryRequest, viewModel.quickLogSubmission.value.completedRequestId)
         assertEquals(2, controlled.startedLogs.size)
@@ -244,7 +244,7 @@ class NutritionViewModelTest {
             viewModel.uiState.collect()
         }
         val request = viewModel.addQuickLog(200,
-            isCaloriesOnly = true, isPer100g = true, grams = 150)
+            isCaloriesOnly = true, isPer100g = true, grams = 150.0)
         runCurrent()
         subscription.cancel()
         now = 100_000L
@@ -256,9 +256,50 @@ class NutritionViewModelTest {
     }
 
     @Test
+    fun `decimal quick log and templates preserve fractions in logs and daily totals`() = runTest {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
+        viewModel.addQuickLog(95, 2.5, 4.12, 0.04, isCaloriesOnly = false, isPer100g = true, grams = 12.5)
+        runCurrent()
+        val template = meal(1).copy(calories = 95, protein = 2.5, carbs = 4.12, fats = 0.04, isPer100g = true)
+        viewModel.saveMealTemplate(template)
+        runCurrent()
+        val savedTemplate = nutritionRepository.getAllMealTemplates().first().single()
+        assertEquals(template, savedTemplate)
+        viewModel.logMealTemplate(savedTemplate, 12.5)
+        runCurrent()
+        val state = viewModel.uiState.value
+        assertEquals(2, state.todayLogs.size)
+        assertEquals(24, state.consumedCalories)
+        assertEquals(0.62, state.consumedProtein, 0.000001)
+        assertEquals(1.04, state.consumedCarbs, 0.000001)
+        assertEquals(0.02, state.consumedFats, 0.000001)
+        state.todayLogs.forEach {
+            assertEquals(0.31, it.protein, 0.0)
+            assertEquals(0.52, it.carbs, 0.0)
+            assertEquals(0.01, it.fats, 0.0)
+        }
+        viewModel.logMealTemplate(savedTemplate.copy(isPer100g = false))
+        runCurrent()
+        assertEquals(3.12, viewModel.uiState.value.consumedProtein, 0.000001)
+    }
+
+    @Test
+    fun `non finite macros cannot be saved or logged from templates`() = runTest {
+        for (invalid in listOf(Double.NaN, Double.POSITIVE_INFINITY, -0.01)) {
+            val template = meal(1).copy(protein = invalid)
+            assertNull(viewModel.saveMealTemplate(template))
+            assertNull(viewModel.logMealTemplate(template))
+            assertNull(viewModel.logMealTemplate(template.copy(isPer100g = true), 100.0))
+        }
+        runCurrent()
+        assertTrue(nutritionRepository.getAllMealTemplates().first().isEmpty())
+        assertTrue(nutritionRepository.getAllNutritionLogs().first().isEmpty())
+    }
+
+    @Test
     fun `deleteLog removes log from repository and state`() = runTest {
         val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
-        viewModel.addQuickLog(calories = 500, protein = 30, carbs = 50, fats = 20, isCaloriesOnly = false)
+        viewModel.addQuickLog(calories = 500, protein = 30.0, carbs = 50.0, fats = 20.0, isCaloriesOnly = false)
         runCurrent()
         
         val logToDelete = nutritionRepository.getAllNutritionLogs().first()[0]
@@ -294,9 +335,9 @@ class NutritionViewModelTest {
             name = "Chicken Rice",
             iconName = "Restaurant",
             calories = 600,
-            protein = 40,
-            carbs = 70,
-            fats = 10
+            protein = 40.0,
+            carbs = 70.0,
+            fats = 10.0
         )
         
         viewModel.saveMealTemplate(template)
@@ -319,26 +360,26 @@ class NutritionViewModelTest {
 
     @Test
     fun `per 100 g template needs grams and produces independent proportional logs`() = runTest {
-        val template = meal(1).copy(calories = 200, protein = 10, carbs = 20, fats = 5, isPer100g = true)
+        val template = meal(1).copy(calories = 200, protein = 10.0, carbs = 20.0, fats = 5.0, isPer100g = true)
         val saveRequest = viewModel.saveMealTemplate(template)
         runCurrent()
         assertEquals(saveRequest, viewModel.mealTemplateSave.value.completedRequestId)
         assertNull(viewModel.logMealTemplate(template))
-        assertNull(viewModel.logMealTemplate(template, 0))
-        assertNull(viewModel.logMealTemplate(template, Int.MAX_VALUE))
+        assertNull(viewModel.logMealTemplate(template, 0.0))
+        assertNull(viewModel.logMealTemplate(template, Int.MAX_VALUE.toDouble()))
         runCurrent()
         assertTrue(nutritionRepository.getAllNutritionLogs().first().isEmpty())
 
-        val firstRequest = viewModel.logMealTemplate(template, 50)
+        val firstRequest = viewModel.logMealTemplate(template, 50.0)
         runCurrent()
         assertEquals(firstRequest, viewModel.mealLogSubmission.value.completedRequestId)
-        val secondRequest = viewModel.logMealTemplate(template, 150)
+        val secondRequest = viewModel.logMealTemplate(template, 150.0)
         runCurrent()
         assertEquals(secondRequest, viewModel.mealLogSubmission.value.completedRequestId)
         val logs = nutritionRepository.getAllNutritionLogs().first()
         assertEquals(2, logs.size)
-        assertTrue(logs.any { listOf(it.calories, it.protein, it.carbs, it.fats) == listOf(100, 5, 10, 3) })
-        assertTrue(logs.any { listOf(it.calories, it.protein, it.carbs, it.fats) == listOf(300, 15, 30, 8) })
+        assertTrue(logs.any { listOf(it.calories, it.protein, it.carbs, it.fats) == listOf(100, 5.0, 10.0, 2.5) })
+        assertTrue(logs.any { listOf(it.calories, it.protein, it.carbs, it.fats) == listOf(300, 15.0, 30.0, 7.5) })
         assertEquals(template, nutritionRepository.getAllMealTemplates().first().single())
     }
 
@@ -346,7 +387,7 @@ class NutritionViewModelTest {
     fun `per 100 g meal log failure leaves no entry and retry succeeds`() = runTest {
         val controlled = useControlledInsert()
         val template = meal(1).copy(isPer100g = true)
-        val firstRequest = viewModel.logMealTemplate(template, 150)
+        val firstRequest = viewModel.logMealTemplate(template, 150.0)
         runCurrent()
         assertEquals(1, controlled.startedLogs.size)
         controlled.failure = IllegalStateException("Database unavailable")
@@ -356,7 +397,7 @@ class NutritionViewModelTest {
         assertTrue(nutritionRepository.getAllNutritionLogs().first().isEmpty())
 
         controlled.failure = null
-        val retry = viewModel.logMealTemplate(template, 150)
+        val retry = viewModel.logMealTemplate(template, 150.0)
         runCurrent()
         assertEquals(retry, viewModel.mealLogSubmission.value.completedRequestId)
         assertEquals(2, controlled.startedLogs.size)
@@ -371,9 +412,9 @@ class NutritionViewModelTest {
         val subscription = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect()
         }
-        val request = viewModel.logMealTemplate(template, 150)
+        val request = viewModel.logMealTemplate(template, 150.0)
         runCurrent()
-        assertEquals(request, viewModel.logMealTemplate(template, 150))
+        assertEquals(request, viewModel.logMealTemplate(template, 150.0))
         runCurrent()
         assertEquals(1, controlled.startedLogs.size)
         subscription.cancel()
@@ -388,7 +429,7 @@ class NutritionViewModelTest {
     fun `deleting a per 100 g template leaves its logged totals intact`() = runTest {
         val template = meal(1).copy(isPer100g = true)
         nutritionRepository.insertMealTemplate(template)
-        viewModel.logMealTemplate(template, 150)
+        viewModel.logMealTemplate(template, 150.0)
         runCurrent()
         val log = nutritionRepository.getAllNutritionLogs().first().single()
         viewModel.deleteMealTemplate(template)
@@ -421,7 +462,7 @@ class NutritionViewModelTest {
     @Test
     fun `deleteMealTemplate removes template`() = runTest {
         val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
-        val template = MealTemplateEntity(id = 1, name = "Test", iconName = "Fastfood", calories = 100, protein = 10, carbs = 10, fats = 10)
+        val template = MealTemplateEntity(id = 1, name = "Test", iconName = "Fastfood", calories = 100, protein = 10.0, carbs = 10.0, fats = 10.0)
         viewModel.saveMealTemplate(template)
         runCurrent()
         
@@ -528,7 +569,7 @@ class NutritionViewModelTest {
     fun `deleteAllNutrition clears logs and templates`() = runTest {
         val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
         viewModel.addQuickLog(calories = 100, isCaloriesOnly = true)
-        viewModel.saveMealTemplate(MealTemplateEntity(name = "T", iconName = "Icon", calories = 100, protein = 10, carbs = 10, fats = 10))
+        viewModel.saveMealTemplate(MealTemplateEntity(name = "T", iconName = "Icon", calories = 100, protein = 10.0, carbs = 10.0, fats = 10.0))
         runCurrent()
         
         viewModel.deleteAllNutrition()

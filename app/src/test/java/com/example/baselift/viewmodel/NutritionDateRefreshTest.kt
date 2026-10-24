@@ -32,7 +32,7 @@ class NutritionDateRefreshTest {
     private var activeQueries = 0
     private var templateStarts = 0
     private val days = mutableListOf<NutritionDay>()
-    private val meal = MealTemplateEntity(1, "Lunch", "restaurant", 600, 40, 70, 10)
+    private val meal = MealTemplateEntity(1, "Lunch", "restaurant", 600, 40.0, 70.0, 10.0)
     private fun instant(value: String) = Instant.parse(value).toEpochMilli()
 
     @After fun tearDown() { store.clear() }
@@ -56,7 +56,7 @@ class NutritionDateRefreshTest {
     }
     private fun TestScope.watch() = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
     private suspend fun seed(name: String, time: String, calories: Int) = repository.insertNutritionLog(
-        NutritionLogEntity(name = name, timestamp = instant(time), calories = calories, protein = 10, carbs = 20, fats = 5))
+        NutritionLogEntity(name = name, timestamp = instant(time), calories = calories, protein = 10.0, carbs = 20.0, fats = 5.0))
 
     @Test fun `same day resume events share one query and live writes still publish`() = runTest {
         prepare("2026-10-17T12:00:00Z"); watch(); watch(); runCurrent()
@@ -77,8 +77,8 @@ class NutritionDateRefreshTest {
         assertEquals(2, days.size); assertEquals(1, activeQueries)
         assertEquals(listOf("New"), vm.uiState.value.todayLogs.map { it.name })
         assertEquals(700, vm.uiState.value.consumedCalories)
-        assertEquals(10, vm.uiState.value.consumedProtein); assertEquals(20, vm.uiState.value.consumedCarbs)
-        assertEquals(5, vm.uiState.value.consumedFats); assertEquals(2500, vm.uiState.value.targetCalories)
+        assertEquals(10.0, vm.uiState.value.consumedProtein, 0.000001); assertEquals(20.0, vm.uiState.value.consumedCarbs, 0.000001)
+        assertEquals(5.0, vm.uiState.value.consumedFats, 0.000001); assertEquals(2500, vm.uiState.value.targetCalories)
         assertEquals(listOf(meal), vm.uiState.value.mealTemplates); assertEquals(1, templateStarts)
         vm.refreshDate(); runCurrent(); assertEquals(2, days.size)
     }
@@ -87,8 +87,8 @@ class NutritionDateRefreshTest {
         prepare("2026-10-17T23:59:59Z"); seed("Old", "2026-10-17T12:00:00Z", 100)
         watch(); runCurrent(); advanceTimeBy(1_000); runCurrent()
         assertTrue(vm.uiState.value.todayLogs.isEmpty())
-        assertEquals(0, vm.uiState.value.consumedCalories); assertEquals(0, vm.uiState.value.consumedProtein)
-        assertEquals(0, vm.uiState.value.consumedCarbs); assertEquals(0, vm.uiState.value.consumedFats)
+        assertEquals(0, vm.uiState.value.consumedCalories); assertEquals(0.0, vm.uiState.value.consumedProtein, 0.000001)
+        assertEquals(0.0, vm.uiState.value.consumedCarbs, 0.000001); assertEquals(0.0, vm.uiState.value.consumedFats, 0.000001)
     }
 
     @Test fun `clock correction within the same day reschedules midnight without querying again`() = runTest {
